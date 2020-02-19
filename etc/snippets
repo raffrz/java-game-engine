@@ -1,0 +1,30 @@
+	void gameLoop() {
+		long current = java.lang.System.currentTimeMillis();
+		long previous = current;
+		long nextRender = current;
+		long lag = 0;
+		boolean running = true;
+		while (running) {
+			current = java.lang.System.currentTimeMillis();
+			long elapsed = current - previous;
+			previous = current;
+			lag += elapsed;
+			while (lag >= msPerFrame) {
+				//update systems
+				for (System s: systems) {
+					s.update(elapsed);
+				}
+				//update entities
+				for (GameObject gameObject : entities) {
+					gameObject.update(elapsed);
+				}
+				lag-=msPerFrame;
+			}
+			if (current < nextRender) {
+				continue;
+			}
+			//render
+			renderSystem.update(elapsed);
+			nextRender = current + msPerFrame;
+		}
+	}
