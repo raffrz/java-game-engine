@@ -1,4 +1,4 @@
-package com.farias.rengine;
+package com.farias.rengine.render;
 
 import static org.lwjgl.opengl.GL13.*;
 import static org.lwjgl.opengl.GL11.*;

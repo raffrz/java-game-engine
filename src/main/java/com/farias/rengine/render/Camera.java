@@ -1,4 +1,4 @@
-package com.farias.rengine;
+package com.farias.rengine.render;
 
 import org.joml.Matrix4f;
 import org.joml.Vector3f;
