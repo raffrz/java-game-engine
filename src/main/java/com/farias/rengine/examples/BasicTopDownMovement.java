@@ -1,5 +1,9 @@
 package com.farias.rengine.examples;
 
+import static org.lwjgl.glfw.GLFW.*;
+
+import org.joml.Vector3f;
+
 import com.farias.rengine.Game;
 import com.farias.rengine.GameEngine;
 import com.farias.rengine.GameObject;
@@ -14,27 +18,23 @@ import com.farias.rengine.io.InputSystem;
 import com.farias.rengine.io.Window;
 import com.farias.rengine.render.RenderSystem;
 import com.farias.rengine.render.Renderable;
-import com.farias.rengine.render.Texture;
 
 public class BasicTopDownMovement {
 	
 	public static void main(String[] args) {
-		Window window = new Window(800, 600);
+		Window window = new Window(640, 480);
 		window.setFullscreen(false);
 		long windowId = window.create("Destiny Warriors");
 		
 		//TODO create initialization methods for entities and components and remove this beforeLoop method
-		Game game = new Game(window) {
-			@Override
-			public void beforeLoop() {
-				this.addEntity(new Player());
-				this.addEntity(new NPC());
-			}
-		};
+		Game game = new Game(window);
 		
 		game.addSystem(new RenderSystem(game));
 		game.addSystem(new InputSystem(game, windowId));
 		game.addSystem(new EventSystem(game));
+		
+		game.addEntity(new Player());
+		game.addEntity(new NPC());
 		
 		GameEngine.initGame(game);
 	}
@@ -45,42 +45,169 @@ class GameMap extends GameObject implements Renderable {
 	TileSet tileSet;
 	
 	public GameMap() {
-		this.addComponent(TileSet.load("assets/floor_tileset.gif", 32, 32));
+		//this.addComponent(TileSet.load("assets/floor_tileset.gif", 32, 32));
 	}
+
+	@Override
+	public void onUpdate(long deltaTime) {
+		// TODO Auto-generated method stub
+		
+	}
+}
+
+enum CreatureState {
+	WALKING_UP, WALKING_DOWN, WALKING_LEFT, WALKING_RIGHT, 
+	STANDING_UP, STANDING_DOWN, STANDING_LEFT, STANDING_RIGHT
 }
 
 class Player extends GameObject implements Renderable, Controllable {
 	Transform transform;
-	TileSet tileSet;
-	Sprite sprite;
+	Velocity velocity;
 	Controller controller;
+	Sprite sprWalkingUp;
+	Sprite sprWalkingDown;
+	Sprite sprWalkingLeft;
+	Sprite sprWalkingRight;
+	boolean walkingUp;
+	boolean walkingDown;
+	boolean walkingLeft;
+	boolean walkingRight;
+	boolean standingUp;
+	boolean standingDown = true;
+	boolean standingLeft;
+	boolean standingRight;
 	//Animation animation;
 	//Physics physics;
 	
-	public Player() {
-		this.addComponent(new Sprite(
-				new Texture("resources/character/Character_Right.png"),
-				1,
-				32f, 32f));
-		this.addComponent(new Transform(0, 0));
-		this.addComponent(new Velocity());
-		this.addComponent(new Controller());
+	@Override
+	public void onInit() {
+		this.velocity = new Velocity();
+		this.addComponent("velocity", velocity);
+		
+		transform = new Transform(0, 0);
+		transform.setScale(new Vector3f(32, 32, 1));
+		
+		this.addComponent("transform", transform);
+		
+		sprWalkingUp = new Sprite("resources/character/Character_Up.png", 0, 32f, 32f);
+		sprWalkingDown = new Sprite("resources/character/Character_Down.png", 0, 32f, 32f);
+		sprWalkingLeft = new Sprite("resources/character/Character_Left.png", 0, 32f, 32f);
+		sprWalkingRight = new Sprite("resources/character/Character_Right.png", 0, 32f, 32f);
+		this.addComponent("wakingUpSprite", sprWalkingUp);
+		this.addComponent("wakingDownSprite", sprWalkingDown);
+		this.addComponent("wakingLeftSprite", sprWalkingLeft);
+		this.addComponent("wakingRightSprite", sprWalkingRight);
+		
+		Controller controller = new Controller();
+		controller.addButton(GLFW_KEY_W, "up");
+		controller.addButton(GLFW_KEY_S, "down");
+		controller.addButton(GLFW_KEY_A, "left");
+		controller.addButton(GLFW_KEY_D, "right");
+		this.addComponent("controller", controller);
+		GameEngine.getCamera().setTarget(this);
+	}
+	
+	@Override
+	public void handleEvent(String event) {
+		if (event.equals("up_pressed")) {
+			walkingUp = true;
+			standingUp = false;
+			standingDown = false;
+			standingLeft = false;
+			standingRight = false;
+		}
+		if (event.equals("down_pressed")) {
+			walkingDown = true;
+			standingUp = false;
+			standingDown = false;
+			standingLeft = false;
+			standingRight = false;
+		} 
+		if (event.equals("left_pressed")) {
+			walkingLeft = true;
+			standingUp = false;
+			standingDown = false;
+			standingLeft = false;
+			standingRight = false;
+		}
+		if (event.equals("right_pressed")) {
+			walkingRight = true;
+			standingUp = false;
+			standingDown = false;
+			standingLeft = false;
+			standingRight = false;
+		}
+		if (event.equals("up_released")) {
+			walkingUp = false;
+			standingUp = true;
+		}
+		if (event.equals("down_released")) {
+			walkingDown = false;
+			standingDown = true;
+		}
+		if (event.equals("left_released")) {
+			walkingLeft = false;
+			standingLeft = true;
+		}
+		if (event.equals("right_released")) {
+			walkingRight = false;
+			standingRight = true;
+		}
+	}
+	
+	@Override
+	public void onUpdate(long deltaTime) {
+		sprWalkingUp.hide();
+		sprWalkingDown.hide();
+		sprWalkingLeft.hide();
+		sprWalkingRight.hide();
+		velocity.setVy(0);
+		velocity.setVx(0);
+		if (walkingUp || standingUp) {
+			if (walkingUp)
+				velocity.setVy(1);
+			sprWalkingUp.show();
+		} else if (walkingDown || standingDown) {
+			if (walkingDown)
+				velocity.setVy(-1);
+			sprWalkingDown.show();
+		} else if (walkingLeft || standingLeft) {
+			if (walkingLeft)
+				velocity.setVx(-1);
+			sprWalkingLeft.show();
+		} else if (walkingRight || standingRight) {
+			if (walkingRight)
+				velocity.setVx(1);
+			sprWalkingRight.show();
+		}
 	}
 }
 
 class NPC extends GameObject implements Renderable {
 	Transform transform;
 	TileSet tileSet;
-	Sprite sprite;
+	Sprite walkingUp;
+	Sprite walkingDown;
+	Sprite walkingLeft;
+	Sprite walkingRight;
 	//Animation animation;
 	//Physics physics;
 	
-	public NPC() {
-		this.addComponent(new Transform(10, 10));
-		this.addComponent(new Velocity());
-		Sprite sprite = new Sprite(new Texture("resources/character/Character_Up.png"),
-				1,
-				32f, 32f);
-		this.addComponent(sprite);
+	@Override
+	public void onInit() {
+		this.addComponent("transform", new Transform(1, 1));
+		this.addComponent("velocity", new Velocity());
+		walkingUp = new Sprite("resources/character/Character_Up.png", 0, 32f, 32f);
+		walkingDown = new Sprite("resources/character/Character_Down.png", 0, 32f, 32f);
+		walkingLeft = new Sprite("resources/character/Character_Left.png", 0, 32f, 32f);
+		walkingRight = new Sprite("resources/character/Character_Right.png", 0, 32f, 32f);
+
+		this.addComponent("wakingDownSprite", walkingDown);
+	}
+
+	@Override
+	public void onUpdate(long deltaTime) {
+		// TODO Auto-generated method stub
+		
 	}
 }

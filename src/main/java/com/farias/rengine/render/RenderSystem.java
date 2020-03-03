@@ -4,6 +4,7 @@ import static org.lwjgl.opengl.GL11.*;
 
 import org.lwjgl.opengl.GL;
 
+import com.farias.rengine.Component;
 import com.farias.rengine.Game;
 import com.farias.rengine.GameEngine;
 import com.farias.rengine.GameObject;
@@ -21,6 +22,7 @@ public class RenderSystem extends com.farias.rengine.System {
 	
 	public void init() {
 		camera = new Camera(GameEngine.getWindowWidth(), GameEngine.getWindowHeight());
+		//GameEngine.getGameInstance().addEntity(camera);
 		GL.createCapabilities();
 		glEnable(GL_BLEND);
 		glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
@@ -32,20 +34,26 @@ public class RenderSystem extends com.farias.rengine.System {
 		// clear color
 		glClear(GL_COLOR_BUFFER_BIT);
 		
+		camera.onUpdate(deltaTime);
+		
 		for (GameObject e : game.getEntities()) {
 			if (e instanceof Renderable) {
-				Transform transform = e.getComponent(Transform.class);
-				Sprite sprite = e.getComponent(Sprite.class);
-				//render sprites
-				if (transform != null && sprite != null) {
-					this.render(transform, sprite);
+				Transform transform = (Transform) e.getComponent("transform");
+				if (transform == null) {
+					continue;
+				}
+				for (Component c : e.getComponents()) {
+					//render sprite
+					if (c instanceof Sprite) {
+						int sampler = 0;
+						((Sprite)c).draw(camera, transform, sampler);
+					}
 				}
 			}
 		}
 	}
-	
-	public void render(Transform transform, Sprite sprite) {
-		int sampler = 0;
-		sprite.draw(camera, transform, sampler);
+
+	public Camera getCamera() {
+		return camera;
 	}
 }

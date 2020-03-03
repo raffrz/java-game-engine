@@ -14,18 +14,20 @@ import com.farias.rengine.render.Texture;
 public class Sprite extends Component {
 	Vector2f dimension;
 	private Model model;
+	private String textureName;
 	private Texture texture;
 	private Shader shader;
 	int tile;
 	boolean tileChanged;
 	long passed;
+	private boolean visible;
 	
 	//how can i convert this float values to pixels width and height and vice versa?
 	static float[] vertices = new float[] {
-		-0.5f, 0.5f, 0,   //TOP LEFT      0
-		0.5f, 0.5f, 0,    //TOP RIGHT     1
-		0.5f, -0.5f, 0,   //BOTTOM RIGHT  2
-		-0.5f, -0.5f, 0,  //BOTTOM LEFT   3
+		-1f, 1f, 0,   //TOP LEFT      0
+		1f, 1f, 0,    //TOP RIGHT     1
+		1f, -1f, 0,   //BOTTOM RIGHT  2
+		-1f, -1f, 0,  //BOTTOM LEFT   3
 	};
 	
 	static int[] indices = new int[] {
@@ -33,43 +35,62 @@ public class Sprite extends Component {
 		2,3,0
 	};
 	
+	public Sprite(String textureName, int tile, float width, float height) {
+		this.dimension = new Vector2f(width, height);
+		this.tile = tile;
+		this.textureName = textureName;
+	}
+	
+	@Override
+	public void onInit() {
+		this.texture = new Texture(textureName);
+		this.shader = new Shader("shader");
+		float[] texCoords = createTexCoords(tile);
+		this.model = new Model(vertices, texCoords, indices);
+		this.show();
+	}
+	
 	@Override
 	public void update(long deltaTime) {
 		//TODO Create an Animation component
 		//animate sprites
 		passed += deltaTime;
-		if (passed >= 1000 / 60 * 20) {
-			Velocity v = getGameObject().getComponent(Velocity.class);
-			if (v.getVx() != 0) {
+		if (passed >= 1000 / 60 * 10) {
+			Velocity v = (Velocity) getGameObject().getComponent("velocity");
+			if (v.getVx() != 0 || v.getVy() != 0) {
 				tile++;
-				model.setTexCoords(createTexCoords(tile));
+			} else {
+				tile = 0;
 			}
+			model.setTexCoords(createTexCoords(tile));
 			passed = 0;
 		}
 	}
 	
-	public Sprite(Texture texture, int tile, float width, float height) {
-		this.dimension = new Vector2f(width, height);
-		this.tile = tile;
-		this.shader = new Shader("shader");
-		this.texture = texture;
-		float[] texCoords = createTexCoords(tile);
-		this.model = new Model(vertices, texCoords, indices);
-	}
-
 	public void draw(Camera camera, Transform transform, int sampler) {
+		if (!visible) {
+			return;
+		}
 		shader.bind();
 		texture.bind(sampler);
-		Matrix4f tile_pos = new Matrix4f().translate(new Vector3f(transform.getPosition().x * 2, 
-				transform.getPosition().y * 2, 0));
-		Matrix4f target = new Matrix4f();
-		
-		camera.getProjection().mul(transform.getScale(), target);
-		target.mul(tile_pos);
+//		Matrix4f tile_pos = new Matrix4f().translate(new Vector3f(transform.getPosition().x * 2, 
+//				transform.getPosition().y * 2, 0));
+//		Matrix4f target = new Matrix4f();
+//		
+//		camera.getProjection().scale(transform.getScale(), target);
+//		target.mul(tile_pos);
 		
 		shader.setUniform("sampler", 0);
-		shader.setUniform("projection", target);
+		shader.setUniform("projection", transform.getProjection(camera.getProjection()));
 		model.draw();
+	}
+	
+	public void show() {
+		this.visible = true;
+	}
+	
+	public void hide() {
+		this.visible = false;
 	}
 	
 	private float[] createTexCoords(int tile) {

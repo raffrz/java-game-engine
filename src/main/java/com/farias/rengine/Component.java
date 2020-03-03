@@ -4,7 +4,11 @@ import com.farias.rengine.event.EventHandler;
 
 public abstract class Component implements EventHandler {
 	protected GameObject gameObject;
-	public void init() {
+	void init() {
+		this.onInit();
+	}
+	
+	public void onInit() {
 		
 	}
 	public void update(long deltaTime) {
