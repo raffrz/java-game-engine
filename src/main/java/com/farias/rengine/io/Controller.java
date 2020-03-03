@@ -1,9 +1,6 @@
 package com.farias.rengine.io;
 
-import static org.lwjgl.glfw.GLFW.GLFW_KEY_DOWN;
-import static org.lwjgl.glfw.GLFW.GLFW_KEY_LEFT;
-import static org.lwjgl.glfw.GLFW.GLFW_KEY_RIGHT;
-import static org.lwjgl.glfw.GLFW.GLFW_KEY_UP;
+import static org.lwjgl.glfw.GLFW.*;
 
 import com.farias.rengine.Component;
 import com.farias.rengine.GameEngine;
@@ -13,10 +10,11 @@ public class Controller extends Component {
 	
 	public Controller() {
 		this.buttons = new String[InputSystem.KEY_LAST];
-		this.addButton(GLFW_KEY_UP, "up");
-		this.addButton(GLFW_KEY_DOWN, "down");
-		this.addButton(GLFW_KEY_LEFT, "left");
-		this.addButton(GLFW_KEY_RIGHT, "right");
+	}
+	
+	@Override
+	public void onInit() {
+
 	}
 	
 	@Override

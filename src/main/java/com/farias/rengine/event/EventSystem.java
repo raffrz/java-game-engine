@@ -19,6 +19,7 @@ public class EventSystem extends com.farias.rengine.System {
 			return;
 		}
 		for (GameObject e : super.game.getEntities()) {
+			e.handleEvent(event);
 			for (EventHandler c : e.getComponents()) {
 				c.handleEvent(event);
 			}

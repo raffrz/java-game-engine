@@ -30,15 +30,17 @@ public class Game implements Runnable {
 		this.window = window;
 	}
 	
-	public void beforeLoop() {
-		
-	}
-	
-	public void run() {
+	public void init() {
 		//initialize resources
 		window.bind();
 		renderSystem.init();
-		this.beforeLoop();
+		for (GameObject e : entities) {
+			e.init();
+		}
+	}
+	
+	public void run() {
+		init();
 		
 		//game loop
 		long start = java.lang.System.currentTimeMillis();
@@ -107,5 +109,9 @@ public class Game implements Runnable {
 	
 	public Window getWindow() {
 		return window;
+	}
+
+	public RenderSystem getRenderSystem() {
+		return renderSystem;
 	}
 }

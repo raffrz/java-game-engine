@@ -7,25 +7,23 @@ import org.joml.Vector3f;
 import com.farias.rengine.gfx.Velocity;
 
 public class Transform extends Component {
-	Vector2f position;
+	Vector3f position;
+	Vector3f scale;
 	Vector2f rotation = new Vector2f();
-	Matrix4f scale;
 	
 	public Transform(float x, float y) {
-		this.position = new Vector2f(x / 100, y / 100);
-		this.scale = new Matrix4f()
-				.translate(new Vector3f(0, 0, 0))
-				.scale(128);
+		this.position = new Vector3f();
+		this.scale = new Vector3f(1, 1, 1);
 	}
 	
 	@Override
 	public void update(long deltaTime) {
-		Velocity v = getGameObject().getComponent(Velocity.class);
+		Velocity v = (Velocity) getGameObject().getComponent("velocity");
 		position.x += v.getVx() / 100;
 		position.y += v.getVy() / 100;
 	}
 	
-	public Vector2f getPosition() {
+	public Vector3f getPosition() {
 		return position;
 	}
 	
@@ -33,7 +31,17 @@ public class Transform extends Component {
 		return rotation;
 	}
 	
-	public Matrix4f getScale() {
+	public Vector3f getScale() {
 		return scale;
+	}
+	
+	public void setScale(Vector3f scale) {
+		this.scale = scale;
+	}
+	
+	public Matrix4f getProjection(Matrix4f target) {
+		target.scale(scale);
+		target.translate(position);
+		return target;
 	}
 }
