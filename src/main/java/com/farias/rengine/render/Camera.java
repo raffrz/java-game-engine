@@ -5,16 +5,19 @@ import org.joml.Vector3f;
 
 import com.farias.rengine.GameObject;
 import com.farias.rengine.Transform;
+import com.farias.rengine.gfx.Velocity;
 
 public class Camera extends GameObject {
 	
-	private static final float MAX_DISTANCE = 1.5f;
+	private static final float MAX_LAG = 32f;
 	private Vector3f position;
 	private Matrix4f projection;
 	private GameObject target;
-	int width;
-	int height;
-	float offsetX;
+	private int width;
+	private int height;
+	private long passed;
+	private long passedx;
+	private float lagx;
 	
 	public Camera(int width, int height) {
 		this.width = width;
@@ -27,7 +30,21 @@ public class Camera extends GameObject {
 	
 	@Override
 	public void onUpdate(long deltaTime) {
-		
+		if (target != null) {
+			Velocity velocity = (Velocity) target.getComponent("velocity");
+			if (velocity.getVx() == 0) {
+				passedx = 0;
+				//lagx = 0;
+			} else {
+				passedx += deltaTime;
+				lagx += velocity.getVx() * 0.5f * -1;
+			}
+			if (lagx > MAX_LAG) {
+				lagx = MAX_LAG;
+			} else if (lagx < -MAX_LAG) {
+				lagx = -MAX_LAG;
+			}
+		}
 	}
 	
 	public void setPosition(Vector3f position) {
@@ -54,7 +71,7 @@ public class Camera extends GameObject {
 			Transform transform = (Transform) target.getComponent("transform");
 			float tx = transform.getPosition().x * transform.getScale().x;
 			float ty = transform.getPosition().y * transform.getScale().y;
-			projection = new Matrix4f().setOrtho2D(tx - width/2, tx + width/2,
+			projection = new Matrix4f().setOrtho2D(tx + lagx - width/2, tx + lagx + width/2,
 					ty - height/2.0f, ty + height/2.0f);
 		}
 		result = projection.mul(pos, result);
