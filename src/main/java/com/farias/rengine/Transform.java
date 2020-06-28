@@ -19,8 +19,12 @@ public class Transform extends Component {
 	@Override
 	public void update(long deltaTime) {
 		Velocity v = (Velocity) getGameObject().getComponent("velocity");
-		position.x += v.getVx() / 100;
-		position.y += v.getVy() / 100;
+		position.x += v.getVx() / 30;
+		position.y += v.getVy() / 30;
+	}
+	
+	public void setPosition(Vector3f position) {
+		this.position = position;
 	}
 	
 	public Vector3f getPosition() {

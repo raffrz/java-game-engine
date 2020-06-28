@@ -45,7 +45,7 @@ class GameMap extends GameObject implements Renderable {
 	TileSet tileSet;
 	
 	public GameMap() {
-		//this.addComponent(TileSet.load("assets/floor_tileset.gif", 32, 32));
+		this.addComponent("tileset", TileSet.load("assets/floor_tileset.gif", 32, 32));
 	}
 
 	@Override
@@ -195,7 +195,10 @@ class NPC extends GameObject implements Renderable {
 	
 	@Override
 	public void onInit() {
-		this.addComponent("transform", new Transform(1, 1));
+		transform = new Transform(0, 0);
+		transform.setScale(new Vector3f(32, 32, 1));
+		transform.setPosition(new Vector3f(4, 4, 0));
+		this.addComponent("transform", transform);
 		this.addComponent("velocity", new Velocity());
 		walkingUp = new Sprite("resources/character/Character_Up.png", 0, 32f, 32f);
 		walkingDown = new Sprite("resources/character/Character_Down.png", 0, 32f, 32f);
