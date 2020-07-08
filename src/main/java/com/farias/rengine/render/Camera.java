@@ -9,15 +9,14 @@ import com.farias.rengine.gfx.Velocity;
 
 public class Camera extends GameObject {
 	
-	private static final float MAX_LAG = 32f;
+	private static final float MAX_LAG = 64f;
 	private Vector3f position;
 	private Matrix4f projection;
 	private GameObject target;
 	private int width;
 	private int height;
-	private long passed;
-	private long passedx;
 	private float lagx;
+	private float lagy;
 	
 	public Camera(int width, int height) {
 		this.width = width;
@@ -32,17 +31,31 @@ public class Camera extends GameObject {
 	public void onUpdate(long deltaTime) {
 		if (target != null) {
 			Velocity velocity = (Velocity) target.getComponent("velocity");
-			if (velocity.getVx() == 0) {
-				passedx = 0;
-				//lagx = 0;
-			} else {
-				passedx += deltaTime;
-				lagx += velocity.getVx() * 0.5f * -1;
+			
+			if (velocity.getVx() != 0) {
+				float factor = 0.5f;
+				if ((velocity.getVx() < 0 && lagx < 0) || (velocity.getVx() > 0 && lagx > 0)) {
+					factor = 1f;
+				}
+				lagx += velocity.getVx() * factor * -1;
 			}
 			if (lagx > MAX_LAG) {
 				lagx = MAX_LAG;
 			} else if (lagx < -MAX_LAG) {
 				lagx = -MAX_LAG;
+			}
+			
+			if (velocity.getVy() != 0) {
+				float factor = 0.5f;
+				if ((velocity.getVy() < 0 && lagy < 0) || (velocity.getVy() > 0 && lagy > 0)) {
+					factor = 1f;
+				}
+				lagy += velocity.getVy() * factor * -1;
+			}
+			if (lagy > MAX_LAG) {
+				lagy = MAX_LAG;
+			} else if (lagy < -MAX_LAG) {
+				lagy = -MAX_LAG;
 			}
 		}
 	}
@@ -72,7 +85,7 @@ public class Camera extends GameObject {
 			float tx = transform.getPosition().x * transform.getScale().x;
 			float ty = transform.getPosition().y * transform.getScale().y;
 			projection = new Matrix4f().setOrtho2D(tx + lagx - width/2, tx + lagx + width/2,
-					ty - height/2.0f, ty + height/2.0f);
+					ty + lagy - height/2, ty + lagy + height/2);
 		}
 		result = projection.mul(pos, result);
 		return result;
