@@ -33,6 +33,7 @@ public class BasicTopDownMovement {
 		game.addSystem(new InputSystem(game, windowId));
 		game.addSystem(new EventSystem(game));
 		
+		//game.addEntity(new GameMap());
 		game.addEntity(new Player());
 		game.addEntity(new NPC());
 		
@@ -76,6 +77,7 @@ class Player extends GameObject implements Renderable, Controllable {
 	boolean standingDown = true;
 	boolean standingLeft;
 	boolean standingRight;
+	final float speed = 2.6f;
 	//Animation animation;
 	//Physics physics;
 	
@@ -165,19 +167,19 @@ class Player extends GameObject implements Renderable, Controllable {
 		velocity.setVx(0);
 		if (walkingUp || standingUp) {
 			if (walkingUp)
-				velocity.setVy(1);
+				velocity.setVy(speed);
 			sprWalkingUp.show();
 		} else if (walkingDown || standingDown) {
 			if (walkingDown)
-				velocity.setVy(-1);
+				velocity.setVy(-speed);
 			sprWalkingDown.show();
 		} else if (walkingLeft || standingLeft) {
 			if (walkingLeft)
-				velocity.setVx(-1);
+				velocity.setVx(-speed);
 			sprWalkingLeft.show();
 		} else if (walkingRight || standingRight) {
 			if (walkingRight)
-				velocity.setVx(1);
+				velocity.setVx(speed);
 			sprWalkingRight.show();
 		}
 	}
