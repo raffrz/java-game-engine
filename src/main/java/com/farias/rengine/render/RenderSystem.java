@@ -10,6 +10,7 @@ import com.farias.rengine.GameEngine;
 import com.farias.rengine.GameObject;
 import com.farias.rengine.Transform;
 import com.farias.rengine.gfx.Sprite;
+import com.farias.rengine.gfx.TileMap;
 
 public class RenderSystem extends com.farias.rengine.System {
 	
@@ -36,6 +37,7 @@ public class RenderSystem extends com.farias.rengine.System {
 		
 		camera.onUpdate(deltaTime);
 		
+		//TODO Interface Renderable vai para o componente e criar uma interface visible para o game object 
 		for (GameObject e : game.getEntities()) {
 			if (e instanceof Renderable) {
 				Transform transform = (Transform) e.getComponent("transform");
@@ -47,6 +49,9 @@ public class RenderSystem extends com.farias.rengine.System {
 					if (c instanceof Sprite) {
 						int sampler = 0;
 						((Sprite)c).draw(camera, transform, sampler);
+					} else if (c instanceof TileMap) {
+						int sampler = 0;
+						((TileMap)c).draw(camera, transform, sampler);
 					}
 				}
 			}
