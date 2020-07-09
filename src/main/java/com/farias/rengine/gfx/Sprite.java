@@ -57,6 +57,8 @@ public class Sprite extends Component {
 		passed += deltaTime;
 		if (passed >= 1000 / 60 * 10) {
 			Velocity v = (Velocity) getGameObject().getComponent("velocity");
+			if (v == null)
+				return;
 			if (v.getVx() != 0 || v.getVy() != 0) {
 				tile++;
 			} else {
@@ -82,6 +84,18 @@ public class Sprite extends Component {
 		
 		shader.setUniform("sampler", 0);
 		shader.setUniform("projection", transform.getProjection(camera.getProjection()));
+		model.draw();
+	}
+	
+	public void draw(Matrix4f projection, int sampler) {
+		if (!visible) {
+			return;
+		}
+		shader.bind();
+		texture.bind(sampler);
+		
+		shader.setUniform("sampler", 0);
+		shader.setUniform("projection", projection);
 		model.draw();
 	}
 	

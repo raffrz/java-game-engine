@@ -13,8 +13,13 @@ public class TileSet extends Component {
 		TileSet t = new TileSet();
 		t.height = heigth;
 		t.width = width;
-		t.texture = new Texture(filename);
+		t.path = filename;
 		return t;
+	}
+	
+	@Override
+	public void onInit() {
+		texture = new Texture(path);
 	}
 	
 	public void bindTexture(int sampler) {

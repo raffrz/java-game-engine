@@ -10,6 +10,7 @@ import com.farias.rengine.GameObject;
 import com.farias.rengine.Transform;
 import com.farias.rengine.event.EventSystem;
 import com.farias.rengine.gfx.Sprite;
+import com.farias.rengine.gfx.TileMap;
 import com.farias.rengine.gfx.TileSet;
 import com.farias.rengine.gfx.Velocity;
 import com.farias.rengine.io.Controllable;
@@ -33,7 +34,7 @@ public class BasicTopDownMovement {
 		game.addSystem(new InputSystem(game, windowId));
 		game.addSystem(new EventSystem(game));
 		
-		//game.addEntity(new GameMap());
+		game.addEntity(new GameMap());
 		game.addEntity(new Player());
 		game.addEntity(new NPC());
 		
@@ -43,10 +44,17 @@ public class BasicTopDownMovement {
 }
 
 class GameMap extends GameObject implements Renderable {
-	TileSet tileSet;
 	
 	public GameMap() {
-		this.addComponent("tileset", TileSet.load("assets/floor_tileset.gif", 32, 32));
+	}
+	
+	@Override
+	public void onInit() {
+		this.addComponent("velocity", new Velocity());
+		Transform transform = new Transform(0, 0);
+		transform.setScale(new Vector3f(32, 32, 1));
+		this.addComponent("transform", transform);
+		this.addComponent("tileMap", new TileMap(new Sprite("resources/map/floor_tileset.gif", 0, 32f, 32f), 64, 64, 32f));
 	}
 
 	@Override
