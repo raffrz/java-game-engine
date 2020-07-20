@@ -27,10 +27,6 @@ public class TileMap extends Component {
 		this.show();
 	}
 	
-	@Override
-	public void update(long deltaTime) {
-	}
-	
 	public void draw(Camera camera, Transform transform, int sampler) {
 		if (!visible) {
 			return;
@@ -39,13 +35,12 @@ public class TileMap extends Component {
 		sprite.getTexture().bind(sampler);
 		sprite.getShader().setUniform("sampler", 0);
 		Matrix4f cameraProjection = camera.getProjection();
-		for (int i = 0; i < 64; i++) {
-			for (int j = 0; j < 64; j++) {
+		for (int i = 0; i < height; i++) {
+			for (int j = 0; j < width; j++) {
 				Matrix4f projection = cameraProjection.scale(transform.getScale(), new Matrix4f());
-				projection.translate(new Vector3f(j, i, 0));
+				projection.translate(new Vector3f(j * 2, i * 2, 0));
 				sprite.getShader().setUniform("projection", projection);
 				sprite.getModel().draw();
-				//sprite.draw(projection, sampler);
 			}
 		}
 	}

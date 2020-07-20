@@ -77,9 +77,6 @@ public class Camera extends GameObject {
 	}
 	
 	public Matrix4f getProjection() {
-		Matrix4f result = new Matrix4f();
-		Matrix4f pos = new Matrix4f().setTranslation(position);
-		
 		if (target != null) {
 			Transform transform = (Transform) target.getComponent("transform");
 			float tx = transform.getPosition().x * transform.getScale().x;
@@ -87,7 +84,6 @@ public class Camera extends GameObject {
 			projection = new Matrix4f().setOrtho2D(tx + lagx - width/2, tx + lagx + width/2,
 					ty + lagy - height/2, ty + lagy + height/2);
 		}
-		result = projection.mul(pos, result);
-		return result;
+		return projection.translate(position, new Matrix4f());
 	}
 }

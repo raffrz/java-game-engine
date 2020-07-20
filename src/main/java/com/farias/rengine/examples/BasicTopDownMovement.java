@@ -34,7 +34,7 @@ public class BasicTopDownMovement {
 		game.addSystem(new InputSystem(game, windowId));
 		game.addSystem(new EventSystem(game));
 		
-		game.addEntity(new GameMap());
+		game.addEntity(new World());
 		game.addEntity(new Player());
 		game.addEntity(new NPC());
 		
@@ -43,24 +43,24 @@ public class BasicTopDownMovement {
 	
 }
 
-class GameMap extends GameObject implements Renderable {
+class World extends GameObject implements Renderable {
 	
-	public GameMap() {
+	public World() {
 	}
 	
 	@Override
 	public void onInit() {
 		this.addComponent("velocity", new Velocity());
 		Transform transform = new Transform(0, 0);
-		transform.setScale(new Vector3f(32, 32, 1));
+		transform.setScale(new Vector3f(16, 16, 1));
 		this.addComponent("transform", transform);
-		this.addComponent("tileMap", new TileMap(new Sprite("resources/map/floor_tileset.gif", 0, 32f, 32f), 64, 64, 32f));
+		Sprite stoneFloorSprite = new Sprite("resources/map/floor_tileset.png", 64, 32f, 32f);
+		this.addComponent("tileMap", new TileMap(stoneFloorSprite, 24, 24, 32f));
 	}
 
 	@Override
 	public void onUpdate(long deltaTime) {
 		// TODO Auto-generated method stub
-		
 	}
 }
 
