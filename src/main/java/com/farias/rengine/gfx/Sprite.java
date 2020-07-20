@@ -87,18 +87,6 @@ public class Sprite extends Component {
 		model.draw();
 	}
 	
-	public void draw(Matrix4f projection, int sampler) {
-		if (!visible) {
-			return;
-		}
-		shader.bind();
-		texture.bind(sampler);
-		
-		shader.setUniform("sampler", 0);
-		shader.setUniform("projection", projection);
-		model.draw();
-	}
-	
 	public void show() {
 		this.visible = true;
 	}
@@ -112,11 +100,13 @@ public class Sprite extends Component {
 		float vTiles = texture.getHeight() / dimension.y;
 		float sx = 1 / hTiles;
 		float sy = 1 / vTiles;
+		int tx = (int) (tile % hTiles);
+		int ty = (int) (tile / vTiles);
 		float[] texCoords = new float[] {
-			sx * tile, sy * tile,
-			sx * tile + sx, sy * tile,
-			sx * tile + sx, sy * tile + sy,
-			sx * tile, sy * tile + sy,
+			sx * tx, sy * ty,
+			sx * tx + sx, sy * ty,
+			sx * tx + sx, sy * ty + sy,
+			sx * tx, sy * ty + sy,
 		};
 		return texCoords;
 	}

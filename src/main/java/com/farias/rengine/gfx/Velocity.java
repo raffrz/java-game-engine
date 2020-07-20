@@ -7,11 +7,6 @@ public class Velocity extends Component {
 	float vx;
 	float vy;
 	
-	@Override
-	public void update(long deltaTime) {
-
-	}
-	
 	public float getVx() {
 		return vx;
 	}

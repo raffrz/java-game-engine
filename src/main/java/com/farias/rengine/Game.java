@@ -50,31 +50,31 @@ public class Game implements Runnable {
 			}
 			
 			long current = java.lang.System.currentTimeMillis();
-			long deltaTime = current - start;
+			long elapsed = current - start;
 			start = current;
 			
 
 			//update input
-			inputSystem.update(deltaTime);
+			inputSystem.update(elapsed);
 			
 			//update other systems
 			for (System s: systems) {
-				s.update(deltaTime);
+				s.update(elapsed);
 			}
 			
 			//update entities
 			for (GameObject gameObject : entities) {
-				gameObject.update(deltaTime);
+				gameObject.update(elapsed);
 			}
 			
 			//render
-			renderSystem.update(deltaTime);
+			renderSystem.update(elapsed);
 			window.swapBuffers();
-			try {
+			/*try {
 				Thread.sleep(java.lang.System.currentTimeMillis() - start + msPerFrame);
 			} catch (InterruptedException e) {
 				throw new RuntimeException(e);
-			}
+			}*/
 		}
 		glfwTerminate();
 	}

@@ -1,7 +1,5 @@
 package com.farias.rengine.io;
 
-import static org.lwjgl.glfw.GLFW.*;
-
 import com.farias.rengine.Component;
 import com.farias.rengine.GameEngine;
 
