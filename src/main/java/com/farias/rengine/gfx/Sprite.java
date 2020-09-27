@@ -1,8 +1,6 @@
 package com.farias.rengine.gfx;
 
-import org.joml.Matrix4f;
 import org.joml.Vector2f;
-import org.joml.Vector3f;
 
 import com.farias.rengine.Component;
 import com.farias.rengine.Transform;
@@ -19,7 +17,7 @@ public class Sprite extends Component {
 	private Shader shader;
 	int tile;
 	boolean tileChanged;
-	long passed;
+	float passed;
 	private boolean visible;
 	
 	//how can i convert this float values to pixels width and height and vice versa?
@@ -51,11 +49,11 @@ public class Sprite extends Component {
 	}
 	
 	@Override
-	public void update(long deltaTime) {
+	public void update(float deltaTime) {
 		//TODO Create an Animation component
 		//animate sprites
 		passed += deltaTime;
-		if (passed >= 1000 / 60 * 10) {
+		if (passed >= 1f / 60f * 10) {
 			Velocity v = (Velocity) getGameObject().getComponent("velocity");
 			if (v == null)
 				return;
@@ -75,13 +73,6 @@ public class Sprite extends Component {
 		}
 		shader.bind();
 		texture.bind(sampler);
-//		Matrix4f tile_pos = new Matrix4f().translate(new Vector3f(transform.getPosition().x * 2, 
-//				transform.getPosition().y * 2, 0));
-//		Matrix4f target = new Matrix4f();
-//		
-//		camera.getProjection().scale(transform.getScale(), target);
-//		target.mul(tile_pos);
-		
 		shader.setUniform("sampler", 0);
 		shader.setUniform("projection", transform.getProjection(camera.getProjection()));
 		model.draw();

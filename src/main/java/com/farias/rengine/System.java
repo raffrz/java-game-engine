@@ -7,7 +7,7 @@ public abstract class System {
 		this.game = g;
 	}
 	
-	public void update(long deltaTime) {
+	public void update(float deltaTime) {
 		
 	}
 }

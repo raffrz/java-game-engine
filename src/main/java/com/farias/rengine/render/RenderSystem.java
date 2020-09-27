@@ -6,7 +6,6 @@ import org.lwjgl.opengl.GL;
 
 import com.farias.rengine.Component;
 import com.farias.rengine.Game;
-import com.farias.rengine.GameEngine;
 import com.farias.rengine.GameObject;
 import com.farias.rengine.Transform;
 import com.farias.rengine.gfx.Sprite;
@@ -17,13 +16,12 @@ public class RenderSystem extends com.farias.rengine.System {
 	//TODO Refactor
 	private Camera camera;
 	
-	public RenderSystem(Game game) {
+	public RenderSystem(Game game, Camera camera) {
 		super(game);
+		this.camera = camera;
 	}
 	
 	public void init() {
-		camera = new Camera(GameEngine.getWindowWidth(), GameEngine.getWindowHeight());
-		//GameEngine.getGameInstance().addEntity(camera);
 		GL.createCapabilities();
 		glEnable(GL_BLEND);
 		glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
@@ -56,8 +54,10 @@ public class RenderSystem extends com.farias.rengine.System {
 				}
 			}
 		}
+		
+		//MatrixPool.clear();
 	}
-
+	
 	public Camera getCamera() {
 		return camera;
 	}

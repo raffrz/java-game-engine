@@ -19,14 +19,14 @@ public class Window {
 		glfwMakeContextCurrent(id);		
 	}
 
-	public long create(String title) {
+	public long create() {
 		// init GLFW
 		if (!glfwInit()) {
 			throw new IllegalStateException("Failed to initialize GLFW");
 		}
 		
 		// creating window
-		this.id = glfwCreateWindow(width, height, title,
+		this.id = glfwCreateWindow(width, height, "",
 				fullscreen ? glfwGetPrimaryMonitor() : 0, 0);
 		if (this.id == 0) {
 			throw new IllegalStateException("Failed to create window");
@@ -59,6 +59,12 @@ public class Window {
 	}
 
 	public void swapBuffers() {
+		// ajuda a controlar a taxa de frames por segundo
+		// 0 não limita o fps
+		// 1 mesmo fps que a taxa de atualização do monitor
+		// 2 metade do fps da taxa de atualização do monitor ex: 60hz -> 30fps
+		// deixei 0 para saber o impacto na performance durante o desenvolvimento
+		glfwSwapInterval(0);
 		glfwSwapBuffers(id);
 	}
 	
@@ -68,5 +74,9 @@ public class Window {
 	
 	public int getHeight() {
 		return height;
+	}
+	
+	public void setTitle(String title) {
+		glfwSetWindowTitle(id, title);
 	}
 }

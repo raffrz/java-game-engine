@@ -29,14 +29,14 @@ public abstract class GameObject implements EventHandler {
 	public void handleEvent(String event) {
 	}
 	
-	void update(long deltaTime) {
+	void update(float deltaTime) {
 		this.onUpdate(deltaTime);
 		for (Component c : components.values()) {
 			c.update(deltaTime);
 		}
 	}
 	
-	public abstract void onUpdate(long deltaTime);
+	public abstract void onUpdate(float deltaTime);
 	
 	public <T extends Component> void addComponent(String name, T component) {
 		this.components.put(name, component);
