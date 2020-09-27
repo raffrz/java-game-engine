@@ -17,7 +17,7 @@ public class Transform extends Component {
 	}
 	
 	@Override
-	public void update(long deltaTime) {
+	public void update(float deltaTime) {
 		Velocity v = (Velocity) getGameObject().getComponent("velocity");
 		// Por que precisa da divisão por 32 para ajuster movimento da câmera?
 		position.x += v.getVx() / scale.x;

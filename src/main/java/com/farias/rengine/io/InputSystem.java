@@ -37,7 +37,7 @@ public class InputSystem extends com.farias.rengine.System {
 	}
 	
 	@Override
-	public void update(long deltaTime) {
+	public void update(float deltaTime) {
 		//update input
 		for (int i = KEY_FIRST; i < GLFW_KEY_LAST; i++)
 			keys[i] = isKeyDown(i);

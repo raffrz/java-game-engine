@@ -18,8 +18,7 @@ public class GameEngine {
 			throw new IllegalStateException("Cannot create a more tha one game instance.");
 		}
 		game_instance = game;
-		Thread t = new Thread(game_instance);
-		t.start();
+		game_instance.run();
 	}
 	
 	public static Game getGameInstance() {

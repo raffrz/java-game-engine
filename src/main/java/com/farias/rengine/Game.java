@@ -16,17 +16,20 @@ import com.farias.rengine.render.RenderSystem;
  * @author rafarias
  *
  */
-public class Game implements Runnable {
+public class Game {
+	private String title;
 	private Window window; 
 	long framesPerSec = 60;
 	long msPerFrame = 1000 / framesPerSec;
+	boolean frameLimiter = true;
 	List<GameObject> entities = new ArrayList<>();
 	RenderSystem renderSystem;
 	InputSystem inputSystem;
 	EventSystem eventSystem;
 	List<System> systems = new ArrayList<System>();
 	
-	public Game(Window window) {
+	public Game(String title, Window window) {
+		this.title = title;
 		this.window = window;
 	}
 	
@@ -44,6 +47,10 @@ public class Game implements Runnable {
 		
 		//game loop
 		long start = java.lang.System.currentTimeMillis();
+		long fpsTime = 0;
+		long updateTime = 0;
+		long renderTime = 0;
+		int frameCount = 0;
 		while (!window.shouldClose()) {
 			if (inputSystem.isKeyPressed(GLFW_KEY_ESCAPE)) {
 				break;
@@ -52,29 +59,43 @@ public class Game implements Runnable {
 			long current = java.lang.System.currentTimeMillis();
 			long elapsed = current - start;
 			start = current;
+			fpsTime += elapsed;
+			updateTime += elapsed;
+			renderTime += elapsed;
 			
-
-			//update input
-			inputSystem.update(elapsed);
-			
-			//update other systems
-			for (System s: systems) {
-				s.update(elapsed);
+			//Display FPS
+			if (fpsTime > 1000) {
+				window.setTitle(title + " - FPS: " + frameCount);
+				frameCount = 0;
+				fpsTime = 0;
 			}
 			
-			//update entities
-			for (GameObject gameObject : entities) {
-				gameObject.update(elapsed);
+			//UPDATE GAME
+			if (updateTime > msPerFrame) {
+				float deltaTime = updateTime/1000f;
+				
+				//update input
+				inputSystem.update(deltaTime);
+				
+				//update other systems
+				for (System s: systems) {
+					s.update(deltaTime);
+				}
+				
+				//update entities
+				for (GameObject gameObject : entities) {
+					gameObject.update(deltaTime);
+				}
+				updateTime = 0;
 			}
 			
-			//render
-			renderSystem.update(elapsed);
-			window.swapBuffers();
-			/*try {
-				Thread.sleep(java.lang.System.currentTimeMillis() - start + msPerFrame);
-			} catch (InterruptedException e) {
-				throw new RuntimeException(e);
-			}*/
+			//RENDER GAME
+			if (!frameLimiter || renderTime > msPerFrame) {
+				renderSystem.update(updateTime);
+				window.swapBuffers();
+				frameCount++;
+				renderTime = 0;
+			}
 		}
 		glfwTerminate();
 	}

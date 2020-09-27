@@ -34,12 +34,11 @@ public class TileMap extends Component {
 		sprite.getShader().bind();
 		sprite.getTexture().bind(sampler);
 		sprite.getShader().setUniform("sampler", 0);
-		Matrix4f cameraProjection = camera.getProjection();
+		Matrix4f projection = transform.getProjection(camera.getProjection());
 		for (int i = 0; i < height; i++) {
 			for (int j = 0; j < width; j++) {
-				Matrix4f projection = cameraProjection.scale(transform.getScale(), new Matrix4f());
-				projection.translate(new Vector3f(j * 2, i * 2, 0));
-				sprite.getShader().setUniform("projection", projection);
+				sprite.getShader().setUniform("projection", 
+						projection.translate(new Vector3f(j * 2, i * 2, 0), new Matrix4f()));
 				sprite.getModel().draw();
 			}
 		}

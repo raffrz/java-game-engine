@@ -16,7 +16,7 @@ public class Controller extends Component {
 	}
 	
 	@Override
-	public void update(long deltaTime) {
+	public void update(float deltaTime) {
 		for (int i = 0; i < buttons.length; i++) {
 			String button = buttons[i];
 			if (GameEngine.getInput().isKeyPressed(i)) {

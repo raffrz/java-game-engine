@@ -11,7 +11,7 @@ public abstract class Component implements EventHandler {
 	public void onInit() {
 		
 	}
-	public void update(long deltaTime) {
+	public void update(float deltaTime) {
 		
 	}
 	@Override

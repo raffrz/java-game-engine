@@ -22,15 +22,18 @@ import com.farias.rengine.render.Renderable;
 
 public class BasicTopDownMovement {
 	
+	static int width = 1024;
+	static int height = 768;
+	
 	public static void main(String[] args) {
-		Window window = new Window(640, 480);
+		Window window = new Window(width, height);
 		window.setFullscreen(false);
-		long windowId = window.create("Destiny Warriors");
+		long windowId = window.create();
 		
 		//TODO create initialization methods for entities and components and remove this beforeLoop method
-		Game game = new Game(window);
+		Game game = new Game("Destiny Warriors", window);
 		
-		game.addSystem(new RenderSystem(game));
+		game.addSystem(new RenderSystem(game, new TopDownCamera2D(640, 480, 64f)));
 		game.addSystem(new InputSystem(game, windowId));
 		game.addSystem(new EventSystem(game));
 		
@@ -52,14 +55,14 @@ class World extends GameObject implements Renderable {
 	public void onInit() {
 		this.addComponent("velocity", new Velocity());
 		Transform transform = new Transform(0, 0);
-		transform.setScale(new Vector3f(16, 16, 1));
+		transform.setScale(new Vector3f(32, 32, 1));
 		this.addComponent("transform", transform);
 		Sprite stoneFloorSprite = new Sprite("resources/map/floor_tileset.png", 64, 32f, 32f);
-		this.addComponent("tileMap", new TileMap(stoneFloorSprite, 24, 24, 32f));
+		this.addComponent("tileMap", new TileMap(stoneFloorSprite, 32, 32, 32f));
 	}
 
 	@Override
-	public void onUpdate(long deltaTime) {
+	public void onUpdate(float deltaTime) {
 		// TODO Auto-generated method stub
 	}
 }
@@ -81,8 +84,8 @@ class Player extends GameObject implements Renderable, Controllable {
 	boolean walkingDown;
 	boolean walkingLeft;
 	boolean walkingRight;
-	boolean standingUp;
-	boolean standingDown = true;
+	boolean standingUp = true;
+	boolean standingDown;
 	boolean standingLeft;
 	boolean standingRight;
 	final float speed = 2.6f;
@@ -95,7 +98,7 @@ class Player extends GameObject implements Renderable, Controllable {
 		this.addComponent("velocity", velocity);
 		
 		transform = new Transform(0, 0);
-		transform.setScale(new Vector3f(32, 32, 1));
+		transform.setScale(new Vector3f(64, 64, 1));
 		
 		this.addComponent("transform", transform);
 		
@@ -114,7 +117,7 @@ class Player extends GameObject implements Renderable, Controllable {
 		controller.addButton(GLFW_KEY_A, "left");
 		controller.addButton(GLFW_KEY_D, "right");
 		this.addComponent("controller", controller);
-		GameEngine.getCamera().setTarget(this);
+		((TopDownCamera2D) GameEngine.getCamera()).setTarget(this);
 	}
 	
 	@Override
@@ -166,7 +169,7 @@ class Player extends GameObject implements Renderable, Controllable {
 	}
 	
 	@Override
-	public void onUpdate(long deltaTime) {
+	public void onUpdate(float deltaTime) {
 		sprWalkingUp.hide();
 		sprWalkingDown.hide();
 		sprWalkingLeft.hide();
@@ -206,7 +209,7 @@ class NPC extends GameObject implements Renderable {
 	@Override
 	public void onInit() {
 		transform = new Transform(0, 0);
-		transform.setScale(new Vector3f(32, 32, 1));
+		transform.setScale(new Vector3f(64, 64, 1));
 		transform.setPosition(new Vector3f(4, 4, 0));
 		this.addComponent("transform", transform);
 		this.addComponent("velocity", new Velocity());
@@ -219,7 +222,7 @@ class NPC extends GameObject implements Renderable {
 	}
 
 	@Override
-	public void onUpdate(long deltaTime) {
+	public void onUpdate(float deltaTime) {
 		// TODO Auto-generated method stub
 		
 	}
