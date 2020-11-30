@@ -19,9 +19,11 @@ public class Transform extends Component {
 	@Override
 	public void update(float deltaTime) {
 		Velocity v = (Velocity) getGameObject().getComponent("velocity");
-		// Por que precisa da divisão por 32 para ajuster movimento da câmera?
-		position.x += v.getVx() / scale.x;
-		position.y += v.getVy() / scale.y;
+		if (v != null) {
+			// Por que precisa da divisão por 32 para ajuster movimento da câmera?
+			position.x += v.getVx() / scale.x;
+			position.y += v.getVy() / scale.y;
+		}
 	}
 	
 	public void setPosition(Vector3f position) {

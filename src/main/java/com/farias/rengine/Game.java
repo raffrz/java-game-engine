@@ -7,6 +7,8 @@ import java.util.ArrayList;
 import java.util.List;
 
 import com.farias.rengine.event.EventSystem;
+import com.farias.rengine.examples.BasicTopDownMovement;
+import com.farias.rengine.examples.TopDownCamera2D;
 import com.farias.rengine.io.InputSystem;
 import com.farias.rengine.io.Window;
 import com.farias.rengine.render.RenderSystem;
@@ -16,12 +18,12 @@ import com.farias.rengine.render.RenderSystem;
  * @author rafarias
  *
  */
-public class Game {
+public abstract class Game {
 	private String title;
 	private Window window; 
 	long framesPerSec = 60;
 	long msPerFrame = 1000 / framesPerSec;
-	boolean frameLimiter = true;
+	boolean frameLimiter = false;
 	List<GameObject> entities = new ArrayList<>();
 	RenderSystem renderSystem;
 	InputSystem inputSystem;
@@ -33,10 +35,20 @@ public class Game {
 		this.window = window;
 	}
 	
+	public Game(String title, int windowWidth, int windowHeight) {
+		this.title = title;
+		this.window = new Window(windowWidth, windowHeight);
+		window.setFullscreen(false);
+		long windowId = window.create();
+		this.addSystem(new RenderSystem(this, new TopDownCamera2D(windowWidth, windowHeight, 0.0f)));
+		this.addSystem(new InputSystem(this, windowId));
+	}
+	
 	public void init() {
 		//initialize resources
 		window.bind();
 		renderSystem.init();
+		this.onUserCreate();
 		for (GameObject e : entities) {
 			e.init();
 		}
@@ -82,6 +94,8 @@ public class Game {
 					s.update(deltaTime);
 				}
 				
+				this.onUserUpdate(deltaTime);
+				
 				//update entities
 				for (GameObject gameObject : entities) {
 					gameObject.update(deltaTime);
@@ -100,8 +114,13 @@ public class Game {
 		glfwTerminate();
 	}
 	
+	public abstract void onUserCreate();
+	
+	public abstract void onUserUpdate(float deltaTime);
+	
 	public void addEntity(GameObject entity) {
 		this.entities.add(entity);
+		entity.init();
 	}
 
 	public void addSystem(System system) {

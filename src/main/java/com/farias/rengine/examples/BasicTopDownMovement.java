@@ -20,10 +20,20 @@ import com.farias.rengine.io.Window;
 import com.farias.rengine.render.RenderSystem;
 import com.farias.rengine.render.Renderable;
 
-public class BasicTopDownMovement {
+public class BasicTopDownMovement extends Game {
 	
-	static int width = 1024;
-	static int height = 768;
+	Player player;
+	
+	World world;
+	
+	static InputSystem input;
+	
+	public BasicTopDownMovement(Window window) {
+		super("Destiny Warriors", window);
+	}
+
+	static int width = 640;
+	static int height = 480;
 	
 	public static void main(String[] args) {
 		Window window = new Window(width, height);
@@ -31,17 +41,32 @@ public class BasicTopDownMovement {
 		long windowId = window.create();
 		
 		//TODO create initialization methods for entities and components and remove this beforeLoop method
-		Game game = new Game("Destiny Warriors", window);
-		
-		game.addSystem(new RenderSystem(game, new TopDownCamera2D(640, 480, 64f)));
-		game.addSystem(new InputSystem(game, windowId));
+		Game game = new BasicTopDownMovement(window);
+		game.addSystem(new RenderSystem(game, new TopDownCamera2D(width, height, 64f)));
+		input = new InputSystem(game, windowId);
+		game.addSystem(input);
 		game.addSystem(new EventSystem(game));
-		
-		game.addEntity(new World());
-		game.addEntity(new Player());
-		game.addEntity(new NPC());
-		
+
 		GameEngine.initGame(game);
+		
+		
+	}
+	
+	@Override
+	public void onUserCreate() {
+		world = new World();
+		player = new Player();
+		
+		this.addEntity(new World());
+		this.addEntity(new NPC((float) (Math.random() * 20), (float) (Math.random() * 20)));
+		this.addEntity(new Player());
+	}
+
+	@Override
+	public void onUserUpdate(float deltaTime) {
+		if (input.isKeyPressed(GLFW_KEY_SPACE)) {
+			this.addEntity(new NPC((float) (Math.random() * 20.0f), (float) (Math.random() * 20.0f)));
+		}
 	}
 	
 }
@@ -55,9 +80,9 @@ class World extends GameObject implements Renderable {
 	public void onInit() {
 		this.addComponent("velocity", new Velocity());
 		Transform transform = new Transform(0, 0);
-		transform.setScale(new Vector3f(32, 32, 1));
+		transform.setScale(new Vector3f(16, 16, 1));
 		this.addComponent("transform", transform);
-		Sprite stoneFloorSprite = new Sprite("resources/map/floor_tileset.png", 64, 32f, 32f);
+		Sprite stoneFloorSprite = new Sprite("resources/map/floor_tileset.png", 61, 32f, 32f);
 		this.addComponent("tileMap", new TileMap(stoneFloorSprite, 32, 32, 32f));
 	}
 
@@ -88,7 +113,7 @@ class Player extends GameObject implements Renderable, Controllable {
 	boolean standingDown;
 	boolean standingLeft;
 	boolean standingRight;
-	final float speed = 2.6f;
+	final float speed = 1.3f;
 	//Animation animation;
 	//Physics physics;
 	
@@ -98,7 +123,7 @@ class Player extends GameObject implements Renderable, Controllable {
 		this.addComponent("velocity", velocity);
 		
 		transform = new Transform(0, 0);
-		transform.setScale(new Vector3f(64, 64, 1));
+		transform.setScale(new Vector3f(32, 32, 1));
 		
 		this.addComponent("transform", transform);
 		
@@ -197,6 +222,7 @@ class Player extends GameObject implements Renderable, Controllable {
 }
 
 class NPC extends GameObject implements Renderable {
+	Vector3f spawnPosition;
 	Transform transform;
 	TileSet tileSet;
 	Sprite walkingUp;
@@ -206,11 +232,15 @@ class NPC extends GameObject implements Renderable {
 	//Animation animation;
 	//Physics physics;
 	
+	public NPC(float x, float y) {
+		spawnPosition = new Vector3f(x, y, 0);
+	}
+	
 	@Override
 	public void onInit() {
 		transform = new Transform(0, 0);
-		transform.setScale(new Vector3f(64, 64, 1));
-		transform.setPosition(new Vector3f(4, 4, 0));
+		transform.setScale(new Vector3f(32, 32, 1));
+		transform.setPosition(spawnPosition);
 		this.addComponent("transform", transform);
 		this.addComponent("velocity", new Velocity());
 		walkingUp = new Sprite("resources/character/Character_Up.png", 0, 32f, 32f);
