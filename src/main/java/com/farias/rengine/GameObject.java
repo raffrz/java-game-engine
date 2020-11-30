@@ -36,7 +36,7 @@ public abstract class GameObject implements EventHandler {
 		}
 	}
 	
-	public abstract void onUpdate(float deltaTime);
+	public void onUpdate(float deltaTime) {}
 	
 	public <T extends Component> void addComponent(String name, T component) {
 		this.components.put(name, component);
