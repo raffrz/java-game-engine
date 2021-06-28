@@ -3,7 +3,7 @@ package com.farias.rengine.animation;
 import java.util.List;
 import java.util.Map;
 
-import com.farias.rengine.Component;
+import com.farias.rengine.ecs.Component;
 import com.farias.rengine.GameEngine;
 
 public class Animation extends Component {

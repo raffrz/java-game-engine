@@ -1,28 +1,26 @@
 package com.farias.rengine.examples;
 
-import org.joml.Matrix4f;
+import com.farias.rengine.ecs.GameObject;
+import com.farias.rengine.ecs.Transform;
+import com.farias.rengine.ecs.render.Camera;
 
-import com.farias.rengine.GameObject;
-import com.farias.rengine.Transform;
-import com.farias.rengine.gfx.Velocity;
-import com.farias.rengine.render.Camera;
-import com.farias.rengine.render.MatrixPool;
+import org.joml.Matrix4f;
 
 public class TopDownCamera2D extends Camera {
 	
 	private GameObject target;
-	private float maxLag;
+	// private float maxLag;
 	private float lagx;
 	private float lagy;
-	private static final Matrix4f EMPTY_MATRIX = new Matrix4f();
-	private Matrix4f matrixBuffer = new Matrix4f();
 	
 	public TopDownCamera2D(int width, int height, float lag) {
 		super(width, height);
-		this.maxLag = lag;
+		// this.maxLag = lag;
 		//usint Matrix4f.ortho2D creates two matrices and multiply then
 		//using Matrix4f.setOrtho2D only creates one matrix
-		projection = new Matrix4f().setOrtho2D(-width/2, width/2, -height/2, height/2);
+		projection = new Matrix4f()
+//				.setOrtho2D(-width/2, width/2, -height/2, height/2);
+				.setOrtho(-width/2, width/2, -height/2, height/2, -width, width);
 	}
 	
 	@Override
@@ -61,14 +59,16 @@ public class TopDownCamera2D extends Camera {
 			
 			final float tx = transform.getPosition().x * transform.getScale().x;
 			final float ty = transform.getPosition().y * transform.getScale().y; 
-			projection.setOrtho2D(tx + lagx - width/2, tx + lagx + width/2,
-					ty + lagy - height/2, ty + lagy + height/2);
+			projection.setOrtho(tx + lagx - width/2, tx + lagx + width/2,
+					ty + lagy - height/2, ty + lagy + height/2, -width, width);
 		}
 	}
 	
 	@Override
 	public Matrix4f getProjection() {
-		return projection.translate(position, MatrixPool.getInstance());
+		return projection.translate(position, new Matrix4f());
+//				.rotateX((float) Math.toRadians(-45f))
+//				.rotateZ((float) Math.toRadians(-30f));
 	}
 	
 	public GameObject getTarget() {
