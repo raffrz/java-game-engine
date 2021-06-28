@@ -1,8 +1,7 @@
 package com.farias.rengine;
 
-import com.farias.rengine.event.EventSystem;
+import com.farias.rengine.ecs.event.EventSystem;
 import com.farias.rengine.io.InputSystem;
-import com.farias.rengine.render.Camera;
 
 /**
  * Manages a game instance and provides useful methods
@@ -35,10 +34,6 @@ public class GameEngine {
 	public static EventSystem getEventSystem() {
 		return getGameInstance().getEventSystem();
 	}
-	
-	public static Camera getCamera() {
-		return getGameInstance().getRenderSystem().getCamera();
-	}	
 
 	public static int getWindowWidth() {
 		return getGameInstance().getWindow().getWidth();

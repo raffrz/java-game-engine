@@ -6,12 +6,10 @@ import static org.lwjgl.glfw.GLFW.glfwTerminate;
 import java.util.ArrayList;
 import java.util.List;
 
-import com.farias.rengine.event.EventSystem;
-import com.farias.rengine.examples.BasicTopDownMovement;
-import com.farias.rengine.examples.TopDownCamera2D;
+import com.farias.rengine.ecs.event.EventSystem;
+import com.farias.rengine.render.RenderSystem;
 import com.farias.rengine.io.InputSystem;
 import com.farias.rengine.io.Window;
-import com.farias.rengine.render.RenderSystem;
 
 /**
  * The representation of game state
@@ -24,7 +22,6 @@ public abstract class Game {
 	long framesPerSec = 60;
 	long msPerFrame = 1000 / framesPerSec;
 	boolean frameLimiter = false;
-	List<GameObject> entities = new ArrayList<>();
 	RenderSystem renderSystem;
 	InputSystem inputSystem;
 	EventSystem eventSystem;
@@ -35,23 +32,11 @@ public abstract class Game {
 		this.window = window;
 	}
 	
-	public Game(String title, int windowWidth, int windowHeight) {
-		this.title = title;
-		this.window = new Window(windowWidth, windowHeight);
-		window.setFullscreen(false);
-		long windowId = window.create();
-		this.addSystem(new RenderSystem(this, new TopDownCamera2D(windowWidth, windowHeight, 0.0f)));
-		this.addSystem(new InputSystem(this, windowId));
-	}
-	
 	public void init() {
 		//initialize resources
 		window.bind();
 		renderSystem.init();
 		this.onUserCreate();
-		for (GameObject e : entities) {
-			e.init();
-		}
 	}
 	
 	public void run() {
@@ -82,30 +67,23 @@ public abstract class Game {
 				fpsTime = 0;
 			}
 			
-			//UPDATE GAME
+			float deltaTime = updateTime/1000f;
+			//update game state
 			if (updateTime > msPerFrame) {
-				float deltaTime = updateTime/1000f;
-				
-				//update input
-				inputSystem.update(deltaTime);
-				
+				//update input system
+				inputSystem.update(deltaTime);	
 				//update other systems
 				for (System s: systems) {
 					s.update(deltaTime);
 				}
-				
+				//update game 
 				this.onUserUpdate(deltaTime);
-				
-				//update entities
-				for (GameObject gameObject : entities) {
-					gameObject.update(deltaTime);
-				}
 				updateTime = 0;
 			}
-			
-			//RENDER GAME
+			//render game
 			if (!frameLimiter || renderTime > msPerFrame) {
-				renderSystem.update(updateTime);
+				renderSystem.update(deltaTime);
+				this.onGfxUpdate(deltaTime);
 				window.swapBuffers();
 				frameCount++;
 				renderTime = 0;
@@ -117,11 +95,6 @@ public abstract class Game {
 	public abstract void onUserCreate();
 	
 	public abstract void onUserUpdate(float deltaTime);
-	
-	public void addEntity(GameObject entity) {
-		this.entities.add(entity);
-		entity.init();
-	}
 
 	public void addSystem(System system) {
 		if (system instanceof RenderSystem) {
@@ -134,9 +107,9 @@ public abstract class Game {
 			this.systems.add(system);
 		}
 	}
-	
-	public List<GameObject> getEntities() {
-		return entities;
+
+	public void onGfxUpdate(float deltaTime) {
+
 	}
 	
 	public InputSystem getInputSystem() {

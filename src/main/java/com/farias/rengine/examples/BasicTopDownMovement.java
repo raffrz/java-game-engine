@@ -4,29 +4,28 @@ import static org.lwjgl.glfw.GLFW.*;
 
 import org.joml.Vector3f;
 
-import com.farias.rengine.Game;
 import com.farias.rengine.GameEngine;
-import com.farias.rengine.GameObject;
-import com.farias.rengine.Transform;
-import com.farias.rengine.event.EventSystem;
-import com.farias.rengine.gfx.Sprite;
-import com.farias.rengine.gfx.TileMap;
-import com.farias.rengine.gfx.TileSet;
-import com.farias.rengine.gfx.Velocity;
-import com.farias.rengine.io.Controllable;
-import com.farias.rengine.io.Controller;
+import com.farias.rengine.ecs.GameObject;
+import com.farias.rengine.ecs.Transform;
+import com.farias.rengine.ecs.Velocity;
+import com.farias.rengine.ecs.event.EventSystem;
+import com.farias.rengine.ecs.gfx.Sprite;
+import com.farias.rengine.ecs.gfx.TileMap;
+import com.farias.rengine.ecs.gfx.TileSet;
+import com.farias.rengine.ecs.input.Controller;
+import com.farias.rengine.ecs.render.Camera;
+import com.farias.rengine.ecs.render.RenderSystemECS;
+import com.farias.rengine.ecs.ECSGame;
 import com.farias.rengine.io.InputSystem;
 import com.farias.rengine.io.Window;
-import com.farias.rengine.render.RenderSystem;
 import com.farias.rengine.render.Renderable;
 
-public class BasicTopDownMovement extends Game {
-	
-	Player player;
-	
-	World world;
+public class BasicTopDownMovement extends ECSGame {
 	
 	static InputSystem input;
+	Player player;
+	World world;
+	static TopDownCamera2D camera;
 	
 	public BasicTopDownMovement(Window window) {
 		super("Destiny Warriors", window);
@@ -40,31 +39,31 @@ public class BasicTopDownMovement extends Game {
 		window.setFullscreen(false);
 		long windowId = window.create();
 		
-		//TODO create initialization methods for entities and components and remove this beforeLoop method
-		Game game = new BasicTopDownMovement(window);
-		game.addSystem(new RenderSystem(game, new TopDownCamera2D(width, height, 64f)));
+		ECSGame game = new BasicTopDownMovement(window);
+		camera = new TopDownCamera2D(width, height, 64f);
+		game.addSystem(new RenderSystemECS(game, camera));
 		input = new InputSystem(game, windowId);
 		game.addSystem(input);
 		game.addSystem(new EventSystem(game));
 
 		GameEngine.initGame(game);
-		
-		
 	}
 	
 	@Override
 	public void onUserCreate() {
+		super.onUserCreate();
 		world = new World();
-		player = new Player();
+		player = new Player(camera);
 		
 		this.addEntity(new World());
 		this.addEntity(new NPC((float) (Math.random() * 20), (float) (Math.random() * 20)));
-		this.addEntity(new Player());
+		this.addEntity(player);
 	}
 
 	@Override
 	public void onUserUpdate(float deltaTime) {
-		if (input.isKeyPressed(GLFW_KEY_SPACE)) {
+		super.onUserUpdate(deltaTime);
+		if (input.isKeyDown(GLFW_KEY_SPACE)) {
 			this.addEntity(new NPC((float) (Math.random() * 20.0f), (float) (Math.random() * 20.0f)));
 		}
 	}
@@ -78,9 +77,11 @@ class World extends GameObject implements Renderable {
 	
 	@Override
 	public void onInit() {
+		System.out.println("creating world");
 		this.addComponent("velocity", new Velocity());
 		Transform transform = new Transform(0, 0);
 		transform.setScale(new Vector3f(16, 16, 1));
+//		transform.setRotation(new Vector3f((float) Math.toRadians(-45f), (float) Math.toRadians(0), (float) Math.toRadians(-30f)));
 		this.addComponent("transform", transform);
 		Sprite stoneFloorSprite = new Sprite("resources/map/floor_tileset.png", 61, 32f, 32f);
 		this.addComponent("tileMap", new TileMap(stoneFloorSprite, 32, 32, 32f));
@@ -97,7 +98,8 @@ enum CreatureState {
 	STANDING_UP, STANDING_DOWN, STANDING_LEFT, STANDING_RIGHT
 }
 
-class Player extends GameObject implements Renderable, Controllable {
+class Player extends GameObject implements Renderable {
+	Camera camera;
 	Transform transform;
 	Velocity velocity;
 	Controller controller;
@@ -116,9 +118,14 @@ class Player extends GameObject implements Renderable, Controllable {
 	final float speed = 1.3f;
 	//Animation animation;
 	//Physics physics;
+
+	Player(Camera camera) {
+		this.camera = camera;
+	}
 	
 	@Override
 	public void onInit() {
+		System.out.println("creating player");
 		this.velocity = new Velocity();
 		this.addComponent("velocity", velocity);
 		
@@ -142,7 +149,7 @@ class Player extends GameObject implements Renderable, Controllable {
 		controller.addButton(GLFW_KEY_A, "left");
 		controller.addButton(GLFW_KEY_D, "right");
 		this.addComponent("controller", controller);
-		((TopDownCamera2D) GameEngine.getCamera()).setTarget(this);
+		((TopDownCamera2D) camera).setTarget(this);
 	}
 	
 	@Override
@@ -225,13 +232,15 @@ class NPC extends GameObject implements Renderable {
 	Vector3f spawnPosition;
 	Transform transform;
 	TileSet tileSet;
-	Sprite walkingUp;
-	Sprite walkingDown;
-	Sprite walkingLeft;
-	Sprite walkingRight;
+	//Criar uma f�brica de sprites ou de resources tratar da questao de otimizacao de disco
+	static final Sprite walkingUp = new Sprite("resources/character/Character_Up.png", 0, 32f, 32f);
+	static final Sprite walkingDown = new Sprite("resources/character/Character_Down.png", 0, 32f, 32f);
+	static final Sprite walkingLeft = new Sprite("resources/character/Character_Left.png", 0, 32f, 32f);
+	static final Sprite walkingRight = new Sprite("resources/character/Character_Right.png", 0, 32f, 32f);
+	
 	//Animation animation;
 	//Physics physics;
-	
+		
 	public NPC(float x, float y) {
 		spawnPosition = new Vector3f(x, y, 0);
 	}
@@ -243,10 +252,6 @@ class NPC extends GameObject implements Renderable {
 		transform.setPosition(spawnPosition);
 		this.addComponent("transform", transform);
 		this.addComponent("velocity", new Velocity());
-		walkingUp = new Sprite("resources/character/Character_Up.png", 0, 32f, 32f);
-		walkingDown = new Sprite("resources/character/Character_Down.png", 0, 32f, 32f);
-		walkingLeft = new Sprite("resources/character/Character_Left.png", 0, 32f, 32f);
-		walkingRight = new Sprite("resources/character/Character_Right.png", 0, 32f, 32f);
 
 		this.addComponent("wakingDownSprite", walkingDown);
 	}
