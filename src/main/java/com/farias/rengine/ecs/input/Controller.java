@@ -23,14 +23,12 @@ public class Controller extends Component {
 			if (GameEngine.getInput().isKeyPressed(i)) {
 				String keyPressEvent = button + "_pressed";
 				if (GameEngine.getEventSystem().isRegistered(keyPressEvent)) {
-					System.out.println(keyPressEvent);
 					GameEngine.getEventSystem().triggerEvent(keyPressEvent);
 				}
 			}
 			if (GameEngine.getInput().isKeyReleased(i)) {
 				String keyReleasedEvent = button + "_released";
 				if (GameEngine.getEventSystem().isRegistered(keyReleasedEvent)) {
-					System.out.println(keyReleasedEvent);
 					GameEngine.getEventSystem().triggerEvent(keyReleasedEvent);
 				}
 			}
