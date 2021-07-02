@@ -19,6 +19,8 @@ public class Model {
 	
 	// index id
 	private int i_id;
+
+	FloatBuffer tex_coords;
 	
 	public Model(float[] vertices, float[] tex_coords, int[] indices) {
 		draw_count = indices.length;
@@ -29,7 +31,8 @@ public class Model {
 		
 		t_id = glGenBuffers();
 		glBindBuffer(GL_ARRAY_BUFFER, t_id);
-		glBufferData(GL_ARRAY_BUFFER, createBuffer(tex_coords), GL_STATIC_DRAW);
+		this.tex_coords = createBuffer(tex_coords);
+		glBufferData(GL_ARRAY_BUFFER, this.tex_coords, GL_STATIC_DRAW);
 		
 		i_id = glGenBuffers();
 		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, i_id);
@@ -65,9 +68,11 @@ public class Model {
 	}
 	
 	public void setTexCoords(float[] tex_coords) {
-		t_id = glGenBuffers();
+		this.tex_coords.clear();
+		this.tex_coords.put(tex_coords);
+		this.tex_coords.flip();
 		glBindBuffer(GL_ARRAY_BUFFER, t_id);
-		glBufferData(GL_ARRAY_BUFFER, createBuffer(tex_coords), GL_STATIC_DRAW);
+		glBufferData(GL_ARRAY_BUFFER, this.tex_coords, GL_STATIC_DRAW);
 		glBindBuffer(GL_ARRAY_BUFFER, 0);
 	}
 	
