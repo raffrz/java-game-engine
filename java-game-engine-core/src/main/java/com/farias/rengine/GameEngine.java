@@ -264,12 +264,12 @@ public class GameEngine {
     // TEXTURES
 	// TODO Rever função com image 256 x 64 e tile 32 x 32
     private static float[] createTexCoords(Texture t, int tile, float width, float height) {
-		float hTiles = t.getWidth() / width;
-		float vTiles = t.getHeight() / height;
-		float sx = 1 / hTiles;
-		float sy = 1 / vTiles;
-		int tx = (int) (tile % hTiles);
-		int ty = (int) (tile / vTiles);
+		float hTiles = t.getWidth() / width; //15
+		float vTiles = t.getHeight() / height; //6
+		float sx = 1 / hTiles; // 1/15 = 0,666666
+		float sy = 1 / vTiles; // 1/6 = 0,166666
+		int tx = (int) (tile % hTiles); // 89 % 15 = 14 
+		int ty = (int) (tile / hTiles); // 89 / 15 = 5
 		float[] texCoords = new float[] {
 			sx * tx, sy * ty,
 			sx * tx + sx, sy * ty,
