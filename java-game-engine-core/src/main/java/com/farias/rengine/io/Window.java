@@ -58,14 +58,17 @@ public class Window {
 		return glfwWindowShouldClose(id);
 	}
 
-	public void swapBuffers() {
+	public void swapBuffers(boolean limitFPS) {
 		// ajuda a controlar a taxa de frames por segundo
-		// 0 não limita o fps
-		// 1 mesmo fps que a taxa de atualização do monitor
-		// 2 metade do fps da taxa de atualização do monitor ex: 60hz -> 30fps
+		// 0 nï¿½o limita o fps
+		// 1 mesmo fps que a taxa de atualizaï¿½ï¿½o do monitor
+		// 2 metade do fps da taxa de atualizaï¿½ï¿½o do monitor ex: 60hz -> 30fps
 		// deixei 0 para saber o impacto na performance durante o desenvolvimento
-		glfwSwapInterval(0);
+		glfwSwapInterval(limitFPS ? 1 : 0);
 		glfwSwapBuffers(id);
+	}
+	public void swapBuffers() {
+		swapBuffers(false);
 	}
 	
 	public int getWidth() {
