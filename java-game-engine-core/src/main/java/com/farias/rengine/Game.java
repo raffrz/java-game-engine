@@ -31,6 +31,12 @@ public abstract class Game {
 		this.title = title;
 		this.window = window;
 	}
+
+	public Game(String title, Window window, boolean limitFPS) {
+		this.frameLimiter = limitFPS;
+		this.title = title;
+		this.window = window;
+	}
 	
 	public void init() {
 		//initialize resources
@@ -81,13 +87,11 @@ public abstract class Game {
 				updateTime = 0;
 			}
 			//render game
-			if (!frameLimiter || renderTime > msPerFrame) {
-				renderSystem.update(deltaTime);
-				this.onGfxUpdate(deltaTime);
-				window.swapBuffers();
-				frameCount++;
-				renderTime = 0;
-			}
+			renderSystem.update(deltaTime);
+			this.onGfxUpdate(deltaTime);
+			window.swapBuffers(frameLimiter);
+			frameCount++;
+			renderTime = 0;
 		}
 		glfwTerminate();
 	}
