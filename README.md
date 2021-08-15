@@ -12,4 +12,4 @@ An OpenGL game engine made in Java using LWJGL library.
 
 ## Trivia
 This engine is still in development.
-At the momment I'm creating a simple spacehip game to figure out what features should be implemented next.
+At the momment I'm creating a simple spaceship game to figure out what features should be implemented next.
