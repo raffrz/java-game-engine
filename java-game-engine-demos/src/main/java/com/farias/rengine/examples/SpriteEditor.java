@@ -80,9 +80,10 @@ public class SpriteEditor extends Game {
         }
 
         if (getInputSystem().isKeyPressed(GLFW_KEY_F1)) {
-            System.out.println(hover_x);
-            System.out.println(hover_y);
-            System.out.println(selected);
+            System.out.println("hoverx=" + hover_x);
+            System.out.println("hovery=" + hover_y);
+            System.out.println("selected=" + selected);
+            System.out.println("color=" + color);
         }
 
         if (getInputSystem().isKeyPressed(GLFW_KEY_S)) {
@@ -103,12 +104,12 @@ public class SpriteEditor extends Game {
             int color = draw[i];
             int x = 8 * (i % 8) + 32;
             int y = - 8 * (i / 8) - 16;
-            drawSprite(pallete, color, 32, 16, x, y, 8, 8);
+            drawSprite(pallete, color, 32, 32, x, y, 8, 8);
         }
         //color bar
         drawSprite(pallete, 0, 256, 64, 32, -88, 64, 16);
         //hover
-        drawSprite(pallete, color, 32, 16, hover_x, hover_y, 8, 8);
+        drawSprite(pallete, color, 32, 32, hover_x, hover_y, 8, 8);
         // info message
         drawText(message, 64, -112, 4, 4);
     }
@@ -117,10 +118,10 @@ public class SpriteEditor extends Game {
     void save() {
         System.out.println("salvando sprite no arquivo my_sprite.png");
         if(saveImage(encodeImage())) {
-            message = "Salvo com sucesso!";
-            System.out.println("sucesso!");
+            message = "Salvo com sucesso! :)";
         } else {
-            System.out.println("falha ao salvar a imagem :(");
+            message = "falha ao salvar a imagem :(";
+            System.err.println("falha ao salvar a imagem :(");
         }
     }
 
