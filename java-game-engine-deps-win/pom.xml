@@ -4,7 +4,7 @@
 	<modelVersion>4.0.0</modelVersion>
 	<groupId>com.farias.rengine</groupId>
 	<artifactId>java-game-engine-deps-windows</artifactId>
-	<version>1.0.0</version>
+	<version>1.0.1-SNAPSHOT</version>
 	<packaging>jar</packaging>
 	<properties>
 		<lwjgl.version>3.2.3</lwjgl.version>
