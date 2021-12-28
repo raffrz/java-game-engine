@@ -4,13 +4,13 @@
 	<modelVersion>4.0.0</modelVersion>
 	<groupId>com.farias.rengine</groupId>
 	<artifactId>java-game-engine-demos</artifactId>
-	<version>1.0.0</version>
+	<version>1.0.1-SNAPSHOT</version>
 
 	<dependencies>
 		<dependency>
 			<groupId>com.farias.rengine</groupId>
 			<artifactId>java-game-engine-core</artifactId>
-			<version>1.0.0</version>
+			<version>1.0.1-SNAPSHOT</version>
 		</dependency>
 		<dependency>
 			<groupId>com.farias.rengine</groupId>
