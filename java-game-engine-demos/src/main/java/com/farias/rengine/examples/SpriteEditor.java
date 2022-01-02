@@ -31,18 +31,11 @@ public class SpriteEditor extends Game {
 
     // 16 colors
     static int[] colors = new int[] {
-        0x000000, 0x0743ac,
-        0x3d7ef0, 0xcc3030,
-        0xf4abab, 0xd08a8a,
-        0x898989, 0x6c0be6,
-        0xffffff, 0x3a8216,
-        0x73bb4f, 0x744531,
-        0x592d1b, 0xf1c71a,
-        0xe6970b, 0x411350
+        0x000000, 0x0743ac, 0x3d7ef0, 0xcc3030, 0xf4abab, 0xd08a8a, 0x898989, 0x6c0be6,
+        0xffffff, 0x3a8216, 0x73bb4f, 0x744531, 0x592d1b, 0xf1c71a, 0xe6970b, 0x411350
     };
 
     Sprite pallete;
-    Sprite gui;
     Sprite fonts;
     int hover_x = 0;
     int hover_y = -32;
@@ -57,7 +50,6 @@ public class SpriteEditor extends Game {
     @Override
     public void onUserCreate() {
         orthographicMode(128, 128);
-        gui = createSprite("resources/gui/sprite_editor.png", 0, 8, 8);
         pallete = createSprite("resources/palletes/default.png", 0, 256, 64);
     }
 
