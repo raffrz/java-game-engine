@@ -124,7 +124,7 @@ class Snake {
     Tile tile = Tile.HEAD_RIGHT;
     int color = 9;
     float time = 0;
-    static final float update_time = 0.25f;
+    static final float update_time = 0.10f;
     List<Body> body = new ArrayList<>();
 
     enum Tile {

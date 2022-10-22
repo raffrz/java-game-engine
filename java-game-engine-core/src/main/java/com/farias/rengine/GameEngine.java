@@ -11,6 +11,7 @@ import com.farias.rengine.io.InputSystem;
 import com.farias.rengine.render.Model;
 import com.farias.rengine.render.Shader;
 import com.farias.rengine.render.Texture;
+import com.farias.rengine.render.TexturedModel;
 
 import org.joml.Matrix4f;
 import org.joml.Vector3f;
@@ -65,32 +66,41 @@ public class GameEngine {
 
 		public Camera() {
 		}
+
+		public Matrix4f getViewMatrix() {
+			return new Matrix4f().identity()
+				.rotate((float) Math.toRadians(this.rotation.x), new Vector3f(1, 0, 0))
+				.rotate((float) Math.toRadians(this.rotation.y), new Vector3f(0, 1, 0))
+				.translate(-this.position.x, -this.position.y, -this.position.z);
+		}
 	}
 
 	private static final Camera camera = new Camera();
 
+	public static void setCamera(int x, int y, int z) {
+		camera.position.x = x;
+		camera.position.y = y;
+		camera.position.z = z;
+	}
+
 	public static void setCamera(int x, int y) {
 		camera.position.x = x;
 		camera.position.y = y;
-		setViewMatrix();
 	}
 
 	public static void rotateCamera(float x, float y) {
 		camera.rotation.x = x;
 		camera.rotation.y = y;
-		setViewMatrix();
 	}
 
 	public static void setCameraZoom(float zoom) {
-		camera.scale.set(zoom, zoom, 1);
-		setViewMatrix();
+		camera.scale.x = zoom;
+		camera.scale.y = zoom;
 	}
 
 	// PROJECTIONS
 
 	private static final Matrix4f projection_matrix = new Matrix4f();
-	private static final Matrix4f view_matrix = new Matrix4f();
-	private static final Matrix4f model_view_matrix = new Matrix4f();
 
 	/**
 	 * Sets the current projection to a simple orthographic projection. Works well
@@ -112,26 +122,28 @@ public class GameEngine {
 		// e final da tela em (width/2, -height/2)
 		// projection_matrix.setOrtho(-width/2, width/2, -height/2, height/2, -width,
 		// width);
-
-		setViewMatrix();
 	}
 
-	private static Matrix4f setViewMatrix() {
-		return view_matrix.identity()
-			.rotate((float) Math.toRadians(camera.rotation.x), new Vector3f(1, 0, 0))
-			.rotate((float) Math.toRadians(camera.rotation.y), new Vector3f(0, 1, 0))
-			.translate(-camera.position.x, -camera.position.y, -camera.position.z);
+	private static final int FOV = 70;
+    private static final float Z_FAR = 1000f;
+    private static final float Z_NEAR = 1.0f;
+
+	public static void perspectiveMode(int width, int height) {
+		float aspectRatio = (float)width / (float)height;
+        projection_matrix.setPerspective(FOV, aspectRatio, Z_NEAR, Z_FAR);
 	}
 
 	private static Matrix4f getModelViewMatrix(Vector3f position, Vector3f rotation, Vector3f scale) {
-		model_view_matrix.identity()
-			.translate(position)
-			.rotateX((float) Math.toRadians(-rotation.x))
-			.rotateY((float) Math.toRadians(-rotation.y))
-			.rotateZ((float) Math.toRadians(-rotation.z))
-			.scale(scale);
-		Matrix4f viewCurr = new Matrix4f(view_matrix);
-		return viewCurr.mul(model_view_matrix);
+		Matrix4f modelMatrix = getModelMatrix(position, rotation, scale);
+		return camera.getViewMatrix().mul(modelMatrix, new Matrix4f());
+	}
+
+	private static Matrix4f getModelMatrix(Vector3f position, Vector3f rotation, Vector3f scale) {
+		Matrix4f translationMatrix = new Matrix4f().translation(position);
+		Matrix4f rotationMatrix = new Matrix4f().rotationXYZ((float) Math.toRadians(-rotation.x), (float) Math.toRadians(-rotation.y), (float) Math.toRadians(-rotation.z));
+		Matrix4f scalingMatrix = new Matrix4f().scale(scale);
+
+		return translationMatrix.mul(scalingMatrix.mul(rotationMatrix));
 	}
 
 	// SPRITES
@@ -181,7 +193,7 @@ public class GameEngine {
 		Matrix4f modelViewMatrix = getModelViewMatrix(new Vector3f(x + width / 2, y - height / 2, 0),
 				new Vector3f(0, 0, rotation), new Vector3f(width / 2, height / 2, 1));
 
-		Matrix4f projection = projection_matrix.mul(modelViewMatrix, model_view_matrix);
+		Matrix4f projection = projection_matrix.mul(modelViewMatrix, new Matrix4f());
 
 		drawSprite(sprite, projection);
 	}
@@ -269,7 +281,7 @@ public class GameEngine {
 						new Vector3f(x + width * col + width / 2, y + height * -row - height / 2, 0),
 						new Vector3f(0, 0, 0), new Vector3f(width / 2, -height / 2, 1));
 
-				Matrix4f projection = projection_matrix.mul(modelViewMatrix, model_view_matrix);
+				Matrix4f projection = projection_matrix.mul(modelViewMatrix, new Matrix4f());
 				map.shader.setUniform("projection", projection);
 				map.model.draw();
 			}
@@ -291,5 +303,14 @@ public class GameEngine {
 			sx * tx, sy * ty + sy 
 		};
 		return texCoords;
+	}
+
+	//3D
+	public static void drawTexturedModel(TexturedModel texturedModel) {
+		Matrix4f modelMatrix = texturedModel.getModelMatrix();
+		Matrix4f modelViewMatrix = camera.getViewMatrix().mul(modelMatrix, new Matrix4f());
+        Matrix4f projection = projection_matrix.mul(modelViewMatrix, new Matrix4f());
+
+		texturedModel.draw(projection);
 	}
 }
