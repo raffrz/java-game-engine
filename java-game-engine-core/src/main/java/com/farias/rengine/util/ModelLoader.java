@@ -1,9 +1,7 @@
-package com.farias.rengine.examples;
+package com.farias.rengine.util;
 
-import static java.lang.Float.parseFloat;
 import static java.lang.Integer.parseInt;
-import static com.farias.rengine.GameEngine.*;
-import static org.lwjgl.glfw.GLFW.*;
+import static java.lang.Float.parseFloat;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileNotFoundException;
@@ -14,105 +12,11 @@ import java.util.List;
 import org.joml.Vector2f;
 import org.joml.Vector3f;
 
-import com.farias.rengine.Game;
-import com.farias.rengine.GameEngine;
-import com.farias.rengine.io.InputSystem;
-import com.farias.rengine.io.Window;
-import com.farias.rengine.render.RenderSystem;
 import com.farias.rengine.render.TexturedModel;
 
-public class ModelViewer extends Game {
-    
-    private static final int WINDOW_WIDTH = 1280;
-    private static final int WINDOW_HEIGTH = 960;
-    private static final int FONT_SIZE = 20;
+public class ModelLoader {
 
-    public static void main(String[] args) {
-        Window window = new Window(WINDOW_WIDTH, WINDOW_HEIGTH);
-        long windowId = window.create();
-        ModelViewer game = new ModelViewer(window);
-        game.addSystem(new InputSystem(game, windowId));
-        game.addSystem(new RenderSystem(game));
-        GameEngine.initGame(game);
-    }
-
-    TexturedModel earth;
-    TexturedModel clouds;
-    private int cam_x = 0;
-    private int cam_y = 0;
-    private int cam_z = -5;
-    private static final float camera_speed = 2.8f;
-    private static final float rotationSpeed = 16f;
-
-    public ModelViewer(Window window) {
-        super("Model Viewer", window);
-    }
-
-    @Override
-    public void onUserCreate() {
-        perspectiveMode(WINDOW_WIDTH, WINDOW_HEIGTH);
-        setCamera(0, 0, -5);
-        earth = OBJLoader.loadModel("earth");
-        clouds = OBJLoader.loadModel("clouds");
-    }
-
-    @Override
-    public void onUserUpdate(float deltaTime) {
-        if (earth.getRotation().y > 360)
-            earth.getRotation().y-=360;
-        earth.getRotation().y-=0.7f * deltaTime * rotationSpeed;
-
-        if (clouds.getRotation().y > 360)
-            clouds.getRotation().y-=360;
-        clouds.getRotation().y-=1f * deltaTime * rotationSpeed;
-
-        // ATMOSPHERE SIZE
-        if (getInput().isKeyDown(GLFW_KEY_A)) {
-            if (getInput().isKeyDown(GLFW_KEY_LEFT_SHIFT)) {
-                clouds.getScale().sub(0.1f, 0.1f, 0.1f);
-            } else {
-                clouds.getScale().add(0.1f, 0.1f, 0.1f);
-            }
-        }
-
-        // CAMERA CONTROL
-        if (getInput().isKeyDown(GLFW_KEY_UP)) {
-            cam_y -= 32 * deltaTime * camera_speed;
-        }
-        if (getInput().isKeyDown(GLFW_KEY_DOWN)) {
-            cam_y += 32 * deltaTime * camera_speed;
-        }
-        if (getInput().isKeyDown(GLFW_KEY_LEFT)) {
-            cam_x += 32 * deltaTime * camera_speed;
-        }
-        if (getInput().isKeyDown(GLFW_KEY_RIGHT)) {
-            cam_x -= 32 * deltaTime * camera_speed;
-        }
-        if (getInput().isKeyDown(GLFW_KEY_Z)) {
-            if (getInput().isKeyDown(GLFW_KEY_LEFT_SHIFT)) {
-                cam_z --;
-            } else {
-                cam_z ++;
-            }
-        }
-        setCamera(cam_x, cam_y, cam_z);
-    }
-
-    @Override
-    public void onGfxUpdate(float deltaTime) {
-        perspectiveMode(WINDOW_WIDTH, WINDOW_HEIGTH);
-
-        drawTexturedModel(earth);
-        drawTexturedModel(clouds);
-
-        orthographicMode(WINDOW_WIDTH, WINDOW_HEIGTH);
-        drawText("ABC", 40, -50, FONT_SIZE, FONT_SIZE);
-    }
-}
-
-class OBJLoader {
-
-    public static TexturedModel loadModel(String fileName) {
+    public static TexturedModel loadWavefrontOBJ(String fileName) {
         FileReader fr = null;
         try {
             fr = new FileReader(new File("resources/models/" + fileName + ".obj"));
@@ -199,5 +103,5 @@ class OBJLoader {
         normalsArray[currentVertexPointer*3+1] = currentNorm.y;
         normalsArray[currentVertexPointer*3+2] = currentNorm.z;
     }
-
+    
 }

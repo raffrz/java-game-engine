@@ -12,6 +12,7 @@ import com.farias.rengine.render.Model;
 import com.farias.rengine.render.Shader;
 import com.farias.rengine.render.Texture;
 import com.farias.rengine.render.TexturedModel;
+import com.farias.rengine.util.ModelLoader;
 
 import org.joml.Matrix4f;
 import org.joml.Vector3f;
@@ -62,16 +63,19 @@ public class GameEngine {
 	static class Camera {
 		Vector3f position = new Vector3f(0, 0, 0);
 		Vector3f scale = new Vector3f(1, 1, 1);
-		Vector3f rotation = new Vector3f();
+		Vector3f rotation = new Vector3f(0, 0, 0);
 
 		public Camera() {
 		}
 
 		public Matrix4f getViewMatrix() {
-			return new Matrix4f().identity()
+			return new Matrix4f()
+				// lookAt(new Vector3f(0f, 0f, 3f),
+				// 	new Vector3f(0f, 0f, 0f),
+				// 	new Vector3f(0f, 1f, 0f));
 				.rotate((float) Math.toRadians(this.rotation.x), new Vector3f(1, 0, 0))
 				.rotate((float) Math.toRadians(this.rotation.y), new Vector3f(0, 1, 0))
-				.translate(-this.position.x, -this.position.y, -this.position.z);
+				.translate(this.position.x, this.position.y, this.position.z);
 		}
 	}
 
@@ -109,19 +113,19 @@ public class GameEngine {
 	 * @param width
 	 * @param height
 	 */
-	public static void orthographicMode(int width, int height) {
+	public static void orthographicMode(float width, float height) {
 		// projecao alternativa com o centro da tela sendo (width/2, height/2) o início
 		// da tela em (0, 0)
 		// e final da tela em (width, -height)
-		projection_matrix.setOrtho(0, width, -height, 0, -width, width);
+		projection_matrix.setOrtho(0, width, -height, 0, 1000, -1000);
 		// .rotateX((float) Math.toRadians(-45f))
 		// .rotateZ((float) Math.toRadians(-30f));
 
 		// projecao padrao com o centro da tela sendo (0, 0) o início da tela em
 		// (-width/2, height/2)
 		// e final da tela em (width/2, -height/2)
-		// projection_matrix.setOrtho(-width/2, width/2, -height/2, height/2, -width,
-		// width);
+		// projection_matrix.setOrtho(-width/2, width/2, -height/2, height/2, 1000, -1000);
+		// projection_matrix.setOrtho(-width/2, width/2, -height/2, height/2, -width, width);
 	}
 
 	private static final int FOV = 70;
@@ -140,7 +144,7 @@ public class GameEngine {
 
 	private static Matrix4f getModelMatrix(Vector3f position, Vector3f rotation, Vector3f scale) {
 		Matrix4f translationMatrix = new Matrix4f().translation(position);
-		Matrix4f rotationMatrix = new Matrix4f().rotationXYZ((float) Math.toRadians(-rotation.x), (float) Math.toRadians(-rotation.y), (float) Math.toRadians(-rotation.z));
+		Matrix4f rotationMatrix = new Matrix4f().rotationXYZ((float) Math.toRadians(rotation.x), (float) Math.toRadians(rotation.y), (float) Math.toRadians(rotation.z));
 		Matrix4f scalingMatrix = new Matrix4f().scale(scale);
 
 		return translationMatrix.mul(scalingMatrix.mul(rotationMatrix));
@@ -167,9 +171,10 @@ public class GameEngine {
 		-1f, -1f, 0, // BOTTOM LEFT 3
 	};
 
+	// In Opengl the indices must be drawn in conter clock wise order
 	private static int[] indices = new int[] { 
-		0, 1, 2,
-		2, 3, 0 
+		0, 3, 2,
+		2, 1, 0 
 	};
 
 	public static Sprite createSprite(String file, int tile, float width, float height) {
@@ -191,7 +196,7 @@ public class GameEngine {
 
 	public static void drawSprite(Sprite sprite, int x, int y, int width, int height, float rotation) {
 		Matrix4f modelViewMatrix = getModelViewMatrix(new Vector3f(x + width / 2, y - height / 2, 0),
-				new Vector3f(0, 0, rotation), new Vector3f(width / 2, height / 2, 1));
+				new Vector3f(0, 0, rotation), new Vector3f(width / 2f, height / 2f, 1f));
 
 		Matrix4f projection = projection_matrix.mul(modelViewMatrix, new Matrix4f());
 
@@ -313,4 +318,10 @@ public class GameEngine {
 
 		texturedModel.draw(projection);
 	}
+
+	// Resource Management
+	public static TexturedModel loadTexturedModel(String fileName) {
+		return ModelLoader.loadWavefrontOBJ(fileName);
+	}
+
 }

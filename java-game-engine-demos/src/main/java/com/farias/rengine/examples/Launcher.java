@@ -1,6 +1,5 @@
 package com.farias.rengine.examples;
 
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;

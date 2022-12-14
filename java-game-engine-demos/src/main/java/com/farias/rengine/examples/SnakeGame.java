@@ -36,8 +36,7 @@ public class SnakeGame extends Game {
         long windowId = window.create();
         SnakeGame game = new SnakeGame(window);
         game.addSystem(new InputSystem(game, windowId));
-        game.addSystem(new RenderSystem(game) {
-        });
+        game.addSystem(RenderSystem.renderSystem2D(game));
         GameEngine.initGame(game);
     }
 
