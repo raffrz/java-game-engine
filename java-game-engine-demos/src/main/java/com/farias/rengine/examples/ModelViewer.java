@@ -11,7 +11,6 @@ import java.io.FileReader;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.joml.Matrix4f;
 import org.joml.Vector2f;
 import org.joml.Vector3f;
 
@@ -33,8 +32,7 @@ public class ModelViewer extends Game {
         long windowId = window.create();
         ModelViewer game = new ModelViewer(window);
         game.addSystem(new InputSystem(game, windowId));
-        game.addSystem(new RenderSystem(game) {
-        });
+        game.addSystem(new RenderSystem(game));
         GameEngine.initGame(game);
     }
 
@@ -42,8 +40,9 @@ public class ModelViewer extends Game {
     TexturedModel clouds;
     private int cam_x = 0;
     private int cam_y = 0;
-    private int cam_z = 5;
+    private int cam_z = -5;
     private static final float camera_speed = 2.8f;
+    private static final float rotationSpeed = 16f;
 
     public ModelViewer(Window window) {
         super("Model Viewer", window);
@@ -52,16 +51,30 @@ public class ModelViewer extends Game {
     @Override
     public void onUserCreate() {
         perspectiveMode(WINDOW_WIDTH, WINDOW_HEIGTH);
-        setCamera(0, 0, 5);
-        earth = OBJLoader.loadObjModel("earth");
-        clouds = OBJLoader.loadObjModel("clouds");
-        clouds.getScale().add(0.1f, 0.1f, 0.1f);
+        setCamera(0, 0, -5);
+        earth = OBJLoader.loadModel("earth");
+        clouds = OBJLoader.loadModel("clouds");
     }
 
     @Override
     public void onUserUpdate(float deltaTime) {
-        if (earth.getRotation().y++ > 360)
-            earth.getRotation().y = 0;
+        if (earth.getRotation().y > 360)
+            earth.getRotation().y-=360;
+        earth.getRotation().y-=0.7f * deltaTime * rotationSpeed;
+
+        if (clouds.getRotation().y > 360)
+            clouds.getRotation().y-=360;
+        clouds.getRotation().y-=1f * deltaTime * rotationSpeed;
+
+        // ATMOSPHERE SIZE
+        if (getInput().isKeyDown(GLFW_KEY_A)) {
+            if (getInput().isKeyDown(GLFW_KEY_LEFT_SHIFT)) {
+                clouds.getScale().sub(0.1f, 0.1f, 0.1f);
+            } else {
+                clouds.getScale().add(0.1f, 0.1f, 0.1f);
+            }
+        }
+
         // CAMERA CONTROL
         if (getInput().isKeyDown(GLFW_KEY_UP)) {
             cam_y -= 32 * deltaTime * camera_speed;
@@ -77,9 +90,9 @@ public class ModelViewer extends Game {
         }
         if (getInput().isKeyDown(GLFW_KEY_Z)) {
             if (getInput().isKeyDown(GLFW_KEY_LEFT_SHIFT)) {
-                cam_z ++;
-            } else {
                 cam_z --;
+            } else {
+                cam_z ++;
             }
         }
         setCamera(cam_x, cam_y, cam_z);
@@ -93,13 +106,13 @@ public class ModelViewer extends Game {
         drawTexturedModel(clouds);
 
         orthographicMode(WINDOW_WIDTH, WINDOW_HEIGTH);
-        drawText("rotation_y:" + earth.getRotation().y, 240, -50, FONT_SIZE, FONT_SIZE);
+        drawText("ABC", 40, -50, FONT_SIZE, FONT_SIZE);
     }
 }
 
 class OBJLoader {
 
-    public static TexturedModel loadObjModel(String fileName) {
+    public static TexturedModel loadModel(String fileName) {
         FileReader fr = null;
         try {
             fr = new FileReader(new File("resources/models/" + fileName + ".obj"));

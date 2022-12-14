@@ -156,8 +156,7 @@ public class SpriteEditor extends Game {
         long windowId = window.create();
         SpriteEditor game = new SpriteEditor("Sprite Editor", window);
         game.addSystem(new InputSystem(game, windowId));
-        game.addSystem(new RenderSystem(game) {
-        });
+        game.addSystem(RenderSystem.renderSystem2D(game));
         GameEngine.initGame(game);
     }
 }
