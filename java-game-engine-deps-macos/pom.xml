@@ -3,12 +3,12 @@
 	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
 	<modelVersion>4.0.0</modelVersion>
 	<groupId>com.farias.rengine</groupId>
-	<artifactId>java-game-engine-core</artifactId>
-	<version>1.0.2-SNAPSHOT</version>
+	<artifactId>java-game-engine-deps-macos</artifactId>
+	<version>1.0.1-SNAPSHOT</version>
 	<packaging>jar</packaging>
 	<properties>
 		<lwjgl.version>3.3.1</lwjgl.version>
-		<joml.version>1.9.20</joml.version>
+		<lwjgl.natives>natives-macos-arm64</lwjgl.natives>
 	</properties>
 
 	<dependencyManagement>
@@ -27,31 +27,32 @@
 		<dependency>
 			<groupId>org.lwjgl</groupId>
 			<artifactId>lwjgl</artifactId>
+			<classifier>${lwjgl.natives}</classifier>
 		</dependency>
 		<dependency>
 			<groupId>org.lwjgl</groupId>
 			<artifactId>lwjgl-assimp</artifactId>
+			<classifier>${lwjgl.natives}</classifier>
 		</dependency>
 		<dependency>
 			<groupId>org.lwjgl</groupId>
 			<artifactId>lwjgl-glfw</artifactId>
+			<classifier>${lwjgl.natives}</classifier>
 		</dependency>
 		<dependency>
 			<groupId>org.lwjgl</groupId>
 			<artifactId>lwjgl-openal</artifactId>
+			<classifier>${lwjgl.natives}</classifier>
 		</dependency>
 		<dependency>
 			<groupId>org.lwjgl</groupId>
 			<artifactId>lwjgl-opengl</artifactId>
+			<classifier>${lwjgl.natives}</classifier>
 		</dependency>
 		<dependency>
 			<groupId>org.lwjgl</groupId>
 			<artifactId>lwjgl-stb</artifactId>
-		</dependency>
-		<dependency>
-			<groupId>org.joml</groupId>
-			<artifactId>joml</artifactId>
-			<version>${joml.version}</version>
+			<classifier>${lwjgl.natives}</classifier>
 		</dependency>
 	</dependencies>
 
