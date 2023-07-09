@@ -22,6 +22,8 @@ import com.farias.rengine.render.RenderSystem;
 
 public class SnakeGame extends Game {
 
+    private static final Random random = new Random();
+
     private final float updateTime = 0.2f;
     private float time = 0;
     private final int rows;
@@ -179,7 +181,6 @@ public class SnakeGame extends Game {
     }
 
     public static int getRandomNumber(int start, int end) {
-        Random random = new Random();
         return random.nextInt(end - start + 1) + start;
     }
 
@@ -336,11 +337,11 @@ class SnakeGameRenderer {
             currentPos = nextPos;
             nextPos = iterator.hasNext() ? iterator.next() : null;
 
-            float angle = getSpriteAngle(previousPos, currentPos, nextPos);
+            float rotation = getSpriteRotation(previousPos, currentPos, nextPos);
             int snakeTile = getSnakeTile(previousPos, currentPos, nextPos);
             GameEngine.drawSprite(snakeSprite, snakeTile, SNAKE_SPRITE_TILE_SIZE, SNAKE_SPRITE_TILE_SIZE,
                     currentPos.x * cellWidth,
-                    -currentPos.y * cellHeight, cellWidth, cellHeight, angle);
+                    -currentPos.y * cellHeight, cellWidth, cellHeight, rotation);
         }
     }
 
@@ -371,7 +372,7 @@ class SnakeGameRenderer {
         return position1.x != position2.x && position1.y != position2.y;
     }
 
-    public float getSpriteAngle(Vector2i previousPos, Vector2i currentPos, Vector2i nextPos) {
+    public float getSpriteRotation(Vector2i previousPos, Vector2i currentPos, Vector2i nextPos) {
         if (nextPos == null) {
             nextPos = currentPos;
         }
