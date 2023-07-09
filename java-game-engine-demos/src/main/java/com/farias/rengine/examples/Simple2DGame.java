@@ -85,16 +85,17 @@ public class Simple2DGame extends Game {
     @Override
     public void onGfxUpdate(float deltaTime) {
         drawMap(map, 0, 0, 32, 32, 0, 0, 8, 8);
-        drawSprite(sprite, (int) sprite_position.x, (int) sprite_position.y, (int) sprite_scale.x, (int) sprite_scale.y, sprite_rotation);
+        drawSprite(sprite, (int) sprite_position.x, (int) sprite_position.y, (int) sprite_scale.x, (int) sprite_scale.y,
+                sprite_rotation);
     }
 
     public static void launch(String[] args) {
         Window window = new Window(width, height);
         long windowId = window.create();
         Simple2DGame game = new Simple2DGame("Simple 2D Game", window);
-        InputSystem input = new InputSystem(game, windowId);
+        InputSystem input = new InputSystem(windowId);
         game.addSystem(input);
-        game.addSystem(RenderSystem.renderSystem2D(game));
+        game.addSystem(RenderSystem.renderSystem2D());
         GameEngine.initGame(game);
     }
 }

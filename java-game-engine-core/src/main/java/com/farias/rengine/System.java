@@ -1,13 +1,6 @@
 package com.farias.rengine;
 
-public abstract class System {
-	protected Game game;
+public interface System {
 	
-	public System(Game g) {
-		this.game = g;
-	}
-	
-	public void update(float deltaTime) {
-		
-	}
+	void update(Game game, float deltaTime);
 }

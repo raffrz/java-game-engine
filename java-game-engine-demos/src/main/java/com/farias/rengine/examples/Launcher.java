@@ -8,17 +8,17 @@ import java.util.function.Consumer;
 
 public class Launcher {
     public static void main(String[] args) {
-        
+
         Map<String, Consumer<String[]>> demos = new HashMap<>();
 
-        demos.put("1-AmorousAdventures", AmorousAdventures::launch);
-        demos.put("2-BasicTopDownMovement", BasicTopDownMovement::launch);
-        demos.put("3-Simple2DGame", Simple2DGame::launch);
-        demos.put("4-SpriteEditor", SpriteEditor::launch);
-        demos.put("5-Snake", SnakeGame::launch);
+        demos.put("1 - SpriteMovement", SpriteMovement::launch);
+        demos.put("2 - BasicTopDownMovement", BasicTopDownMovement::launch);
+        demos.put("3 - Simple2DGame", Simple2DGame::launch);
+        demos.put("4 - SpriteEditor", SpriteEditor::launch);
+        demos.put("5 - Snake", SnakeGame::launch);
 
         System.out.println("Selecione uma opção:");
-        for (String entry: demos.keySet()) {
+        for (String entry : demos.keySet()) {
             System.out.println(entry);
         }
 
@@ -26,13 +26,13 @@ public class Launcher {
         String line = scanner.next();
 
         Optional<String> option = demos.keySet().stream()
-            .filter(k -> k.startsWith(String.valueOf(line)))
-            .findFirst();
+                .filter(k -> k.startsWith(String.valueOf(line)))
+                .findFirst();
 
         option.ifPresent(o -> {
             demos.get(o).accept(args);
         });
-        
+
         scanner.close();
     }
 }
