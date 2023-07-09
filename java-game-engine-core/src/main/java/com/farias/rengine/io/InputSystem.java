@@ -8,7 +8,7 @@ import com.farias.rengine.Game;
 
 import org.lwjgl.BufferUtils;
 
-public class InputSystem extends com.farias.rengine.System {
+public class InputSystem implements com.farias.rengine.System {
 	
 	public static final int KEY_FIRST = GLFW_KEY_SPACE;
 	
@@ -21,8 +21,7 @@ public class InputSystem extends com.farias.rengine.System {
 	private DoubleBuffer mouseX = BufferUtils.createDoubleBuffer(1);
 	private DoubleBuffer mouseY = BufferUtils.createDoubleBuffer(1);
 	
-	public InputSystem(Game game, long window) {
-		super(game);
+	public InputSystem(long window) {
 		this.window = window;
 		this.keys = new boolean[KEY_LAST];
 	}
@@ -52,7 +51,7 @@ public class InputSystem extends com.farias.rengine.System {
 	}
 	
 	@Override
-	public void update(float deltaTime) {
+	public void update(Game game, float deltaTime) {
 		//update input
 		for (int i = KEY_FIRST; i < GLFW_KEY_LAST; i++)
 			keys[i] = isKeyDown(i);

@@ -18,21 +18,21 @@ import com.farias.rengine.render.RenderSystem;
 public class SpriteEditor extends Game {
 
     // 8x8 draw area
-    static int [] draw = new int[] {
-        8, 8, 8, 8, 8, 8, 8, 8,
-        8, 8, 8, 8, 8, 8, 8, 8,
-        8, 8, 8, 8, 8, 8, 8, 8,
-        8, 8, 8, 8, 8, 8, 8, 8,
-        8, 8, 8, 8, 8, 8, 8, 8,
-        8, 8, 8, 8, 8, 8, 8, 8,
-        8, 8, 8, 8, 8, 8, 8, 8,
-        8, 8, 8, 8, 8, 8, 8, 8,
+    static int[] draw = new int[] {
+            8, 8, 8, 8, 8, 8, 8, 8,
+            8, 8, 8, 8, 8, 8, 8, 8,
+            8, 8, 8, 8, 8, 8, 8, 8,
+            8, 8, 8, 8, 8, 8, 8, 8,
+            8, 8, 8, 8, 8, 8, 8, 8,
+            8, 8, 8, 8, 8, 8, 8, 8,
+            8, 8, 8, 8, 8, 8, 8, 8,
+            8, 8, 8, 8, 8, 8, 8, 8,
     };
 
     // 16 colors
     static int[] colors = new int[] {
-        0x000000, 0x0743ac, 0x3d7ef0, 0xcc3030, 0xf4abab, 0xd08a8a, 0x898989, 0x6c0be6,
-        0xffffff, 0x3a8216, 0x73bb4f, 0x744531, 0x592d1b, 0xf1c71a, 0xe6970b, 0x411350
+            0x000000, 0x0743ac, 0x3d7ef0, 0xcc3030, 0xf4abab, 0xd08a8a, 0x898989, 0x6c0be6,
+            0xffffff, 0x3a8216, 0x73bb4f, 0x744531, 0x592d1b, 0xf1c71a, 0xe6970b, 0x411350
     };
 
     Sprite pallete;
@@ -56,7 +56,7 @@ public class SpriteEditor extends Game {
     @Override
     public void onUserUpdate(float deltaTime) {
         int mouse_x = (int) getInput().getMouseX() / 4 / 8;
-        int mouse_y = - (int) getInput().getMouseY() / 4 / 8;
+        int mouse_y = -(int) getInput().getMouseY() / 4 / 8;
 
         hover_x = mouse_x * 8;
         hover_y = mouse_y * 8;
@@ -65,9 +65,9 @@ public class SpriteEditor extends Game {
             int x = mouse_x - 4;
             int y = -mouse_y - 2;
             selected = 8 * y + x;
-            if (selected >= 0 && selected <64)
+            if (selected >= 0 && selected < 64)
                 draw[selected] = color;
-            if (selected >=72 && selected < 88)
+            if (selected >= 72 && selected < 88)
                 color = selected - 72;
         }
 
@@ -81,7 +81,7 @@ public class SpriteEditor extends Game {
         if (getInputSystem().isKeyPressed(GLFW_KEY_S)) {
             save();
         }
-        //clear messages
+        // clear messages
         if (getInputSystem().isKeyPressed(GLFW_KEY_ENTER)) {
             message = "";
         }
@@ -89,27 +89,27 @@ public class SpriteEditor extends Game {
 
     @Override
     public void onGfxUpdate(float deltaTime) {
-        //title
+        // title
         drawText("Sprite Editor", 64, -4, 4, 4);
-        //draw area
+        // draw area
         for (int i = 0; i < draw.length; i++) {
             int color = draw[i];
             int x = 8 * (i % 8) + 32;
-            int y = - 8 * (i / 8) - 16;
+            int y = -8 * (i / 8) - 16;
             drawSprite(pallete, color, 32, 32, x, y, 8, 8);
         }
-        //color bar
+        // color bar
         drawSprite(pallete, 0, 256, 64, 32, -88, 64, 16);
-        //hover
+        // hover
         drawSprite(pallete, color, 32, 32, hover_x, hover_y, 8, 8);
         // info message
         drawText(message, 64, -112, 4, 4);
     }
 
-    //TODO Refactor
+    // TODO Refactor
     void save() {
         System.out.println("salvando sprite no arquivo my_sprite.png");
-        if(saveImage(encodeImage())) {
+        if (saveImage(encodeImage())) {
             message = "Salvo com sucesso! :)";
         } else {
             message = "falha ao salvar a imagem :(";
@@ -122,15 +122,15 @@ public class SpriteEditor extends Game {
         for (int i = 0; i < draw.length; i++) {
             int color_hexa = colors[draw[i]];
             int[] color_rgb = hexToRgb(color_hexa);
-            int a = 255; //alpha
-            int r = color_rgb[0]; //red
-            int g = color_rgb[1]; //green
-            int b = color_rgb[2]; //blue
+            int a = 255; // alpha
+            int r = color_rgb[0]; // red
+            int g = color_rgb[1]; // green
+            int b = color_rgb[2]; // blue
 
-            int pixel = (a<<24) | (r<<16) | (g<<8) | b;
+            int pixel = (a << 24) | (r << 16) | (g << 8) | b;
             img.setRGB(i % 8, i / 8, pixel);
         }
-        
+
         return img;
     }
 
@@ -148,15 +148,19 @@ public class SpriteEditor extends Game {
         int r = (hex >> 16) & 255;
         int g = (hex >> 8) & 255;
         int b = hex & 255;
-        return new int[] {r, g, b};
+        return new int[] { r, g, b };
     }
 
     public static void launch(String[] args) {
         Window window = new Window(512, 512);
         long windowId = window.create();
         SpriteEditor game = new SpriteEditor("Sprite Editor", window);
-        game.addSystem(new InputSystem(game, windowId));
-        game.addSystem(RenderSystem.renderSystem2D(game));
+        game.addSystem(new InputSystem(windowId));
+        game.addSystem(RenderSystem.renderSystem2D());
         GameEngine.initGame(game);
+    }
+
+    public static void main(String[] args) {
+        launch(args);
     }
 }

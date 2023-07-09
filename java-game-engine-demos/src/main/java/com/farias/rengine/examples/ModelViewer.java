@@ -31,8 +31,8 @@ public class ModelViewer extends Game {
         Window window = new Window(WINDOW_WIDTH, WINDOW_HEIGTH);
         long windowId = window.create();
         ModelViewer game = new ModelViewer(window);
-        game.addSystem(new InputSystem(game, windowId));
-        game.addSystem(new RenderSystem(game));
+        game.addSystem(new InputSystem(windowId));
+        game.addSystem(new RenderSystem());
         GameEngine.initGame(game);
     }
 

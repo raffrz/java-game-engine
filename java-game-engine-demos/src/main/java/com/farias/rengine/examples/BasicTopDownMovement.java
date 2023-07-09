@@ -41,8 +41,8 @@ public class BasicTopDownMovement extends ECSGame {
 		
 		ECSGame game = new BasicTopDownMovement(window);
 		camera = new TopDownCamera2D(width, height, 64f);
-		game.addSystem(new RenderSystemECS(game, camera));
-		input = new InputSystem(game, windowId);
+		game.addSystem(new RenderSystemECS(camera));
+		input = new InputSystem(windowId);
 		game.addSystem(input);
 		game.addSystem(new EventSystem(game));
 

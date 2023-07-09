@@ -4,6 +4,7 @@ import static org.lwjgl.opengl.GL11.*;
 
 import org.lwjgl.opengl.GL;
 
+import com.farias.rengine.Game;
 import com.farias.rengine.ecs.Component;
 import com.farias.rengine.ecs.ECSGame;
 import com.farias.rengine.ecs.GameObject;
@@ -17,8 +18,7 @@ public class RenderSystemECS extends RenderSystem {
 	
 	private Camera camera;
 	
-	public RenderSystemECS(ECSGame game, Camera camera) {
-		super(game);
+	public RenderSystemECS(Camera camera) {
 		this.camera = camera;
 	}
 	
@@ -32,7 +32,7 @@ public class RenderSystemECS extends RenderSystem {
 	}
 
 	@Override
-	public void update(float deltaTime) {
+	public void update(Game game, float deltaTime) {
 		//clears all the pixel colors to black you can use glClearColor to change the
 		// clear color
 		glClear(GL_COLOR_BUFFER_BIT);

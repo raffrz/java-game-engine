@@ -77,17 +77,17 @@ public abstract class Game {
 			//update game state
 			if (updateTime > msPerFrame) {
 				//update input system
-				inputSystem.update(deltaTime);	
+				inputSystem.update(this, deltaTime);	
 				//update other systems
 				for (System s: systems) {
-					s.update(deltaTime);
+					s.update(this, deltaTime);
 				}
 				//update game 
 				this.onUserUpdate(deltaTime);
 				updateTime = 0;
 			}
 			//render game
-			renderSystem.update(deltaTime);
+			renderSystem.update(this, deltaTime);
 			this.onGfxUpdate(deltaTime);
 			window.swapBuffers(frameLimiter);
 			frameCount++;

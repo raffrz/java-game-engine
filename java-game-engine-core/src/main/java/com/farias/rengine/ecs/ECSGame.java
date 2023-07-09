@@ -25,8 +25,8 @@ public abstract class ECSGame extends Game {
 		super(title, new Window(windowWidth, windowHeight));
 		getWindow().setFullscreen(false);
 		long windowId = getWindow().create();
-		this.addSystem(new RenderSystemECS(this, camera));
-		this.addSystem(new InputSystem(this, windowId));
+		this.addSystem(new RenderSystemECS(camera));
+		this.addSystem(new InputSystem(windowId));
 	}
 	
 	public void onUserCreate() {

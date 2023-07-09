@@ -2,311 +2,394 @@ package com.farias.rengine.examples;
 
 import static org.lwjgl.glfw.GLFW.*;
 
-import java.util.ArrayList;
+import java.util.Deque;
+import java.util.Iterator;
+import java.util.LinkedList;
 import java.util.List;
+import java.util.Optional;
+import java.util.Random;
+import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 
-import static com.farias.rengine.GameEngine.*;
+import org.joml.Vector2i;
+
 import com.farias.rengine.Game;
 import com.farias.rengine.GameEngine;
+import com.farias.rengine.GameEngine.Sprite;
 import com.farias.rengine.io.InputSystem;
 import com.farias.rengine.io.Window;
 import com.farias.rengine.render.RenderSystem;
 
 public class SnakeGame extends Game {
 
-    public static final int WINDOW_WIDTH = 1024;
-    public static final int  WINDOW_HEIGHT= 1024;
-    public static final int GRID_WIDTH = 128;
-    public static final int GRID_HEIGTH = 128;
-    public static final int GRID_CELL_SIZE = 8;
-    public static final int FONT_SIZE = 4;
-    public static final int BACKGROUND_COLOR = 5;
-
+    private final float updateTime = 0.2f;
+    private float time = 0;
+    private final int rows;
+    private final int cols;
     Snake snake;
-    List<Apple> apples = new ArrayList<>();
-    int score = 0;
-    Sprite pallete;
-
-    public SnakeGame(Window window) {
-        super("Snake", window);
-    }
+    Apple apple;
+    private Direction direction;
+    private Direction nexDirection;
+    int score;
+    private SnakeGameRenderer renderer;
+    boolean gameOver = false;
 
     public static void launch(String[] args) {
-        Window window = new Window(WINDOW_WIDTH, WINDOW_HEIGHT);
+        int windowWidth = 512;
+        int windowHeight = 512;
+        Window window = new Window(windowWidth, windowHeight);
         long windowId = window.create();
-        SnakeGame game = new SnakeGame(window);
-        game.addSystem(new InputSystem(game, windowId));
-        game.addSystem(RenderSystem.renderSystem2D(game));
+        SnakeGame game = new SnakeGame(window, 10, 10);
+        game.addSystem(new InputSystem(windowId));
+        game.addSystem(RenderSystem.renderSystem2D());
         GameEngine.initGame(game);
+    }
+
+    public static void main(String[] args) {
+        launch(args);
+    }
+
+    public SnakeGame(Window window, int rows, int cols) {
+        super("New Snake Game", window);
+        this.rows = rows;
+        this.cols = cols;
+
+        this.resetGame();
+    }
+
+    private void resetGame() {
+        this.score = 0;
+        int snakeX = this.cols / 3;
+        int snakeY = this.rows / 2;
+        int snakeSize = 3;
+        this.snake = new Snake(snakeX, snakeY, snakeSize);
+
+        int appleX = cols / 3 * 2;
+        int appleY = rows / 2;
+        this.apple = new Apple(appleX, appleY);
+        this.nexDirection = Direction.RIGHT;
     }
 
     @Override
     public void onUserCreate() {
-        pallete = createSprite("resources/palletes/default.png", 0, 256, 64);
-        orthographicMode(GRID_WIDTH, GRID_HEIGTH);
-        this.snake = new Snake(GRID_CELL_SIZE);
-        this.apples.add(new Apple(GRID_CELL_SIZE, GRID_WIDTH, -GRID_HEIGTH));
+        this.renderer = new SnakeGameRenderer(rows, cols);
     }
 
     @Override
     public void onUserUpdate(float deltaTime) {
-        if (!snake.dead) {
+        this.time += deltaTime;
+        if (!this.gameOver) {
             if (getInputSystem().isKeyPressed(GLFW_KEY_UP)) {
-                this.snake.dx = 0;
-                this.snake.dy = 1;
+                this.changeDirection(Direction.UP);
             }
             if (getInputSystem().isKeyPressed(GLFW_KEY_DOWN)) {
-                this.snake.dx = 0;
-                this.snake.dy = -1;
+                this.changeDirection(Direction.DOWN);
             }
             if (getInputSystem().isKeyPressed(GLFW_KEY_LEFT)) {
-                this.snake.dx = -1;
-                this.snake.dy = 0;
+                this.changeDirection(Direction.LEFT);
             }
             if (getInputSystem().isKeyPressed(GLFW_KEY_RIGHT)) {
-                this.snake.dx = 1;
-                this.snake.dy = 0;
+                this.changeDirection(Direction.RIGHT);
             }
-            this.snake.update(deltaTime);
-            Apple eated = null;
-            for (Apple a : apples) {
-                if (snake.x == a.x && snake.y == a.y) {
-                    eated = a;
-                }
-            }
-            if (eated != null) {
-                apples.remove(eated);
-                snake.onEat();
-                apples.add(new Apple(GRID_CELL_SIZE, GRID_WIDTH, -GRID_HEIGTH));
-                score++;
+            if (time >= updateTime) {
+                this.direction = nexDirection;
+                this.moveSnake();
+                this.time = 0;
             }
         } else {
             if (getInputSystem().isKeyPressed(GLFW_KEY_ENTER)) {
-                this.snake = new Snake(GRID_CELL_SIZE);
-                this.apples.clear();
-                this.apples.add(new Apple(GRID_CELL_SIZE, GRID_WIDTH, -GRID_HEIGTH));
-                this.score = 0;
+                this.gameOver = false;
+                this.resetGame();
             }
         }
+
     }
 
     @Override
     public void onGfxUpdate(float deltaTime) {
-        //background
-        drawSprite(pallete, BACKGROUND_COLOR, 32, 32, 0, 0, GRID_WIDTH, GRID_HEIGTH);
+        this.renderer.render(this);
+    }
 
-        // draw snake
-        this.snake.draw();
+    public void changeDirection(Direction direction) {
+        if (isOppositeDirection(direction) || this.direction == direction) {
+            return;
+        }
+        this.nexDirection = direction;
+    }
 
-        // draw apples
-        for (Apple apple : apples) {
-            apple.draw();
+    public boolean isOppositeDirection(Direction direction) {
+        return this.direction.getOpposite() == direction;
+    }
+
+    public void moveSnake() {
+        final var head = Optional.of(snake.getHead());
+        final Optional<Vector2i> newHead;
+        switch (direction) {
+            case UP:
+                newHead = head.map((pos) -> new Vector2i(pos.x, pos.y - 1));
+                break;
+            case DOWN:
+                newHead = head.map((pos) -> new Vector2i(pos.x, pos.y + 1));
+                break;
+            case LEFT:
+                newHead = head.map((pos) -> new Vector2i(pos.x - 1, pos.y));
+                break;
+            case RIGHT:
+                newHead = head.map((pos) -> new Vector2i(pos.x + 1, pos.y));
+                break;
+            default:
+                newHead = Optional.empty();
         }
 
-        // draw ui
-        drawText("score: " + score, 64, -112, FONT_SIZE, FONT_SIZE);
-        if (snake.dead) {
-            drawText("game over!", 64, -64, FONT_SIZE, FONT_SIZE);
-            drawText("press [enter] to try again", 64, -70, FONT_SIZE, FONT_SIZE);
+        newHead.ifPresent(pos -> {
+            if (!this.isValid(pos)) {
+                this.gameOver = true;
+                return;
+            }
+            snake.add(pos.x, pos.y);
+            if (!apple.isPositionEqualTo(pos)) {
+                snake.remove();
+            } else {
+                var applePosition = randomPosition();
+                apple = new Apple(applePosition.x, applePosition.y);
+                score++;
+            }
+        });
+    }
+
+    public boolean isValid(Vector2i position) {
+        return position.x >= 0 && position.x < this.cols && position.y >= 0 && position.y < this.rows
+                && !this.snake.contains(position.x, position.y);
+    }
+
+    public Vector2i randomPosition() {
+        var freePositions = IntStream.rangeClosed(1, cols)
+                .boxed()
+                .flatMap(x -> IntStream.rangeClosed(1, rows)
+                        .mapToObj(y -> new Vector2i(x - 1, y - 1)))
+                .filter(pos -> !this.snake.contains(pos.x, pos.y))
+                .collect(Collectors.toList());
+
+        return getRandomElement(freePositions);
+    }
+
+    public static <T> T getRandomElement(List<T> list) {
+        var randomIndex = getRandomNumber(0, list.size() - 1);
+        return list.get(randomIndex);
+    }
+
+    public static int getRandomNumber(int start, int end) {
+        Random random = new Random();
+        return random.nextInt(end - start + 1) + start;
+    }
+
+}
+
+enum Direction {
+    UP, DOWN, LEFT, RIGHT;
+
+    public Direction getOpposite() {
+        switch (this) {
+            case UP:
+                return DOWN;
+            case DOWN:
+                return UP;
+            case LEFT:
+                return RIGHT;
+            case RIGHT:
+                return LEFT;
+            default:
+                throw new IllegalArgumentException("Invalid direction");
         }
     }
 }
 
 class Snake {
-    boolean dead = false;
-    int x = 24;
-    int y = -24;
-    int dx = 1;
-    int dy = 0;
-    int size;
-    Sprite sprite;
-    Tile tile = Tile.HEAD_RIGHT;
-    int color = 9;
-    float time = 0;
-    static final float update_time = 0.10f;
-    List<Body> body = new ArrayList<>();
+    final Deque<Vector2i> positions;
 
-    enum Tile {
-        HEAD_RIGHT(2), BODY_RIGHT(1), TAIL_RIGHT(0),
-        HEAD_LEFT(5), BODY_LEFT(6), TAIL_LEFT(7),
-        HEAD_UP(3), BODY_UP(8), TAIL_UP(19),
-        HEAD_DOWN(14), BODY_DOWN(9), TAIL_DOWN(4),
-        CORNER_TOP_LEFT(10),CORNER_TOP_RIGHT(11),
-        CORNER_TOP_LEFT_VARIANT(12),CORNER_TOP_RIGHT_VARIANT(13),
-        CORNER_BOTTOM_LEFT(15),CORNER_BOTTOM_RIGHT(16),
-        CORNER_BOTTOM_LEFT_VARIANT(17),CORNER_BOTTOM_RIGHT_VARIANT(18);
-
-        int value;
-
-        Tile(int value) {
-            this.value = value;
-        }
-
-        public int value() {
-            return value;
-        }
-
-    }
-
-    class Body {
-        int x;
-        int y;
-        int dx;
-        int dy;
-        Tile tile;
-        Body prev;
-        Body next;
-
-        Body(int x, int y, int dx, int dy) {
-            this.x = x;
-            this.y = y;
-            this.dx = dx;
-            this.dy = dy;
-        }
-
-        void update(int x, int y, int dx, int dy) {
-            int prevx = this.x;
-            int prevy = this.y;
-            int prevdx = this.dx;
-            int prevdy = this.dy;
-            this.x = x;
-            this.y = y;
-            this.dx = dx;
-            this.dy = dy;
-            if (prev != null) {
-                this.updateSprite(prevdx, prevdy, false);
-                prev.update(prevx, prevy, prevdx, prevdy);
-            } else {
-                this.updateSprite(prevdx, prevdy, true);
-            }
-        }
-
-        void updateSprite(int prevdx, int prevdy, boolean last) {
-            if (last) {
-                if (this.dx > 0) {
-                    this.tile = Tile.TAIL_RIGHT;
-                } else if (this.dx < 0) {
-                    this.tile = Tile.TAIL_LEFT;
-                } else if (this.dy > 0) {
-                    this.tile = Tile.TAIL_UP;
-                } else if (this.dy < 0) {
-                    this.tile = Tile.TAIL_DOWN;
-                }
-            }
-            else {
-                if (dx > 0 && prevdy == 0) {
-                    this.tile = Tile.BODY_RIGHT;
-                } else if (dx > 0 && prevdy > 0) {
-                    this.tile = Tile.CORNER_TOP_LEFT;
-                } else if (dx > 0 && prevdy < 0) {
-                    this.tile = Tile.CORNER_BOTTOM_LEFT_VARIANT;
-                } else if (dx < 0 && prevdy > 0) {
-                    this.tile = Tile.CORNER_TOP_RIGHT_VARIANT;
-                } else if (dx < 0 && prevdy < 0) {
-                    this.tile = Tile.CORNER_BOTTOM_RIGHT;
-                } else if (dx < 0 && prevdy == 0) {
-                    this.tile = Tile.BODY_LEFT;
-                } else if (dy > 0 && prevdx > 0) {
-                    this.tile = Tile.CORNER_BOTTOM_RIGHT_VARIANT;
-                } else if (dy > 0 && prevdx < 0) {
-                    this.tile = Tile.CORNER_BOTTOM_LEFT;
-                } else if (dy < 0 && prevdx < 0) {
-                    this.tile = Tile.CORNER_TOP_LEFT_VARIANT;
-                } else if (dy < 0 && prevdx > 0) {
-                    this.tile = Tile.CORNER_TOP_RIGHT;
-                } else if (dy > 0 && prevdx == 0) {
-                    this.tile = Tile.BODY_UP;
-                } else if (dy < 0 && prevdx == 0) {
-                    this.tile = Tile.BODY_DOWN;
-                }
-            }
+    public Snake(int x, int y, int size) {
+        positions = new LinkedList<Vector2i>();
+        positions.offerFirst(new Vector2i(x, y));
+        for (int i = 0; i < size; i++) {
+            positions.offerLast(new Vector2i(x, y));
         }
     }
 
-    Snake(int size) {
-        this.sprite = createSprite("resources/snakegame/snake.png", 2, 156, 128);
-        this.size = size;
-        this.body = new ArrayList<>();
+    public Vector2i getHead() {
+        return new Vector2i(positions.peekFirst());
     }
 
-    public void onEat() {
-        this.addBody(x, y, this.dx, this.dy);
+    public void add(int x, int y) {
+        this.positions.offerFirst(new Vector2i(x, y));
     }
 
-    public void addBody(int x, int y, int dx, int dy) {
-        Body b = new Body(x, y, dx, dy);
-        if (!this.body.isEmpty()) {
-            Body last = body.get(body.size() - 1);
-            last.prev = b;
-        }
-        body.add(b);
+    public Vector2i remove() {
+        return this.positions.pollLast();
     }
 
-    void update(float deltaTime) {
-        this.time += deltaTime;
-        if (time >= update_time) {
-            int prevx = x;
-            int prevy = y;
-            this.x += size * dx;
-            this.y += size * dy;
-            this.time = 0;
-            this.updateSprite();
-            if (body.isEmpty()) {
-                this.addBody(x - size, y, dx, dy);
-                this.addBody(30, y, dx, dy);
-            }
-            Body neck = body.get(0);
-            neck.update(prevx, prevy, dx, dy);
-
-            //collision
-            Body b = neck;
-            while (b.prev != null) {
-                if (b.prev.x == x && b.prev.y == y) {
-                    this.dead = true;
-                    return;
-                }
-                b = b.prev;
-            }
-        }
+    public boolean contains(int x, int y) {
+        return positions.contains(new Vector2i(x, y));
     }
 
-    private void updateSprite() {
-        if (this.dx > 0) {
-            this.tile = Tile.HEAD_RIGHT;
-        } else if (this.dx < 0) {
-            this.tile = Tile.HEAD_LEFT;
-        } else if (this.dy > 0) {
-            this.tile = Tile.HEAD_UP;
-        } else if (this.dy < 0) {
-            this.tile = Tile.HEAD_DOWN;
-        }
+    public Deque<Vector2i> getPositions() {
+        return positions;
     }
 
-    void draw() {
-        drawSprite(sprite, this.tile.value(), 32, 32, x, y, size, size);
-        for (Body b : body) {
-            if (b.tile != null) {
-                drawSprite(sprite, b.tile.value(), 32, 32, b.x, b.y, size, size);
-            }
-        }
+    public Iterator<Vector2i> positionsIterator() {
+        return positions.iterator();
     }
 }
 
 class Apple {
-    int x;
-    int y;
-    Sprite sprite;
-    int size;
-    int color = 3;
+    final Vector2i position;
 
-    Apple(int size, int xmax, int ymax) {
-        this.sprite = createSprite("resources/snakegame/apple.png", 0, 32, 32);
-        this.size = size;
-        this.x = (int) (Math.random() * xmax / size) * size;
-        this.y = (int) (Math.random() * ymax / size) * size;
+    public Apple(int x, int y) {
+        this.position = new Vector2i(x, y);
     }
 
-    void draw() {
-        drawSprite(sprite, color, 32, 32, x, y, size, size);
+    public boolean isPositionEqualTo(Vector2i pos) {
+        return this.position.equals(pos);
+    }
+}
+
+class SnakeGameRenderer {
+    private static final int BACKGROUND_COLOR = 7;
+    private static final int TAIL_TILE = 0;
+    private static final int BODY_TILE = 1;
+    private static final int CORNER_TILE = 2;
+    private static final int HEAD_TILE = 3;
+
+    private static final int PALLETE_SPRITE_INDEX = 0;
+    private static final int PALLETE_SPRITE_WIDTH = 256;
+    private static final int PALLETE_SPRITE_HEIGHT = 64;
+    private static final int PALLETE_SPRITE_TILE_SIZE = 32;
+    private static final int SNAKE_SPRITE_INDEX = 0;
+    private static final int SNAKE_SPRITE_WIDTH = 32;
+    private static final int SNAKE_SPRITE_HEIGHT = 8;
+    private static final int SNAKE_SPRITE_TILE_SIZE = 8;
+    private static final int APPLE_SPRITE_INDEX = 0;
+    private static final int APPLE_SPRITE_WIDTH = 8;
+    private static final int APPLE_SPRITE_HEIGHT = 8;
+    private static final int APPLE_SPRITE_TILE_SIZE = 8;
+
+    public static final int FONT_SIZE = 12;
+
+    final Sprite palleteSprite;
+    final Sprite snakeSprite;
+    final Sprite appleSprite;
+    final int width = 640;
+    final int height = 640;
+    final int rows;
+    final int cols;
+
+    public SnakeGameRenderer(int rows, int cols) {
+        this.rows = rows;
+        this.cols = cols;
+
+        GameEngine.orthographicMode(width, height);
+        this.palleteSprite = GameEngine.createSprite("resources/palletes/default.png", PALLETE_SPRITE_INDEX,
+                PALLETE_SPRITE_WIDTH, PALLETE_SPRITE_HEIGHT);
+        this.snakeSprite = GameEngine.createSprite("resources/snakegame/snake-pixel-art.png", SNAKE_SPRITE_INDEX,
+                SNAKE_SPRITE_WIDTH, SNAKE_SPRITE_HEIGHT);
+        this.appleSprite = GameEngine.createSprite("resources/snakegame/apple-pixel-art.png", APPLE_SPRITE_INDEX,
+                APPLE_SPRITE_WIDTH, APPLE_SPRITE_HEIGHT);
+    }
+
+    public void render(SnakeGame game) {
+        renderBackground();
+        int cellWidth = width / cols;
+        int cellHeight = height / rows;
+        renderSnake(game.snake, cellWidth, cellHeight);
+        renderApple(game.apple, cellWidth, cellHeight);
+
+        // draw ui
+        GameEngine.drawText("score: " + game.score, width / 2, -32, FONT_SIZE, FONT_SIZE);
+        if (game.gameOver) {
+            GameEngine.drawText("game over!", width / 2, -height / 2, FONT_SIZE, FONT_SIZE);
+            GameEngine.drawText("press [enter] to try again", width / 2, -height / 2 - 32, FONT_SIZE, FONT_SIZE);
+        }
+    }
+
+    private void renderApple(Apple apple, int cellWidth, int cellHeight) {
+        GameEngine.drawSprite(appleSprite, APPLE_SPRITE_INDEX, APPLE_SPRITE_TILE_SIZE, APPLE_SPRITE_TILE_SIZE,
+                apple.position.x * cellWidth,
+                -apple.position.y * cellHeight,
+                cellWidth,
+                cellHeight);
+    }
+
+    private void renderBackground() {
+        GameEngine.drawSprite(palleteSprite, BACKGROUND_COLOR, PALLETE_SPRITE_TILE_SIZE, PALLETE_SPRITE_TILE_SIZE, 0, 0,
+                width, height);
+    }
+
+    private void renderSnake(Snake snake, int cellWidth, int cellHeight) {
+        var iterator = snake.positionsIterator();
+        if (!iterator.hasNext()) {
+            return;
+        }
+
+        Vector2i currentPos = iterator.next();
+        Vector2i nextPos = currentPos;
+        while (nextPos != null) {
+            Vector2i previousPos = currentPos;
+            currentPos = nextPos;
+            nextPos = iterator.hasNext() ? iterator.next() : null;
+
+            float angle = getSpriteAngle(previousPos, currentPos, nextPos);
+            int snakeTile = getSnakeTile(previousPos, currentPos, nextPos);
+            GameEngine.drawSprite(snakeSprite, snakeTile, SNAKE_SPRITE_TILE_SIZE, SNAKE_SPRITE_TILE_SIZE,
+                    currentPos.x * cellWidth,
+                    -currentPos.y * cellHeight, cellWidth, cellHeight, angle);
+        }
+    }
+
+    private int getSnakeTile(Vector2i previousPos, Vector2i currentPos, Vector2i nextPos) {
+        if (previousPos.equals(currentPos)) {
+            return HEAD_TILE;
+        } else if (isCorner(previousPos, nextPos)) {
+            return CORNER_TILE;
+        } else if (nextPos == null) {
+            return TAIL_TILE;
+        } else {
+            return BODY_TILE;
+        }
+    }
+
+    private float adjustCornerAngle(Vector2i currentPos, Vector2i nextPos, Vector2i previousPos, float angle) {
+        if (crossProduct(previousPos, currentPos, nextPos) > 0) {
+            return angle += 45;
+        } else {
+            return angle -= 135;
+        }
+    }
+
+    public boolean isCorner(Vector2i position1, Vector2i position2) {
+        if (position1 == null || position2 == null) {
+            return false;
+        }
+        return position1.x != position2.x && position1.y != position2.y;
+    }
+
+    public float getSpriteAngle(Vector2i previousPos, Vector2i currentPos, Vector2i nextPos) {
+        if (nextPos == null) {
+            nextPos = currentPos;
+        }
+        int dx = nextPos.x - previousPos.x;
+        int dy = previousPos.y - nextPos.y;
+
+        float angleRadians = (float) Math.atan2(dy, dx);
+        float angleDegrees = (float) Math.toDegrees(angleRadians);
+
+        if (isCorner(previousPos, nextPos)) {
+            angleDegrees = adjustCornerAngle(currentPos, nextPos, previousPos, angleDegrees);
+        }
+
+        return angleDegrees;
+    }
+
+    public int crossProduct(Vector2i p1, Vector2i p2, Vector2i p3) {
+        return (p2.x - p1.x) * (p3.y - p2.y)
+                - (p2.y - p1.y) * (p3.x - p2.x);
     }
 }
