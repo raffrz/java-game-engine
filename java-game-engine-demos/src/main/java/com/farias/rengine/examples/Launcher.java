@@ -2,14 +2,13 @@ package com.farias.rengine.examples;
 
 import java.util.HashMap;
 import java.util.Map;
-import java.util.Optional;
+import java.util.Map.Entry;
 import java.util.Scanner;
-import java.util.function.Consumer;
 
 public class Launcher {
     public static void main(String[] args) {
 
-        Map<String, Consumer<String[]>> demos = new HashMap<>();
+        Map<String, Runnable> demos = new HashMap<>();
 
         demos.put("1 - SpriteMovement", SpriteMovement::launch);
         demos.put("2 - BasicTopDownMovement", BasicTopDownMovement::launch);
@@ -18,20 +17,15 @@ public class Launcher {
         demos.put("5 - Snake", SnakeGame::launch);
 
         System.out.println("Selecione uma opção:");
-        for (String entry : demos.keySet()) {
-            System.out.println(entry);
-        }
+        demos.keySet().forEach(System.out::println);
 
-        Scanner scanner = new Scanner(System.in);
-        String line = scanner.next();
+        var scanner = new Scanner(System.in);
+        var line = scanner.next();
 
-        Optional<String> option = demos.keySet().stream()
-                .filter(k -> k.startsWith(String.valueOf(line)))
-                .findFirst();
-
-        option.ifPresent(o -> {
-            demos.get(o).accept(args);
-        });
+        demos.entrySet().stream()
+                .filter(k -> k.getKey().startsWith(String.valueOf(line)))
+                .findFirst().map(Entry::getValue)
+                .ifPresent(Runnable::run);
 
         scanner.close();
     }

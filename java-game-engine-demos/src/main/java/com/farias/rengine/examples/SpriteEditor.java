@@ -151,7 +151,7 @@ public class SpriteEditor extends Game {
         return new int[] { r, g, b };
     }
 
-    public static void launch(String[] args) {
+    public static void launch() {
         Window window = new Window(512, 512);
         long windowId = window.create();
         SpriteEditor game = new SpriteEditor("Sprite Editor", window);
@@ -161,6 +161,6 @@ public class SpriteEditor extends Game {
     }
 
     public static void main(String[] args) {
-        launch(args);
+        launch();
     }
 }
