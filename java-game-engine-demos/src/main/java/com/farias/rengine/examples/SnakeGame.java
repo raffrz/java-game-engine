@@ -1,9 +1,12 @@
 package com.farias.rengine.examples;
 
-import static org.lwjgl.glfw.GLFW.*;
+import static org.lwjgl.glfw.GLFW.GLFW_KEY_DOWN;
+import static org.lwjgl.glfw.GLFW.GLFW_KEY_ENTER;
+import static org.lwjgl.glfw.GLFW.GLFW_KEY_LEFT;
+import static org.lwjgl.glfw.GLFW.GLFW_KEY_RIGHT;
+import static org.lwjgl.glfw.GLFW.GLFW_KEY_UP;
 
 import java.util.Deque;
-import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Optional;
@@ -24,19 +27,19 @@ public class SnakeGame extends Game {
 
     private static final Random random = new Random();
 
-    private final float updateTime = 0.2f;
+    private static final float UPDATE_TIME = 0.2f;
     private float time = 0;
     private final int rows;
     private final int cols;
-    Snake snake;
-    Apple apple;
+    Deque<Vector2i> snake;
+    Vector2i apple;
     private Direction direction;
     private Direction nexDirection;
     int score;
     private SnakeGameRenderer renderer;
     boolean gameOver = false;
 
-    public static void launch(String[] args) {
+    public static void launch() {
         int windowWidth = 512;
         int windowHeight = 512;
         Window window = new Window(windowWidth, windowHeight);
@@ -48,7 +51,7 @@ public class SnakeGame extends Game {
     }
 
     public static void main(String[] args) {
-        launch(args);
+        launch();
     }
 
     public SnakeGame(Window window, int rows, int cols) {
@@ -64,17 +67,17 @@ public class SnakeGame extends Game {
         int snakeX = this.cols / 3;
         int snakeY = this.rows / 2;
         int snakeSize = 3;
-        this.snake = new Snake(snakeX, snakeY, snakeSize);
+        this.snake = createSnake(snakeX, snakeY, snakeSize);
 
         int appleX = cols / 3 * 2;
-        int appleY = rows / 2;
-        this.apple = new Apple(appleX, appleY);
+        int appleY = rows / 2 + 1;
+        this.apple = new Vector2i(appleX, appleY);
         this.nexDirection = Direction.RIGHT;
     }
 
     @Override
     public void onUserCreate() {
-        this.renderer = new SnakeGameRenderer(rows, cols);
+        this.renderer = new SnakeGameRenderer(640, 640, rows, cols);
     }
 
     @Override
@@ -93,7 +96,7 @@ public class SnakeGame extends Game {
             if (getInputSystem().isKeyPressed(GLFW_KEY_RIGHT)) {
                 this.changeDirection(Direction.RIGHT);
             }
-            if (time >= updateTime) {
+            if (time >= UPDATE_TIME) {
                 this.direction = nexDirection;
                 this.moveSnake();
                 this.time = 0;
@@ -124,20 +127,20 @@ public class SnakeGame extends Game {
     }
 
     public void moveSnake() {
-        final var head = Optional.of(snake.getHead());
+        final var head = Optional.of(snake.peekFirst());
         final Optional<Vector2i> newHead;
         switch (direction) {
             case UP:
-                newHead = head.map((pos) -> new Vector2i(pos.x, pos.y - 1));
+                newHead = head.map(pos -> new Vector2i(pos.x, pos.y - 1));
                 break;
             case DOWN:
-                newHead = head.map((pos) -> new Vector2i(pos.x, pos.y + 1));
+                newHead = head.map(pos -> new Vector2i(pos.x, pos.y + 1));
                 break;
             case LEFT:
-                newHead = head.map((pos) -> new Vector2i(pos.x - 1, pos.y));
+                newHead = head.map(pos -> new Vector2i(pos.x - 1, pos.y));
                 break;
             case RIGHT:
-                newHead = head.map((pos) -> new Vector2i(pos.x + 1, pos.y));
+                newHead = head.map(pos -> new Vector2i(pos.x + 1, pos.y));
                 break;
             default:
                 newHead = Optional.empty();
@@ -148,20 +151,29 @@ public class SnakeGame extends Game {
                 this.gameOver = true;
                 return;
             }
-            snake.add(pos.x, pos.y);
-            if (!apple.isPositionEqualTo(pos)) {
-                snake.remove();
+            snake.offerFirst(pos);
+            if (!apple.equals(pos)) {
+                snake.pollLast();
             } else {
                 var applePosition = randomPosition();
-                apple = new Apple(applePosition.x, applePosition.y);
+                apple = new Vector2i(applePosition.x, applePosition.y);
                 score++;
             }
         });
     }
 
+    public static Deque<Vector2i> createSnake(int x, int y, int size) {
+        var positions = new LinkedList<Vector2i>();
+        positions.offerFirst(new Vector2i(x, y));
+        for (int i = 0; i < size; i++) {
+            positions.offerLast(new Vector2i(x - (i + 1), y));
+        }
+        return positions;
+    }
+
     public boolean isValid(Vector2i position) {
         return position.x >= 0 && position.x < this.cols && position.y >= 0 && position.y < this.rows
-                && !this.snake.contains(position.x, position.y);
+                && !this.snake.contains(position);
     }
 
     public Vector2i randomPosition() {
@@ -169,18 +181,18 @@ public class SnakeGame extends Game {
                 .boxed()
                 .flatMap(x -> IntStream.rangeClosed(1, rows)
                         .mapToObj(y -> new Vector2i(x - 1, y - 1)))
-                .filter(pos -> !this.snake.contains(pos.x, pos.y))
+                .filter(pos -> !this.snake.contains(pos))
                 .collect(Collectors.toList());
 
         return getRandomElement(freePositions);
     }
 
-    public static <T> T getRandomElement(List<T> list) {
+    private static <T> T getRandomElement(List<T> list) {
         var randomIndex = getRandomNumber(0, list.size() - 1);
         return list.get(randomIndex);
     }
 
-    public static int getRandomNumber(int start, int end) {
+    private static int getRandomNumber(int start, int end) {
         return random.nextInt(end - start + 1) + start;
     }
 
@@ -203,54 +215,7 @@ enum Direction {
                 throw new IllegalArgumentException("Invalid direction");
         }
     }
-}
 
-class Snake {
-    final Deque<Vector2i> positions;
-
-    public Snake(int x, int y, int size) {
-        positions = new LinkedList<Vector2i>();
-        positions.offerFirst(new Vector2i(x, y));
-        for (int i = 0; i < size; i++) {
-            positions.offerLast(new Vector2i(x, y));
-        }
-    }
-
-    public Vector2i getHead() {
-        return new Vector2i(positions.peekFirst());
-    }
-
-    public void add(int x, int y) {
-        this.positions.offerFirst(new Vector2i(x, y));
-    }
-
-    public Vector2i remove() {
-        return this.positions.pollLast();
-    }
-
-    public boolean contains(int x, int y) {
-        return positions.contains(new Vector2i(x, y));
-    }
-
-    public Deque<Vector2i> getPositions() {
-        return positions;
-    }
-
-    public Iterator<Vector2i> positionsIterator() {
-        return positions.iterator();
-    }
-}
-
-class Apple {
-    final Vector2i position;
-
-    public Apple(int x, int y) {
-        this.position = new Vector2i(x, y);
-    }
-
-    public boolean isPositionEqualTo(Vector2i pos) {
-        return this.position.equals(pos);
-    }
 }
 
 class SnakeGameRenderer {
@@ -273,19 +238,21 @@ class SnakeGameRenderer {
     private static final int APPLE_SPRITE_HEIGHT = 8;
     private static final int APPLE_SPRITE_TILE_SIZE = 8;
 
-    public static final int FONT_SIZE = 12;
+    public static final int FONT_SIZE = 14;
 
     final Sprite palleteSprite;
     final Sprite snakeSprite;
     final Sprite appleSprite;
-    final int width = 640;
-    final int height = 640;
+    final int width;
+    final int height;
     final int rows;
     final int cols;
 
-    public SnakeGameRenderer(int rows, int cols) {
+    public SnakeGameRenderer(int width, int height, int rows, int cols) {
         this.rows = rows;
         this.cols = cols;
+        this.width = width;
+        this.height = height;
 
         GameEngine.orthographicMode(width, height);
         this.palleteSprite = GameEngine.createSprite("resources/palletes/default.png", PALLETE_SPRITE_INDEX,
@@ -298,12 +265,17 @@ class SnakeGameRenderer {
 
     public void render(SnakeGame game) {
         renderBackground();
+
         int cellWidth = width / cols;
         int cellHeight = height / rows;
+
         renderSnake(game.snake, cellWidth, cellHeight);
         renderApple(game.apple, cellWidth, cellHeight);
 
-        // draw ui
+        renderUI(game);
+    }
+
+    private void renderUI(SnakeGame game) {
         GameEngine.drawText("score: " + game.score, width / 2, -32, FONT_SIZE, FONT_SIZE);
         if (game.gameOver) {
             GameEngine.drawText("game over!", width / 2, -height / 2, FONT_SIZE, FONT_SIZE);
@@ -311,10 +283,10 @@ class SnakeGameRenderer {
         }
     }
 
-    private void renderApple(Apple apple, int cellWidth, int cellHeight) {
+    private void renderApple(Vector2i apple, int cellWidth, int cellHeight) {
         GameEngine.drawSprite(appleSprite, APPLE_SPRITE_INDEX, APPLE_SPRITE_TILE_SIZE, APPLE_SPRITE_TILE_SIZE,
-                apple.position.x * cellWidth,
-                -apple.position.y * cellHeight,
+                apple.x * cellWidth,
+                -apple.y * cellHeight,
                 cellWidth,
                 cellHeight);
     }
@@ -324,8 +296,8 @@ class SnakeGameRenderer {
                 width, height);
     }
 
-    private void renderSnake(Snake snake, int cellWidth, int cellHeight) {
-        var iterator = snake.positionsIterator();
+    private void renderSnake(Deque<Vector2i> snake, int cellWidth, int cellHeight) {
+        var iterator = snake.iterator();
         if (!iterator.hasNext()) {
             return;
         }
@@ -359,10 +331,11 @@ class SnakeGameRenderer {
 
     private float adjustCornerAngle(Vector2i currentPos, Vector2i nextPos, Vector2i previousPos, float angle) {
         if (crossProduct(previousPos, currentPos, nextPos) > 0) {
-            return angle += 45;
+            angle += 45;
         } else {
-            return angle -= 135;
+            angle -= 135;
         }
+        return angle;
     }
 
     public boolean isCorner(Vector2i position1, Vector2i position2) {

@@ -36,7 +36,7 @@ public class SpriteMovement extends ECSGame {
         super(TITLE, screen_width, screen_height, new TopDownCamera2D(screen_width, screen_height, 0.0f));
     }
 
-    public static void launch(String[] args) {
+    public static void launch() {
         Game game = new SpriteMovement();
         GameEngine.initGame(game);
     }

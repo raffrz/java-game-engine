@@ -89,7 +89,7 @@ public class Simple2DGame extends Game {
                 sprite_rotation);
     }
 
-    public static void launch(String[] args) {
+    public static void launch() {
         Window window = new Window(width, height);
         long windowId = window.create();
         Simple2DGame game = new Simple2DGame("Simple 2D Game", window);
