@@ -1,6 +1,7 @@
 package com.farias.rengine.io;
 
 import static org.lwjgl.glfw.GLFW.*;
+import static org.lwjgl.opengl.GL11.GL_TRUE;
 
 import org.lwjgl.glfw.GLFWVidMode;
 
@@ -21,10 +22,15 @@ public class Window {
 
 	public long create() {
 		// init GLFW
-		if (!glfwInit()) {
-			throw new IllegalStateException("Failed to initialize GLFW");
-		}
-		
+        if (!glfwInit()) {
+            throw new IllegalStateException("Failed to initialize GLFW");
+        }
+        
+        glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
+        glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
+        glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+        glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
+        
 		// creating window
 		this.id = glfwCreateWindow(width, height, "",
 				fullscreen ? glfwGetPrimaryMonitor() : 0, 0);

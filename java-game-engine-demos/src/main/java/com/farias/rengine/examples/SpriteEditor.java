@@ -14,6 +14,7 @@ import com.farias.rengine.GameEngine;
 import com.farias.rengine.io.InputSystem;
 import com.farias.rengine.io.Window;
 import com.farias.rengine.render.RenderSystem;
+import com.farias.rengine.render.Sprite;
 
 public class SpriteEditor extends Game {
 
