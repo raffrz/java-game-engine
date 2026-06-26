@@ -86,9 +86,12 @@ public abstract class Game {
 				this.onUserUpdate(deltaTime);
 				updateTime = 0;
 			}
-			//render game
+            //render game
+            GameEngine.setState(GameState.SCENE);
 			renderSystem.update(this, deltaTime);
-			this.onGfxUpdate(deltaTime);
+            this.onGfxUpdate(deltaTime);
+            GameEngine.setState(GameState.UI);
+			this.onUIUpdate(deltaTime);
 			window.swapBuffers(frameLimiter);
 			frameCount++;
 			renderTime = 0;
@@ -112,9 +115,14 @@ public abstract class Game {
 		}
 	}
 
-	public void onGfxUpdate(float deltaTime) {
+    public void onGfxUpdate(float deltaTime) {
 
-	}
+    }
+    
+    // UI
+    public void onUIUpdate(float deltaTime) {
+
+    }
 	
 	public InputSystem getInputSystem() {
 		return inputSystem;

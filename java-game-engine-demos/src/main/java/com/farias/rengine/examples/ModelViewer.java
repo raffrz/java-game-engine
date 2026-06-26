@@ -4,10 +4,6 @@ import static com.farias.rengine.GameEngine.drawText;
 import static com.farias.rengine.GameEngine.drawTexturedModel;
 import static com.farias.rengine.GameEngine.getInput;
 import static com.farias.rengine.GameEngine.orthographicMode;
-import static com.farias.rengine.GameEngine.perspectiveMode;
-import static com.farias.rengine.GameEngine.setCamera;
-import static java.lang.Float.parseFloat;
-import static java.lang.Integer.parseInt;
 import static org.lwjgl.glfw.GLFW.GLFW_KEY_A;
 import static org.lwjgl.glfw.GLFW.GLFW_KEY_DOWN;
 import static org.lwjgl.glfw.GLFW.GLFW_KEY_LEFT;
@@ -15,16 +11,6 @@ import static org.lwjgl.glfw.GLFW.GLFW_KEY_LEFT_SHIFT;
 import static org.lwjgl.glfw.GLFW.GLFW_KEY_RIGHT;
 import static org.lwjgl.glfw.GLFW.GLFW_KEY_UP;
 import static org.lwjgl.glfw.GLFW.GLFW_KEY_Z;
-
-import java.io.BufferedReader;
-import java.io.File;
-import java.io.FileNotFoundException;
-import java.io.FileReader;
-import java.util.ArrayList;
-import java.util.List;
-
-import org.joml.Vector2f;
-import org.joml.Vector3f;
 
 import com.farias.rengine.Game;
 import com.farias.rengine.GameEngine;
@@ -36,41 +22,72 @@ import com.farias.rengine.render.TexturedModel;
 public class ModelViewer extends Game {
 
     private static final int WINDOW_WIDTH = 960;
-    private static final int WINDOW_HEIGTH = 960;
+    private static final int WINDOW_HEIGHT = 960;
     private static final int FONT_SIZE = 20;
-    private static final float CAMERA_SPEED = 2.8f;
+    private static final float CAMERA_SPEED = 5.0f;
     private static final float ROTATION_SPEED = 16f;
 
-    TexturedModel earth;
-    TexturedModel clouds;
-    private int camX = 0;
-    private int camY = 0;
-    private int camZ = -5;
+    private TexturedModel earth;
+    private TexturedModel clouds;
+
+    // ponto observado pela câmera
+    private float targetX = 0;
+    private float targetY = 0;
+    private float targetZ = 0;
+    private float fov = 5f;
+
+    // distância da câmera para visão isométrica
+    private float cameraDistance = 10f;
 
     public ModelViewer(Window window) {
-        super("Model Viewer", window);
+        super("Model Viewer - Isometric", window);
     }
 
     @Override
     public void onUserCreate() {
-        perspectiveMode(WINDOW_WIDTH, WINDOW_HEIGTH);
-        setCamera(0, 0, -5);
-        earth = OBJLoader.loadModel("earth");
-        clouds = OBJLoader.loadModel("clouds");
+
+        // Projeção ortográfica = base da visão isométrica
+        orthographicMode(WINDOW_WIDTH, WINDOW_HEIGHT);
+
+        earth = GameEngine.loadTexturedModel("earth");
+        clouds = GameEngine.loadTexturedModel("clouds");
+
+        updateIsometricCamera();
+    }
+
+    private void updateIsometricCamera() {
+        GameEngine.setCameraLookAt(
+                targetX + cameraDistance,
+                targetY + cameraDistance,
+                targetZ + cameraDistance,
+
+                targetX,
+                targetY,
+                targetZ,
+
+                0, 1, 0);
     }
 
     @Override
     public void onUserUpdate(float deltaTime) {
-        if (earth.getRotation().y > 360)
-            earth.getRotation().y -= 360;
+
+        // rotação da terra
         earth.getRotation().y -= 0.7f * deltaTime * ROTATION_SPEED;
 
-        if (clouds.getRotation().y > 360)
-            clouds.getRotation().y -= 360;
-        clouds.getRotation().y -= 1f * deltaTime * ROTATION_SPEED;
+        if (earth.getRotation().y < -360f) {
+            earth.getRotation().y += 360f;
+        }
 
-        // ATMOSPHERE SIZE
+        // rotação das nuvens
+        clouds.getRotation().y -= 1.0f * deltaTime * ROTATION_SPEED;
+
+        if (clouds.getRotation().y < -360f) {
+            clouds.getRotation().y += 360f;
+        }
+
+        // tamanho da atmosfera
         if (getInput().isKeyDown(GLFW_KEY_A)) {
+
             if (getInput().isKeyDown(GLFW_KEY_LEFT_SHIFT)) {
                 clouds.getScale().sub(0.1f, 0.1f, 0.1f);
             } else {
@@ -78,143 +95,106 @@ public class ModelViewer extends Game {
             }
         }
 
-        // CAMERA CONTROL
+        float move = CAMERA_SPEED * deltaTime;
+
+        /*
+         * Movimento isométrico
+         *
+         * ↑ = nordeste
+         * ↓ = sudoeste
+         * ← = noroeste
+         * → = sudeste
+         */
+
         if (getInput().isKeyDown(GLFW_KEY_UP)) {
-            camY -= 32 * deltaTime * CAMERA_SPEED;
+            targetX += move;
+            targetZ += move;
         }
+
         if (getInput().isKeyDown(GLFW_KEY_DOWN)) {
-            camY += 32 * deltaTime * CAMERA_SPEED;
+            targetX -= move;
+            targetZ -= move;
         }
+
         if (getInput().isKeyDown(GLFW_KEY_LEFT)) {
-            camX += 32 * deltaTime * CAMERA_SPEED;
+            targetX -= move;
+            targetZ += move;
         }
+
         if (getInput().isKeyDown(GLFW_KEY_RIGHT)) {
-            camX -= 32 * deltaTime * CAMERA_SPEED;
+            targetX += move;
+            targetZ -= move;
         }
+
+        // sobe/desce a câmera
+        if (getInput().isKeyDown(GLFW_KEY_UP)) {
+            targetY += move;
+        }
+
+        if (getInput().isKeyDown(GLFW_KEY_DOWN)) {
+            targetY -= move;
+        }
+
+        // zoom
         if (getInput().isKeyDown(GLFW_KEY_Z)) {
+
+            
             if (getInput().isKeyDown(GLFW_KEY_LEFT_SHIFT)) {
-                camZ--;
+                // cameraDistance += move;
+                fov += 2f * deltaTime * CAMERA_SPEED;
             } else {
-                camZ++;
+                // cameraDistance -= move;
+                fov -= 2f * deltaTime * CAMERA_SPEED;
+            }
+
+            if (cameraDistance < 2f) {
+                cameraDistance = 2f;
             }
         }
-        setCamera(camX, camY, camZ);
+
+        updateIsometricCamera();
     }
 
     @Override
     public void onGfxUpdate(float deltaTime) {
-        perspectiveMode(WINDOW_WIDTH, WINDOW_HEIGTH);
+
+        // Renderização 3D ortográfica
+        GameEngine.orthographic3DMode(fov, (float)WINDOW_WIDTH / WINDOW_HEIGHT);
 
         drawTexturedModel(earth);
         drawTexturedModel(clouds);
 
-        orthographicMode(WINDOW_WIDTH, WINDOW_HEIGTH);
-        drawText("ABC", 40, -50, FONT_SIZE, FONT_SIZE);
+        GameEngine.orthographicMode(WINDOW_WIDTH, WINDOW_HEIGHT);
+
+        // UI
+        drawText(
+                "ISOMETRIC VIEW",
+                20,
+                20,
+                FONT_SIZE,
+                FONT_SIZE);
+
+        drawText(
+                "ARROWS = MOVE | Z = ZOOM | SHIFT+Z = ZOOM OUT",
+                20,
+                50,
+                14,
+                14);
     }
 
     public static void main(String[] args) {
-        Window window = new Window(WINDOW_WIDTH, WINDOW_HEIGTH);
+
+        Window window = new Window(
+                WINDOW_WIDTH,
+                WINDOW_HEIGHT);
+
         long windowId = window.create();
+
         ModelViewer game = new ModelViewer(window);
+
         game.addSystem(new InputSystem(windowId));
         game.addSystem(new RenderSystem());
+
         GameEngine.initGame(game);
     }
-}
-
-class OBJLoader {
-
-    private OBJLoader() {
-
-    }
-
-    public static TexturedModel loadModel(String fileName) {
-        FileReader fr = null;
-        try {
-            fr = new FileReader(new File("resources/models/" + fileName + ".obj"));
-        } catch (FileNotFoundException e) {
-            System.err.println("Couldn't load the file!");
-            return null;
-        }
-
-        String line;
-        List<Vector3f> vertices = new ArrayList<>();
-        List<Vector2f> textures = new ArrayList<>();
-        List<Vector3f> normals = new ArrayList<>();
-        List<Integer> indices = new ArrayList<>();
-        float[] verticesArray = null;
-        float[] normalsArray = null;
-        float[] textureArray = null;
-        int[] indicesArray = null;
-        try (BufferedReader reader = new BufferedReader(fr)) {
-            while (true) {
-                line = reader.readLine();
-                String[] currLine = line.split(" ");
-                if (line.startsWith("v ")) {
-                    Vector3f vertex = new Vector3f(parseFloat(currLine[1]), parseFloat(currLine[2]),
-                            parseFloat(currLine[3]));
-                    vertices.add(vertex);
-                } else if (line.startsWith("vt ")) {
-                    Vector2f texture = new Vector2f(parseFloat(currLine[1]), parseFloat(currLine[2]));
-                    textures.add(texture);
-                } else if (line.startsWith("vn ")) {
-                    Vector3f normal = new Vector3f(parseFloat(currLine[1]), parseFloat(currLine[2]),
-                            parseFloat(currLine[3]));
-                    normals.add(normal);
-                } else if (line.startsWith("f ")) {
-                    textureArray = new float[vertices.size() * 2];
-                    normalsArray = new float[vertices.size() * 3];
-                    break;
-                }
-            }
-
-            while (line != null) {
-                if (!line.startsWith("f")) {
-                    line = reader.readLine();
-                    continue;
-                }
-                String[] currLine = line.split(" ");
-                String[] vertex1 = currLine[1].split("/");
-                String[] vertex2 = currLine[2].split("/");
-                String[] vertex3 = currLine[3].split("/");
-
-                processVertex(vertex1, indices, textures, normals, textureArray, normalsArray);
-                processVertex(vertex2, indices, textures, normals, textureArray, normalsArray);
-                processVertex(vertex3, indices, textures, normals, textureArray, normalsArray);
-                line = reader.readLine();
-            }
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-
-        verticesArray = new float[vertices.size() * 3];
-        indicesArray = new int[indices.size()];
-
-        int vertexPointer = 0;
-        for (Vector3f vertex : vertices) {
-            verticesArray[vertexPointer++] = vertex.x;
-            verticesArray[vertexPointer++] = vertex.y;
-            verticesArray[vertexPointer++] = vertex.z;
-        }
-
-        for (int i = 0; i < indices.size(); i++) {
-            indicesArray[i] = indices.get(i);
-        }
-
-        return TexturedModel.load(fileName, verticesArray, textureArray, indicesArray);
-    }
-
-    private static void processVertex(String[] vertexData, List<Integer> indices, List<Vector2f> textures,
-            List<Vector3f> normals, float[] textureArray, float[] normalsArray) {
-        int currentVertexPointer = parseInt(vertexData[0]) - 1;
-        indices.add(currentVertexPointer);
-        Vector2f currentTex = textures.get(parseInt(vertexData[1]) - 1);
-        textureArray[currentVertexPointer * 2] = currentTex.x;
-        textureArray[currentVertexPointer * 2 + 1] = 1 - currentTex.y;
-        Vector3f currentNorm = normals.get(parseInt(vertexData[2]) - 1);
-        normalsArray[currentVertexPointer * 3] = currentNorm.x;
-        normalsArray[currentVertexPointer * 3 + 1] = currentNorm.y;
-        normalsArray[currentVertexPointer * 3 + 2] = currentNorm.z;
-    }
-
 }

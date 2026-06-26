@@ -18,7 +18,7 @@ import org.joml.Vector2i;
 
 import com.farias.rengine.Game;
 import com.farias.rengine.GameEngine;
-import com.farias.rengine.GameEngine.Sprite;
+import com.farias.rengine.render.Sprite;
 import com.farias.rengine.io.InputSystem;
 import com.farias.rengine.io.Window;
 import com.farias.rengine.render.RenderSystem;
@@ -46,6 +46,10 @@ public class SnakeGame extends Game {
         long windowId = window.create();
         SnakeGame game = new SnakeGame(window, 10, 10);
         game.addSystem(new InputSystem(windowId));
+        // RenderSystem.RenderSystemOptions renderOptions = new RenderSystem.RenderSystemOptions();
+        // renderOptions.setEnableCulling(true);
+        // renderOptions.setEnableTransparency(true);
+        // renderOptions.setEnableDepthTest(true);
         game.addSystem(RenderSystem.renderSystem2D());
         GameEngine.initGame(game);
     }
