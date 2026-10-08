@@ -19,8 +19,6 @@ import com.farias.rengine.Game;
 import com.farias.rengine.GameEngine;
 import com.farias.rengine.io.InputSystem;
 import com.farias.rengine.io.Window;
-import com.farias.rengine.render.RenderSystem;
-import com.farias.rengine.render.RenderSystem.RenderSystemOptions;
 import com.farias.rengine.render.TexturedModel;
 
 public class IsometricChess extends Game {
@@ -144,20 +142,18 @@ public class IsometricChess extends Game {
         drawText("ARROWS = MOVE | Z = ZOOM | SHIFT+Z = ZOOM OUT", WINDOW_WIDTH / 2, -50, 14, 14);
     }
 
-    public static void main(String[] args) {
+    public static void launch() {
         Window window = new Window(WINDOW_WIDTH, WINDOW_HEIGHT);
         long windowId = window.create();
 
         IsometricChess game = new IsometricChess(window);
 
         game.addSystem(new InputSystem(windowId));
-        RenderSystemOptions renderOptions = new RenderSystemOptions();
-        renderOptions.setEnableTransparency(false);
-        renderOptions.setEnableDepthTest(true);
-        renderOptions.setEnableCulling(false);
-        game.addSystem(new RenderSystem(renderOptions));
-
         GameEngine.initGame(game);
+    }
+
+    public static void main(String[] args) {
+        launch();
     }
 
     class ChessPiece {

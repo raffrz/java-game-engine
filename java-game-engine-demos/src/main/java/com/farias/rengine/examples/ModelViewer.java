@@ -16,7 +16,6 @@ import com.farias.rengine.Game;
 import com.farias.rengine.GameEngine;
 import com.farias.rengine.io.InputSystem;
 import com.farias.rengine.io.Window;
-import com.farias.rengine.render.RenderSystem;
 import com.farias.rengine.render.TexturedModel;
 
 public class ModelViewer extends Game {
@@ -182,8 +181,7 @@ public class ModelViewer extends Game {
                 14);
     }
 
-    public static void main(String[] args) {
-
+    public static void launch() {
         Window window = new Window(
                 WINDOW_WIDTH,
                 WINDOW_HEIGHT);
@@ -193,8 +191,11 @@ public class ModelViewer extends Game {
         ModelViewer game = new ModelViewer(window);
 
         game.addSystem(new InputSystem(windowId));
-        game.addSystem(new RenderSystem());
 
         GameEngine.initGame(game);
+    }
+
+    public static void main(String[] args) {
+        launch();
     }
 }

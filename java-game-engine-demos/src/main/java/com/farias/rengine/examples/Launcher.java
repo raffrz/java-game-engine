@@ -10,11 +10,11 @@ public class Launcher {
 
         Map<String, Runnable> demos = new HashMap<>();
 
-        demos.put("1 - SpriteMovement", SpriteMovement::launch);
-        demos.put("2 - BasicTopDownMovement", BasicTopDownMovement::launch);
-        demos.put("3 - Simple2DGame", Simple2DGame::launch);
-        demos.put("4 - SpriteEditor", SpriteEditor::launch);
-        demos.put("5 - Snake", SnakeGame::launch);
+        demos.put("1 - Snake", SnakeGame::launch);
+        demos.put("2 - SpriteEditor", SpriteEditor::launch);
+        demos.put("3 - ModelViewer", ModelViewer::launch);
+        demos.put("4 - IsometricChess", IsometricChess::launch);
+        demos.put("5 - ShadowCubeDemo", ShadowCubeDemo::launch);
 
         System.out.println("Selecione uma opção:");
         demos.keySet().forEach(System.out::println);
