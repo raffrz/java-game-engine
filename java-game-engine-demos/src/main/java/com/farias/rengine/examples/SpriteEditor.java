@@ -13,7 +13,6 @@ import com.farias.rengine.Game;
 import com.farias.rengine.GameEngine;
 import com.farias.rengine.io.InputSystem;
 import com.farias.rengine.io.Window;
-import com.farias.rengine.render.RenderSystem;
 import com.farias.rengine.render.Sprite;
 
 public class SpriteEditor extends Game {
@@ -157,7 +156,6 @@ public class SpriteEditor extends Game {
         long windowId = window.create();
         SpriteEditor game = new SpriteEditor("Sprite Editor", window);
         game.addSystem(new InputSystem(windowId));
-        game.addSystem(RenderSystem.renderSystem2D());
         GameEngine.initGame(game);
     }
 
