@@ -84,8 +84,14 @@ public class IsometricChess extends Game {
         scene3DDescriptor = new RenderPassDescriptor("isometric-chess-3d")
                 .clearColor(0f, 0f, 0f, 1f)
                 .depthTest(true)
-                .cullFace(true)
-                .blend(true);
+                // os modelos das pecas de xadrez tem winding oposto ao do
+                // earth/clouds do ModelViewer (exportados de outra fonte), e
+                // culling descarta a face de fora em vez da de dentro. Sem
+                // blend, o depth test sozinho ja resolve corretamente qual
+                // lado mostrar (o mais perto da camera), entao culling aqui
+                // so economizaria fill-rate - nao e necessario pra corretude.
+                .cullFace(false)
+                .blend(false);
 
         uiDescriptor = new RenderPassDescriptor("isometric-chess-ui")
                 .clearColorBuffer(false)
@@ -269,7 +275,9 @@ public class IsometricChess extends Game {
             // Se z <= 1, as peças são pretas. Se z >= 6, as peças são brancas.
             String color = (z <= 1) ? "black" : "white";
             String pieceName = PIECE_TYPES[pieceId] + "_" + color;
-            TexturedModel model = ModelLoader.loadWavefrontOBJ(pieceName, renderer, litShader);
+            // as normais desses .obj apontam pra dentro (confirmado medindo
+            // contra o centroide da malha), senao a iluminacao fica invertida
+            TexturedModel model = ModelLoader.loadWavefrontOBJ(pieceName, renderer, litShader, true);
 
             // Regra de rotação original: Cavalos brancos rotacionam em -180f, pretos em 0f. O resto usa 90f.
             float rotation = DEFAULT_PIECE_ROTATION;
