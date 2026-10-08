@@ -1,9 +1,5 @@
 package com.farias.rengine.examples;
 
-import static com.farias.rengine.GameEngine.drawText;
-import static com.farias.rengine.GameEngine.drawTexturedModel;
-import static com.farias.rengine.GameEngine.getInput;
-import static com.farias.rengine.GameEngine.orthographicMode;
 import static org.lwjgl.glfw.GLFW.GLFW_KEY_DOWN;
 import static org.lwjgl.glfw.GLFW.GLFW_KEY_LEFT;
 import static org.lwjgl.glfw.GLFW.GLFW_KEY_LEFT_SHIFT;
@@ -15,11 +11,27 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.IntStream;
 
+import org.joml.Matrix4f;
+import org.joml.Vector3f;
+
 import com.farias.rengine.Game;
-import com.farias.rengine.GameEngine;
-import com.farias.rengine.io.InputSystem;
-import com.farias.rengine.io.Window;
-import com.farias.rengine.render.TexturedModel;
+import com.farias.rengine.camera.Camera;
+import com.farias.rengine.gfx.BitmapFont;
+import com.farias.rengine.gfx.Materials;
+import com.farias.rengine.gfx.Meshes;
+import com.farias.rengine.gfx.Projections;
+import com.farias.rengine.gfx.Shaders;
+import com.farias.rengine.gfx.SpriteBatch2D;
+import com.farias.rengine.gfx.TexturedModel;
+import com.farias.rengine.renderer.Material;
+import com.farias.rengine.renderer.Mesh;
+import com.farias.rengine.renderer.RenderCommand;
+import com.farias.rengine.renderer.RenderPassDescriptor;
+import com.farias.rengine.renderer.RenderPassNode;
+import com.farias.rengine.renderer.RenderView;
+import com.farias.rengine.renderer.Shader;
+import com.farias.rengine.util.ModelLoader;
+import com.farias.rengine.util.TextureLoader;
 
 public class IsometricChess extends Game {
 
@@ -30,9 +42,16 @@ public class IsometricChess extends Game {
 
     float rotationAngle = 0f;
 
+    private final Camera camera = new Camera();
+    private Shader litShader;
     private TexturedModel whiteTile;
     private TexturedModel blackTile;
     private ChessBoard chessBoard;
+
+    private SpriteBatch2D batch;
+    private BitmapFont font;
+    private RenderPassDescriptor scene3DDescriptor;
+    private RenderPassDescriptor uiDescriptor;
 
     // ponto observado pela câmera
     private float targetX = 0;
@@ -43,28 +62,50 @@ public class IsometricChess extends Game {
     // distância da câmera para visão isométrica
     private float cameraDistance = 10f;
 
-    public IsometricChess(Window window) {
-        super("Isometric Chess", window);
+    public IsometricChess() {
+        super("Isometric Chess", WINDOW_WIDTH, WINDOW_HEIGHT);
     }
 
     @Override
-    public void onUserCreate() {
-        // Projeção ortográfica = base da visão isométrica
-        orthographicMode(WINDOW_WIDTH, WINDOW_HEIGHT);
+    protected void onCreate() {
+        litShader = renderer.createShader(Shaders.LIT_VERTEX, Shaders.LIT_FRAGMENT);
 
         // Inicializa os pisos do tabuleiro
-        whiteTile = GameEngine.createPlane("yellow_sprite", 1, 1);
-        blackTile = GameEngine.createPlane("brown_sprite", 1, 1);
+        whiteTile = createPlane("yellow_sprite", 1, 1);
+        blackTile = createPlane("brown_sprite", 1, 1);
 
         // Inicializa o tabuleiro e popula as peças internamente
         chessBoard = new ChessBoard();
         chessBoard.setupDefaultBoard();
 
+        batch = new SpriteBatch2D(renderer);
+        font = new BitmapFont(batch);
+
+        scene3DDescriptor = new RenderPassDescriptor("isometric-chess-3d")
+                .clearColor(0f, 0f, 0f, 1f)
+                .depthTest(true)
+                .cullFace(true)
+                .blend(true);
+
+        uiDescriptor = new RenderPassDescriptor("isometric-chess-ui")
+                .clearColorBuffer(false)
+                .clearDepthBuffer(false)
+                .depthTest(false)
+                .cullFace(true)
+                .blend(true);
+
         updateIsometricCamera();
     }
 
+    private TexturedModel createPlane(String textureName, float width, float height) {
+        Mesh mesh = Meshes.plane(renderer, width, height);
+        Material material = Materials.lit(renderer, litShader,
+                TextureLoader.load(renderer, "resources/textures/" + textureName + ".png"));
+        return new TexturedModel(mesh, material);
+    }
+
     private void updateIsometricCamera() {
-        GameEngine.setCameraLookAt(
+        camera.lookAt(
                 targetX + cameraDistance,
                 targetY + cameraDistance,
                 targetZ + cameraDistance,
@@ -75,11 +116,11 @@ public class IsometricChess extends Game {
     }
 
     @Override
-    public void onUserUpdate(float deltaTime) {
+    protected void onUpdate(float deltaTime) {
         // BOARD CONTROLS
-        if (getInput().isMouseButtonDown(0)) {
-            double mouseX = getInput().getMouseX();
-            double mouseY = getInput().getMouseY();
+        if (input.isMouseButtonDown(0)) {
+            double mouseX = input.getMouseX();
+            double mouseY = input.getMouseY();
 
             int boardX = (int) (mouseX / (WINDOW_WIDTH / 8));
             int boardZ = (int) (mouseY / (WINDOW_HEIGHT / 8));
@@ -91,23 +132,23 @@ public class IsometricChess extends Game {
 
         // CAMERA CONTROLS
         float move = CAMERA_SPEED * deltaTime;
-        if (getInput().isKeyDown(GLFW_KEY_LEFT)) {
+        if (input.isKeyDown(GLFW_KEY_LEFT)) {
             targetX -= move / 2f;
             targetZ += move / 2f;
         }
-        if (getInput().isKeyDown(GLFW_KEY_RIGHT)) {
+        if (input.isKeyDown(GLFW_KEY_RIGHT)) {
             targetX += move / 2f;
             targetZ -= move / 2f;
         }
-        if (getInput().isKeyDown(GLFW_KEY_UP)) {
+        if (input.isKeyDown(GLFW_KEY_UP)) {
             targetY += move;
         }
-        if (getInput().isKeyDown(GLFW_KEY_DOWN)) {
+        if (input.isKeyDown(GLFW_KEY_DOWN)) {
             targetY -= move;
         }
         // zoom
-        if (getInput().isKeyDown(GLFW_KEY_Z)) {
-            if (getInput().isKeyDown(GLFW_KEY_LEFT_SHIFT)) {
+        if (input.isKeyDown(GLFW_KEY_Z)) {
+            if (input.isKeyDown(GLFW_KEY_LEFT_SHIFT)) {
                 fov += 2f * deltaTime * CAMERA_SPEED;
             } else {
                 fov -= 2f * deltaTime * CAMERA_SPEED;
@@ -120,36 +161,49 @@ public class IsometricChess extends Game {
     }
 
     @Override
-    public void onGfxUpdate(float deltaTime) {
-        GameEngine.orthographic3DMode(fov, (float) WINDOW_WIDTH / WINDOW_HEIGHT);
-        drawBoard();
-        chessBoard.drawPieces();
+    protected void onRender(float deltaTime) {
+        Matrix4f projection3D = Projections.orthographic3D(fov, (float) WINDOW_WIDTH / WINDOW_HEIGHT);
+        RenderView view3D = new RenderView(window.getFramebufferWidth(), window.getFramebufferHeight(),
+                projection3D, camera.getViewMatrix());
+        RenderPassNode scenePass = renderer.createPass(scene3DDescriptor, view3D);
+
+        drawBoard(scenePass);
+        chessBoard.drawPieces(scenePass);
+
+        Matrix4f projectionUI = Projections.orthographic2D(WINDOW_WIDTH, WINDOW_HEIGHT);
+        RenderView viewUI = new RenderView(window.getFramebufferWidth(), window.getFramebufferHeight(),
+                projectionUI, new Matrix4f());
+        RenderPassNode uiPass = renderer.createPass(uiDescriptor, viewUI);
+
+        font.drawText(uiPass, "ISOMETRIC CHESS - LWJGL RENDER ENGINE", WINDOW_WIDTH / 2, -20, FONT_SIZE, FONT_SIZE);
+        font.drawText(uiPass, "ARROWS = MOVE | Z = ZOOM | SHIFT+Z = ZOOM OUT", WINDOW_WIDTH / 2, -50, 14, 14);
     }
 
-    private void drawBoard() {
+    private void drawBoard(RenderPassNode pass) {
         for (int i = 0; i < 8; i++) {
             for (int j = 0; j < 8; j++) {
                 boolean isWhite = (i + j) % 2 == 0;
                 TexturedModel tileModel = isWhite ? whiteTile : blackTile;
-                drawTexturedModel(tileModel, i, 0f, j, 1f, 90f, 0f, 0f);
+                submitModel(pass, tileModel, i, 0f, j, 1f, 90f, 0f, 0f);
             }
         }
     }
 
-    @Override
-    public void onUIUpdate(float deltaTime) {
-        drawText("ISOMETRIC CHESS - LWJGL RENDER ENGINE", WINDOW_WIDTH / 2, -20, FONT_SIZE, FONT_SIZE);
-        drawText("ARROWS = MOVE | Z = ZOOM | SHIFT+Z = ZOOM OUT", WINDOW_WIDTH / 2, -50, 14, 14);
+    private void submitModel(RenderPassNode pass, TexturedModel model, float x, float y, float z, float scale,
+            float rotX, float rotY, float rotZ) {
+        Matrix4f translationMatrix = new Matrix4f().translation(new Vector3f(x, y, z));
+        Matrix4f rotationMatrix = new Matrix4f().rotationXYZ(
+                (float) Math.toRadians(rotX),
+                (float) Math.toRadians(rotY),
+                (float) Math.toRadians(rotZ));
+        Matrix4f scalingMatrix = new Matrix4f().scale(scale, scale, scale);
+        Matrix4f modelMatrix = translationMatrix.mul(scalingMatrix.mul(rotationMatrix));
+
+        pass.submit(new RenderCommand(model.getMesh(), model.getMaterial(), modelMatrix));
     }
 
     public static void launch() {
-        Window window = new Window(WINDOW_WIDTH, WINDOW_HEIGHT);
-        long windowId = window.create();
-
-        IsometricChess game = new IsometricChess(window);
-
-        game.addSystem(new InputSystem(windowId));
-        GameEngine.initGame(game);
+        new IsometricChess().run();
     }
 
     public static void main(String[] args) {
@@ -169,9 +223,9 @@ public class IsometricChess extends Game {
             this.rotationY = rotationY;
         }
 
-        public void draw() {
+        public void draw(RenderPassNode pass) {
             // Reaproveita as constantes de renderização originais das peças
-            drawTexturedModel(model, x, 0f, z, 1.2f, 0f, rotationY, 0f);
+            submitModel(pass, model, x, 0f, z, 1.2f, 0f, rotationY, 0f);
         }
 
         public int getX() { return x; }
@@ -187,8 +241,8 @@ public class IsometricChess extends Game {
             pieces.add(new ChessPiece(model, x, z, rotationY));
         }
 
-        public void drawPieces() {
-            pieces.forEach(ChessPiece::draw);
+        public void drawPieces(RenderPassNode pass) {
+            pieces.forEach(piece -> piece.draw(pass));
         }
 
         public void setupDefaultBoard() {
@@ -210,12 +264,12 @@ public class IsometricChess extends Game {
                 }
             }));
         }
-        
+
         private void createAndPlace(int pieceId, int x, int z) {
             // Se z <= 1, as peças são pretas. Se z >= 6, as peças são brancas.
             String color = (z <= 1) ? "black" : "white";
             String pieceName = PIECE_TYPES[pieceId] + "_" + color;
-            TexturedModel model = GameEngine.loadTexturedModel(pieceName);
+            TexturedModel model = ModelLoader.loadWavefrontOBJ(pieceName, renderer, litShader);
 
             // Regra de rotação original: Cavalos brancos rotacionam em -180f, pretos em 0f. O resto usa 90f.
             float rotation = DEFAULT_PIECE_ROTATION;
