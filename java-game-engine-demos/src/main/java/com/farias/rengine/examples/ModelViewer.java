@@ -162,10 +162,12 @@ public class ModelViewer extends Game {
 
         drawTexturedModel(earth);
         drawTexturedModel(clouds);
+    }
 
+    @Override
+    public void onUIUpdate(float deltaTime) {
         GameEngine.orthographicMode(WINDOW_WIDTH, WINDOW_HEIGHT);
 
-        // UI
         drawText(
                 "ISOMETRIC VIEW",
                 20,
