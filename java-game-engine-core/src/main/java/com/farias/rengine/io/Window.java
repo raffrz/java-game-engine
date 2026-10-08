@@ -77,6 +77,10 @@ public class Window {
 		swapBuffers(false);
 	}
 	
+	public long getHandle() {
+		return id;
+	}
+
 	public int getWidth() {
 		return width;
 	}

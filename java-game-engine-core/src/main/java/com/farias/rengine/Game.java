@@ -3,114 +3,80 @@ package com.farias.rengine;
 import static org.lwjgl.glfw.GLFW.GLFW_KEY_ESCAPE;
 import static org.lwjgl.glfw.GLFW.glfwTerminate;
 
-import java.util.ArrayList;
-import java.util.List;
-
+import com.farias.rengine.engine.Engine;
+import com.farias.rengine.engine.EngineContext;
+import com.farias.rengine.engine.Timer;
+import com.farias.rengine.engine.modules.InputModule;
+import com.farias.rengine.engine.modules.RenderModule;
+import com.farias.rengine.engine.modules.WindowModule;
 import com.farias.rengine.io.InputSystem;
 import com.farias.rengine.io.Window;
+import com.farias.rengine.renderer.Renderer;
 
 /**
- * Dono do game loop. A renderizacao em si (passes, camera, projecao) e
- * gerenciada pela fachada {@link GameEngine}, que por sua vez delega para o
- * Renderer modular.
+ * Casca fina sobre Engine/EngineContext/Timer: monta a janela, o input e o
+ * renderer via modulos, e repassa os callbacks de ciclo de vida do jogo. Nao
+ * ha GameState nem passes fixos aqui - cada Game decide, em onRender, quais
+ * passes criar e submeter (ver Renderer/RenderPassDescriptor), do mesmo jeito
+ * que o renderer/example/Example.java demonstra.
  */
 public abstract class Game {
     private final String title;
-    private final Window window;
-    private final long msPerFrame = 1000 / 60;
-    private final boolean frameLimiter;
-    private InputSystem inputSystem;
-    private final List<System> systems = new ArrayList<>();
+    private final int width;
+    private final int height;
 
-    public Game(String title, Window window) {
-        this(title, window, false);
-    }
+    protected Engine engine;
+    protected EngineContext context;
+    protected Window window;
+    protected InputSystem input;
+    protected Renderer renderer;
+    protected Timer timer;
 
-    public Game(String title, Window window, boolean limitFPS) {
+    protected Game(String title, int width, int height) {
         this.title = title;
-        this.window = window;
-        this.frameLimiter = limitFPS;
+        this.width = width;
+        this.height = height;
     }
 
-    public void init() {
-        window.bind();
-        GameEngine.initRenderer(window.getFramebufferWidth(), window.getFramebufferHeight());
-        this.onUserCreate();
-    }
+    public final void run() {
+        engine = new Engine();
+        engine.registerModule(new WindowModule(width, height, title));
+        engine.registerModule(new InputModule());
+        engine.registerModule(new RenderModule());
+        context = engine.start();
 
-    public void run() {
-        init();
+        window = context.resolve(Window.class);
+        input = context.resolve(InputSystem.class);
+        renderer = context.resolve(Renderer.class);
+        timer = new Timer();
 
-        long start = java.lang.System.currentTimeMillis();
-        long fpsTime = 0;
-        long updateTime = 0;
-        int frameCount = 0;
+        onCreate();
 
         while (!window.shouldClose()) {
-            if (inputSystem.isKeyPressed(GLFW_KEY_ESCAPE)) {
+            if (input.isKeyPressed(GLFW_KEY_ESCAPE)) {
                 break;
             }
 
-            long current = java.lang.System.currentTimeMillis();
-            long elapsed = current - start;
-            start = current;
-            fpsTime += elapsed;
-            updateTime += elapsed;
+            timer.update();
+            float deltaTime = timer.deltaTime();
 
-            if (fpsTime > 1000) {
-                window.setTitle(title + " - FPS: " + frameCount);
-                frameCount = 0;
-                fpsTime = 0;
-            }
+            input.update(this, deltaTime);
+            onUpdate(deltaTime);
 
-            float deltaTime = updateTime / 1000f;
-            if (updateTime > msPerFrame) {
-                inputSystem.update(this, deltaTime);
-                for (System s : systems) {
-                    s.update(this, deltaTime);
-                }
-                this.onUserUpdate(deltaTime);
-                updateTime = 0;
-            }
+            renderer.beginFrame();
+            onRender(deltaTime);
+            renderer.endFrame();
 
-            GameEngine.beginFrame();
-            GameEngine.setState(GameState.SCENE);
-            this.onGfxUpdate(deltaTime);
-            GameEngine.setState(GameState.UI);
-            this.onUIUpdate(deltaTime);
-            GameEngine.endFrame();
-
-            window.swapBuffers(frameLimiter);
-            frameCount++;
+            window.swapBuffers();
         }
 
-        GameEngine.dispose();
+        engine.terminate();
         glfwTerminate();
     }
 
-    public abstract void onUserCreate();
+    protected abstract void onCreate();
 
-    public abstract void onUserUpdate(float deltaTime);
+    protected abstract void onUpdate(float deltaTime);
 
-    public void onGfxUpdate(float deltaTime) {
-    }
-
-    public void onUIUpdate(float deltaTime) {
-    }
-
-    public void addSystem(System system) {
-        if (system instanceof InputSystem is) {
-            this.inputSystem = is;
-        } else {
-            this.systems.add(system);
-        }
-    }
-
-    public InputSystem getInputSystem() {
-        return inputSystem;
-    }
-
-    public Window getWindow() {
-        return window;
-    }
+    protected abstract void onRender(float deltaTime);
 }

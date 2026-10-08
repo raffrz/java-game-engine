@@ -1,7 +1,7 @@
-package com.farias.rengine.render;
+package com.farias.rengine.gfx;
 
 /**
- * GLSL source embutido para os shaders padrao da engine. O novo
+ * GLSL source embutido para os shaders padrao da engine. O
  * com.farias.rengine.renderer.Shader recebe o source direto (sem ler arquivo
  * de classpath), entao os sources ficam aqui como texto.
  */

@@ -1,4 +1,4 @@
-package com.farias.rengine.render;
+package com.farias.rengine.gfx;
 
 import org.joml.Matrix4f;
 import org.joml.Vector3f;
@@ -6,6 +6,10 @@ import org.joml.Vector3f;
 import com.farias.rengine.renderer.Material;
 import com.farias.rengine.renderer.Mesh;
 
+/**
+ * Um Mesh + Material (tipicamente lit via {@link Materials#lit}) mais
+ * posicao/rotacao/escala no mundo.
+ */
 public final class TexturedModel {
     private final Mesh mesh;
     private final Material material;
