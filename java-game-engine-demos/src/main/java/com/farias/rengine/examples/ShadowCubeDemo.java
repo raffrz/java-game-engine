@@ -73,7 +73,7 @@ public class ShadowCubeDemo {
         Renderer renderer = new Renderer(new OpenGLBackend());
         renderer.initialize();
 
-        createScene(renderer, width, height);
+        createScene(renderer, window.getFramebufferWidth(), window.getFramebufferHeight());
 
         long lastTime = System.nanoTime();
         while (!window.shouldClose()) {

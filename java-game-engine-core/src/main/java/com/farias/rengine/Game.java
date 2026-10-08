@@ -34,7 +34,7 @@ public abstract class Game {
 
     public void init() {
         window.bind();
-        GameEngine.initRenderer(window.getWidth(), window.getHeight());
+        GameEngine.initRenderer(window.getFramebufferWidth(), window.getFramebufferHeight());
         this.onUserCreate();
     }
 

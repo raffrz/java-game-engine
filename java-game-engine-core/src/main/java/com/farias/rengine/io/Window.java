@@ -80,12 +80,31 @@ public class Window {
 	public int getWidth() {
 		return width;
 	}
-	
+
 	public int getHeight() {
 		return height;
 	}
-	
+
 	public void setTitle(String title) {
 		glfwSetWindowTitle(id, title);
+	}
+
+	/**
+	 * Tamanho real do framebuffer em pixels. Em telas HiDPI (ex: Retina no
+	 * macOS) isso difere do width/height logico passado ao construtor, e e o
+	 * que deve ser usado para configurar o viewport do OpenGL.
+	 */
+	public int getFramebufferWidth() {
+		int[] w = new int[1];
+		int[] h = new int[1];
+		glfwGetFramebufferSize(id, w, h);
+		return w[0];
+	}
+
+	public int getFramebufferHeight() {
+		int[] w = new int[1];
+		int[] h = new int[1];
+		glfwGetFramebufferSize(id, w, h);
+		return h[0];
 	}
 }

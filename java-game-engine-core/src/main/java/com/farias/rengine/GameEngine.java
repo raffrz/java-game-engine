@@ -190,7 +190,7 @@ public class GameEngine {
 
         RenderPassDescriptor descriptor = new RenderPassDescriptor(state + "-" + renderMode)
                 .depthTest(is3D)
-                .cullFace(!is3D)
+                .cullFace(true)
                 .blend(true)
                 .clearColorBuffer(!clearedThisFrame)
                 .clearDepthBuffer(!clearedThisFrame);
