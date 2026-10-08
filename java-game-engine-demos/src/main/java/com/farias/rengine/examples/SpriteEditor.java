@@ -1,6 +1,8 @@
 package com.farias.rengine.examples;
 
-import static org.lwjgl.glfw.GLFW.*;
+import static org.lwjgl.glfw.GLFW.GLFW_KEY_ENTER;
+import static org.lwjgl.glfw.GLFW.GLFW_KEY_F1;
+import static org.lwjgl.glfw.GLFW.GLFW_KEY_S;
 
 import java.awt.image.BufferedImage;
 import java.io.File;
@@ -8,14 +10,21 @@ import java.io.IOException;
 
 import javax.imageio.ImageIO;
 
-import static com.farias.rengine.GameEngine.*;
+import org.joml.Matrix4f;
+
 import com.farias.rengine.Game;
-import com.farias.rengine.GameEngine;
-import com.farias.rengine.io.InputSystem;
-import com.farias.rengine.io.Window;
-import com.farias.rengine.render.Sprite;
+import com.farias.rengine.gfx.BitmapFont;
+import com.farias.rengine.gfx.Projections;
+import com.farias.rengine.gfx.Sprite;
+import com.farias.rengine.gfx.SpriteBatch2D;
+import com.farias.rengine.renderer.RenderPassDescriptor;
+import com.farias.rengine.renderer.RenderPassNode;
+import com.farias.rengine.renderer.RenderView;
 
 public class SpriteEditor extends Game {
+
+    private static final int WINDOW_SIZE = 512;
+    private static final int VIRTUAL_SIZE = 128;
 
     // 8x8 draw area
     static int[] draw = new int[] {
@@ -35,33 +44,43 @@ public class SpriteEditor extends Game {
             0xffffff, 0x3a8216, 0x73bb4f, 0x744531, 0x592d1b, 0xf1c71a, 0xe6970b, 0x411350
     };
 
+    private SpriteBatch2D batch;
+    private BitmapFont font;
+    private RenderPassDescriptor passDescriptor;
+
     Sprite pallete;
-    Sprite fonts;
     int hover_x = 0;
     int hover_y = -32;
     int selected;
     int color = 0;
     String message = "";
 
-    public SpriteEditor(String title, Window window) {
-        super(title, window);
+    public SpriteEditor() {
+        super("Sprite Editor", WINDOW_SIZE, WINDOW_SIZE);
     }
 
     @Override
-    public void onUserCreate() {
-        orthographicMode(128, 128);
-        pallete = createSprite("resources/palletes/default.png", 0, 256, 64);
+    protected void onCreate() {
+        batch = new SpriteBatch2D(renderer);
+        font = new BitmapFont(batch);
+        pallete = batch.createSprite("resources/palletes/default.png", 0, 256, 64);
+
+        passDescriptor = new RenderPassDescriptor("sprite-editor")
+                .clearColor(0f, 0f, 0f, 1f)
+                .depthTest(false)
+                .cullFace(true)
+                .blend(true);
     }
 
     @Override
-    public void onUserUpdate(float deltaTime) {
-        int mouse_x = (int) getInput().getMouseX() / 4 / 8;
-        int mouse_y = -(int) getInput().getMouseY() / 4 / 8;
+    protected void onUpdate(float deltaTime) {
+        int mouse_x = (int) input.getMouseX() / 4 / 8;
+        int mouse_y = -(int) input.getMouseY() / 4 / 8;
 
         hover_x = mouse_x * 8;
         hover_y = mouse_y * 8;
 
-        if (getInputSystem().isMouseButtonDown(0)) {
+        if (input.isMouseButtonDown(0)) {
             int x = mouse_x - 4;
             int y = -mouse_y - 2;
             selected = 8 * y + x;
@@ -71,39 +90,43 @@ public class SpriteEditor extends Game {
                 color = selected - 72;
         }
 
-        if (getInputSystem().isKeyPressed(GLFW_KEY_F1)) {
+        if (input.isKeyPressed(GLFW_KEY_F1)) {
             System.out.println("hoverx=" + hover_x);
             System.out.println("hovery=" + hover_y);
             System.out.println("selected=" + selected);
             System.out.println("color=" + color);
         }
 
-        if (getInputSystem().isKeyPressed(GLFW_KEY_S)) {
+        if (input.isKeyPressed(GLFW_KEY_S)) {
             save();
         }
         // clear messages
-        if (getInputSystem().isKeyPressed(GLFW_KEY_ENTER)) {
+        if (input.isKeyPressed(GLFW_KEY_ENTER)) {
             message = "";
         }
     }
 
     @Override
-    public void onGfxUpdate(float deltaTime) {
+    protected void onRender(float deltaTime) {
+        RenderView view = new RenderView(window.getFramebufferWidth(), window.getFramebufferHeight(),
+                Projections.orthographic2D(VIRTUAL_SIZE, VIRTUAL_SIZE), new Matrix4f());
+        RenderPassNode pass = renderer.createPass(passDescriptor, view);
+
         // title
-        drawText("Sprite Editor", 64, -4, 4, 4);
+        font.drawText(pass, "Sprite Editor", 64, -4, 4, 4);
         // draw area
         for (int i = 0; i < draw.length; i++) {
-            int color = draw[i];
+            int cellColor = draw[i];
             int x = 8 * (i % 8) + 32;
             int y = -8 * (i / 8) - 16;
-            drawSprite(pallete, color, 32, 32, x, y, 8, 8);
+            batch.draw(pass, pallete, cellColor, 32, 32, SpriteBatch2D.rectTransform(x, y, 8, 8));
         }
         // color bar
-        drawSprite(pallete, 0, 256, 64, 32, -88, 64, 16);
+        batch.draw(pass, pallete, 0, 256, 64, SpriteBatch2D.rectTransform(32, -88, 64, 16));
         // hover
-        drawSprite(pallete, color, 32, 32, hover_x, hover_y, 8, 8);
+        batch.draw(pass, pallete, color, 32, 32, SpriteBatch2D.rectTransform(hover_x, hover_y, 8, 8));
         // info message
-        drawText(message, 64, -112, 4, 4);
+        font.drawText(pass, message, 64, -112, 4, 4);
     }
 
     // TODO Refactor
@@ -152,11 +175,7 @@ public class SpriteEditor extends Game {
     }
 
     public static void launch() {
-        Window window = new Window(512, 512);
-        long windowId = window.create();
-        SpriteEditor game = new SpriteEditor("Sprite Editor", window);
-        game.addSystem(new InputSystem(windowId));
-        GameEngine.initGame(game);
+        new SpriteEditor().run();
     }
 
     public static void main(String[] args) {

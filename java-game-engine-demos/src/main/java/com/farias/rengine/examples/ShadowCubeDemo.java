@@ -4,13 +4,16 @@ import static org.lwjgl.glfw.GLFW.glfwPollEvents;
 
 import org.joml.Matrix4f;
 import org.joml.Vector3f;
-import org.lwjgl.opengl.GL;
 
+import com.farias.rengine.engine.Engine;
+import com.farias.rengine.engine.EngineContext;
+import com.farias.rengine.engine.Timer;
+import com.farias.rengine.engine.modules.RenderModule;
+import com.farias.rengine.engine.modules.WindowModule;
 import com.farias.rengine.io.Window;
 import com.farias.rengine.renderer.Material;
 import com.farias.rengine.renderer.Mesh;
 import com.farias.rengine.renderer.MeshData;
-import com.farias.rengine.renderer.OpenGLBackend;
 import com.farias.rengine.renderer.RenderCommand;
 import com.farias.rengine.renderer.RenderPassDescriptor;
 import com.farias.rengine.renderer.RenderPassNode;
@@ -22,9 +25,9 @@ import com.farias.rengine.renderer.Texture;
 /**
  * Cubo girando projetando sombra sobre um piso (shadow mapping: pass de
  * profundidade do ponto de vista da luz + pass forward que amostra o shadow
- * map). Ao contrario dos outros exemplos, este usa o Renderer modular
- * diretamente (sem passar pela fachada GameEngine), pois o modelo de passes
- * fixos da fachada nao cobre multi-pass customizado como shadow mapping.
+ * map). Ao contrario dos outros exemplos, este nao estende Game - monta
+ * Engine/EngineContext/modulos e roda o loop na mao, para mostrar esse nivel
+ * mais baixo de composicao tambem (o mesmo estilo de Example.java).
  */
 public class ShadowCubeDemo {
 
@@ -61,27 +64,22 @@ public class ShadowCubeDemo {
     }
 
     private void run() {
-        int width = 1280;
-        int height = 720;
+        Engine engine = new Engine();
+        engine.registerModule(new WindowModule(1280, 720, "Shadow Cube Demo"));
+        engine.registerModule(new RenderModule());
+        EngineContext context = engine.start();
 
-        Window window = new Window(width, height);
-        window.create();
-        window.setTitle("Shadow Cube Demo");
-        window.bind();
-        GL.createCapabilities();
-
-        Renderer renderer = new Renderer(new OpenGLBackend());
-        renderer.initialize();
+        Window window = context.resolve(Window.class);
+        Renderer renderer = context.resolve(Renderer.class);
+        Timer timer = new Timer();
 
         createScene(renderer, window.getFramebufferWidth(), window.getFramebufferHeight());
 
-        long lastTime = System.nanoTime();
         while (!window.shouldClose()) {
             glfwPollEvents();
 
-            long now = System.nanoTime();
-            float deltaTime = (now - lastTime) / 1_000_000_000f;
-            lastTime = now;
+            timer.update();
+            float deltaTime = timer.deltaTime();
 
             angle += Math.toRadians(90.0) * deltaTime;
             boxRotation.set(0f, angle, 0f);
@@ -104,7 +102,7 @@ public class ShadowCubeDemo {
             window.swapBuffers();
         }
 
-        renderer.dispose();
+        engine.terminate();
     }
 
     private Matrix4f getBoxModelMatrix() {
