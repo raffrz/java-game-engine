@@ -45,10 +45,9 @@ public class ModelViewer extends Game {
     private float targetX = 0;
     private float targetY = 0;
     private float targetZ = 0;
-    private float fov = 5f;
 
-    // distância da câmera para visão isométrica
-    private float cameraDistance = 10f;
+    // distância da câmera (terra tem raio ~1, entao perto o bastante pra preencher a tela)
+    private float cameraDistance = 3f;
 
     public ModelViewer() {
         super("Model Viewer - Isometric", WINDOW_WIDTH, WINDOW_HEIGHT);
@@ -159,13 +158,13 @@ public class ModelViewer extends Game {
             targetY -= move;
         }
 
-        // zoom
+        // zoom (aproxima/afasta a câmera do alvo)
         if (input.isKeyDown(GLFW_KEY_Z)) {
 
             if (input.isKeyDown(GLFW_KEY_LEFT_SHIFT)) {
-                fov += 2f * deltaTime * CAMERA_SPEED;
+                cameraDistance += 2f * deltaTime * CAMERA_SPEED;
             } else {
-                fov -= 2f * deltaTime * CAMERA_SPEED;
+                cameraDistance -= 2f * deltaTime * CAMERA_SPEED;
             }
 
             if (cameraDistance < 2f) {
@@ -178,8 +177,8 @@ public class ModelViewer extends Game {
 
     @Override
     protected void onRender(float deltaTime) {
-        // Renderização 3D ortográfica
-        Matrix4f projection3D = Projections.orthographic3D(fov, (float) WINDOW_WIDTH / WINDOW_HEIGHT);
+        // Renderização 3D em perspectiva (era ortográfica/isométrica)
+        Matrix4f projection3D = Projections.perspective(WINDOW_WIDTH, WINDOW_HEIGHT);
         RenderView view3D = new RenderView(window.getFramebufferWidth(), window.getFramebufferHeight(),
                 projection3D, camera.getViewMatrix());
         RenderPassNode scenePass = renderer.createPass(scene3DDescriptor, view3D);
@@ -193,8 +192,8 @@ public class ModelViewer extends Game {
                 projectionUI, new Matrix4f());
         RenderPassNode uiPass = renderer.createPass(uiDescriptor, viewUI);
 
-        font.drawText(uiPass, "ISOMETRIC VIEW", 20, 20, FONT_SIZE, FONT_SIZE);
-        font.drawText(uiPass, "ARROWS = MOVE | Z = ZOOM | SHIFT+Z = ZOOM OUT", 20, 50, 14, 14);
+        font.drawText(uiPass, "ISOMETRIC VIEW", WINDOW_WIDTH / 2, -20, FONT_SIZE, FONT_SIZE);
+        font.drawText(uiPass, "ARROWS = MOVE | Z = ZOOM | SHIFT+Z = ZOOM OUT", WINDOW_WIDTH / 2, -50, 14, 14);
     }
 
     public static void launch() {

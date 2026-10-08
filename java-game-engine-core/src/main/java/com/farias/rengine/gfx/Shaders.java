@@ -85,7 +85,10 @@ public final class Shaders {
                 float diffuse = max(dot(normal, normalize(lightDirection)), 0.0);
                 float light = ambientStrength + diffuse * diffuseStrength;
 
-                fragColor = texColor * light;
+                // so a cor e afetada pela luz - o alpha vem direto da
+                // textura, senao fragmentos escuros/em sombra ficam com
+                // alpha baixo e, com blend ligado, parecem transparentes.
+                fragColor = vec4(texColor.rgb * light, texColor.a);
             }
             """;
 }

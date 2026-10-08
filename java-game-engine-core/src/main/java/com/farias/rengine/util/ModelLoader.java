@@ -26,6 +26,18 @@ import com.farias.rengine.renderer.Texture;
 public class ModelLoader {
 
     public static TexturedModel loadWavefrontOBJ(String fileName, Renderer renderer, Shader litShader) {
+        return loadWavefrontOBJ(fileName, renderer, litShader, false);
+    }
+
+    /**
+     * @param flipNormals inverte as normais lidas do arquivo - alguns .obj
+     *                     sao exportados com as normais apontando "pra
+     *                     dentro" (ao contrario de earth/clouds, que ja vem
+     *                     corretas); nesses casos a iluminacao fica invertida
+     *                     a menos que as normais sejam invertidas aqui.
+     */
+    public static TexturedModel loadWavefrontOBJ(String fileName, Renderer renderer, Shader litShader,
+            boolean flipNormals) {
         FileReader fr;
         try {
             fr = new FileReader(new File("resources/models/" + fileName + ".obj"));
@@ -99,10 +111,11 @@ public class ModelLoader {
         }
 
         int normalPointer = 0;
+        float normalSign = flipNormals ? -1f : 1f;
         for (Vector3f normal : outNormals) {
-            normalsArray[normalPointer++] = normal.x;
-            normalsArray[normalPointer++] = normal.y;
-            normalsArray[normalPointer++] = normal.z;
+            normalsArray[normalPointer++] = normal.x * normalSign;
+            normalsArray[normalPointer++] = normal.y * normalSign;
+            normalsArray[normalPointer++] = normal.z * normalSign;
         }
 
         for (int i = 0; i < indices.size(); i++) {
