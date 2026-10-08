@@ -14,16 +14,18 @@ import java.util.Map;
 import org.joml.Vector2f;
 import org.joml.Vector3f;
 
-import com.farias.rengine.GameEngine;
-import com.farias.rengine.render.TexturedModel;
+import com.farias.rengine.gfx.Materials;
+import com.farias.rengine.gfx.TexturedModel;
 import com.farias.rengine.renderer.Material;
 import com.farias.rengine.renderer.Mesh;
 import com.farias.rengine.renderer.MeshData;
+import com.farias.rengine.renderer.Renderer;
+import com.farias.rengine.renderer.Shader;
 import com.farias.rengine.renderer.Texture;
 
 public class ModelLoader {
 
-    public static TexturedModel loadWavefrontOBJ(String fileName) {
+    public static TexturedModel loadWavefrontOBJ(String fileName, Renderer renderer, Shader litShader) {
         FileReader fr;
         try {
             fr = new FileReader(new File("resources/models/" + fileName + ".obj"));
@@ -107,9 +109,9 @@ public class ModelLoader {
             indicesArray[i] = indices.get(i);
         }
 
-        Mesh mesh = GameEngine.getRenderer().createMesh(new MeshData(verticesArray, textureArray, normalsArray, indicesArray));
-        Texture texture = TextureLoader.load(GameEngine.getRenderer(), "resources/textures/" + fileName + ".png");
-        Material material = GameEngine.createLitMaterial(texture);
+        Mesh mesh = renderer.createMesh(new MeshData(verticesArray, textureArray, normalsArray, indicesArray));
+        Texture texture = TextureLoader.load(renderer, "resources/textures/" + fileName + ".png");
+        Material material = Materials.lit(renderer, litShader, texture);
 
         return new TexturedModel(mesh, material);
     }

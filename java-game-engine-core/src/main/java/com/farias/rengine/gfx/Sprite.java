@@ -1,13 +1,13 @@
-package com.farias.rengine.render;
+package com.farias.rengine.gfx;
 
 import org.joml.Vector2f;
 
 import com.farias.rengine.renderer.Texture;
 
 /**
- * A textured quad. The UV sub-rect (offset/scale) is mutable so the same
- * sprite can be re-sliced into a different tile of a spritesheet between
- * draw calls (see GameEngine#drawSprite tile overloads).
+ * Uma textura mais a sub-regiao de UV atualmente selecionada (para recorte de
+ * spritesheet). O offset/scale e mutavel para permitir trocar de tile entre
+ * desenhos sem precisar de uma nova textura ou mesh.
  */
 public final class Sprite {
     private final Texture texture;
