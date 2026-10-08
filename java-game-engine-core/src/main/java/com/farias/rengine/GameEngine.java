@@ -6,73 +6,209 @@ import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.StandardCopyOption;
 
-import com.farias.rengine.ecs.event.EventSystem;
-import com.farias.rengine.io.InputSystem;
-import com.farias.rengine.render.Model;
-import com.farias.rengine.render.Shader;
-import com.farias.rengine.render.Texture;
-import com.farias.rengine.render.TexturedModel;
-import com.farias.rengine.util.ModelLoader;
-
 import org.joml.Matrix4f;
+import org.joml.Vector2f;
 import org.joml.Vector3f;
+import org.lwjgl.opengl.GL;
+
 import com.farias.rengine.camera.Camera;
+import com.farias.rengine.io.InputSystem;
+import com.farias.rengine.render.Shaders;
 import com.farias.rengine.render.Sprite;
+import com.farias.rengine.render.TexturedModel;
+import com.farias.rengine.renderer.Material;
+import com.farias.rengine.renderer.Mesh;
+import com.farias.rengine.renderer.MeshData;
+import com.farias.rengine.renderer.OpenGLBackend;
+import com.farias.rengine.renderer.RenderCommand;
+import com.farias.rengine.renderer.RenderPassDescriptor;
+import com.farias.rengine.renderer.RenderPassNode;
+import com.farias.rengine.renderer.RenderView;
+import com.farias.rengine.renderer.Renderer;
+import com.farias.rengine.renderer.Shader;
+import com.farias.rengine.renderer.Texture;
+import com.farias.rengine.util.TextureLoader;
 
 /**
- * Manages a game instance and provides useful methods that can be invoked from
- * any part of the system
- * 
- * @author rafarias
- *
+ * Fachada estatica da engine. Por baixo, delega toda a renderizacao para o
+ * Renderer modular do modulo java-game-engine-renderer (passes, Material,
+ * Mesh) em vez de chamadas OpenGL imediatas.
  */
 public class GameEngine {
-    private static Game game_instance;
+    private static Game gameInstance;
 
     public static void initGame(Game game) {
-        if (game_instance != null) {
-            throw new IllegalStateException("Cannot create a more tha one game instance.");
+        if (gameInstance != null) {
+            throw new IllegalStateException("Cannot create a more than one game instance.");
         }
-        game_instance = game;
-        game_instance.run();
+        gameInstance = game;
+        gameInstance.run();
     }
 
     public static Game getGameInstance() {
-        if (game_instance == null) {
+        if (gameInstance == null) {
             throw new IllegalStateException("Cannot obtain a game instance. The game must be created first.");
         }
-        return game_instance;
+        return gameInstance;
     }
 
     public static InputSystem getInput() {
         return getGameInstance().getInputSystem();
     }
 
-    public static EventSystem getEventSystem() {
-        return getGameInstance().getEventSystem();
-    }
-
     // WINDOW
+
     public static int getWindowWidth() {
-        return getGameInstance().getWindow().getWidth();
+        return windowWidth;
     }
 
     public static int getWindowHeight() {
-        return getGameInstance().getWindow().getHeight();
+        return windowHeight;
+    }
+
+    private static int windowWidth;
+    private static int windowHeight;
+
+    // RENDERER (internal - driven by Game's loop)
+
+    private static Renderer renderer;
+    private static Shader spriteShader;
+    private static Shader litShader;
+    private static Mesh spriteQuadMesh;
+
+    private static RenderPassNode currentPass;
+
+    /**
+     * Marca que a configuracao de render (estado, modo de projecao, camera)
+     * mudou desde o ultimo draw e um novo pass precisa ser aberto antes do
+     * proximo comando ser submetido. Ver {@link #ensurePass()}.
+     */
+    private static boolean dirty = true;
+
+    /**
+     * Se o color/depth buffer ja foi limpo neste frame. So o primeiro pass
+     * aberto no frame deve limpar; os demais (abertos por causa de uma troca
+     * de modo de projecao ou de estado no meio do frame) desenham por cima.
+     */
+    private static boolean clearedThisFrame;
+
+    private enum RenderMode {
+        MODE_2D,
+        MODE_3D
+    }
+
+    private static RenderMode renderMode = RenderMode.MODE_3D;
+
+    /**
+     * Chamado uma vez por {@link Game#init()}, com o contexto GL ja corrente.
+     */
+    static void initRenderer(int width, int height) {
+        windowWidth = width;
+        windowHeight = height;
+
+        GL.createCapabilities();
+
+        renderer = new Renderer(new OpenGLBackend());
+        renderer.initialize();
+
+        spriteShader = renderer.createShader(Shaders.SPRITE_VERTEX, Shaders.SPRITE_FRAGMENT);
+        litShader = renderer.createShader(Shaders.LIT_VERTEX, Shaders.LIT_FRAGMENT);
+        spriteQuadMesh = renderer.createMesh(spriteQuadData());
+    }
+
+    static void beginFrame() {
+        renderer.beginFrame();
+        currentPass = null;
+        clearedThisFrame = false;
+        dirty = true;
+    }
+
+    static void endFrame() {
+        renderer.endFrame();
+    }
+
+    static void dispose() {
+        renderer.dispose();
+    }
+
+    public static Renderer getRenderer() {
+        return renderer;
+    }
+
+    static Shader getLitShader() {
+        return litShader;
+    }
+
+    private static MeshData spriteQuadData() {
+        float[] vertices = {
+                -1f, 1f, 0f,
+                1f, 1f, 0f,
+                1f, -1f, 0f,
+                -1f, -1f, 0f,
+        };
+        float[] texCoords = {
+                0f, 0f,
+                1f, 0f,
+                1f, 1f,
+                0f, 1f,
+        };
+        float[] normals = {
+                0f, 0f, 1f,
+                0f, 0f, 1f,
+                0f, 0f, 1f,
+                0f, 0f, 1f,
+        };
+        int[] indices = { 0, 3, 2, 2, 1, 0 };
+        return new MeshData(vertices, texCoords, normals, indices);
     }
 
     // GAME STATE
+
     private static GameState state = GameState.SCENE;
 
     public static void setState(GameState newState) {
         state = newState;
+        dirty = true;
     }
 
     public static GameState getState() {
         return state;
     }
 
+    /**
+     * Abre um novo pass se o estado/modo de projecao/camera mudou desde o
+     * ultimo draw (ver os setters abaixo, que marcam {@link #dirty}).
+     * Reaproveita o pass atual quando nada mudou, para que draws consecutivos
+     * compativeis sejam batched no mesmo RenderPassNode.
+     */
+    private static void ensurePass() {
+        if (!dirty && currentPass != null) {
+            return;
+        }
+
+        boolean is3D = state != GameState.UI && renderMode == RenderMode.MODE_3D;
+
+        RenderPassDescriptor descriptor = new RenderPassDescriptor(state + "-" + renderMode)
+                .depthTest(is3D)
+                .cullFace(!is3D)
+                .blend(true)
+                .clearColorBuffer(!clearedThisFrame)
+                .clearDepthBuffer(!clearedThisFrame);
+        if (!clearedThisFrame) {
+            descriptor.clearColor(0f, 0f, 0f, 1f);
+        }
+
+        RenderView view = new RenderView(windowWidth, windowHeight,
+                new Matrix4f(getCurrentProjection()),
+                new Matrix4f(getCurrentCamera().getViewMatrix()));
+
+        currentPass = renderer.createPass(descriptor, view);
+        clearedThisFrame = true;
+        dirty = false;
+    }
+
     // CAMERA
+
     private static final Camera camera = new Camera();
     private static final Camera uiCamera = new Camera(0, 0, -5);
 
@@ -81,82 +217,56 @@ public class GameEngine {
         camera.position.x = x;
         camera.position.y = y;
         camera.position.z = z;
+        dirty = true;
     }
 
     public static void setCamera(int x, int y) {
         camera.disableLookAt();
         camera.position.x = x;
         camera.position.y = y;
+        dirty = true;
     }
 
     public static void rotateCamera(float x, float y) {
         camera.disableLookAt();
         camera.rotation.x = x;
         camera.rotation.y = y;
+        dirty = true;
     }
 
     public static void setCameraZoom(float zoom) {
         camera.scale.x = zoom;
         camera.scale.y = zoom;
+        dirty = true;
     }
 
     public static void setCameraLookAt(float eyeX, float eyeY, float eyeZ,
             float targetX, float targetY, float targetZ,
             float upX, float upY, float upZ) {
-
-        camera.lookAt(eyeX, eyeY, eyeZ,
-                targetX, targetY, targetZ,
-                upX, upY, upZ);
+        camera.lookAt(eyeX, eyeY, eyeZ, targetX, targetY, targetZ, upX, upY, upZ);
+        dirty = true;
     }
 
     private static Camera getCurrentCamera() {
-        if (state == GameState.SCENE) {
-            return camera;
-        } else if (state == GameState.UI) {
-            return uiCamera;
-        } else {
-            throw new IllegalStateException("Invalid game state: " + state);
-        }
+        return state == GameState.UI ? uiCamera : camera;
     }
 
     // PROJECTIONS
 
-    private static final Matrix4f projection_matrix = new Matrix4f();
-    private static final Matrix4f ui_projection_matrix = new Matrix4f();
+    private static final Matrix4f projectionMatrix = new Matrix4f();
+    private static final Matrix4f uiProjectionMatrix = new Matrix4f();
 
-    /**
-     * Sets the current projection to a simple orthographic projection. Works well
-     * with 2D Games
-     * 
-     * @param width
-     * @param height
-     */
     public static void orthographicMode(float width, float height) {
-        // projecao alternativa com o centro da tela sendo (width/2, height/2) o início
-        // da tela em (0, 0)
-        // e final da tela em (width, -height)
-        projection_matrix.setOrtho(0, width, -height, 0, 1000, -1000);
-        ui_projection_matrix.setOrtho(0, width, -height, 0, 1000, -1000);
-        // .rotateX((float) Math.toRadians(-45f))
-        // .rotateZ((float) Math.toRadians(-30f));
-
-        // projecao padrao com o centro da tela sendo (0, 0) o início da tela em
-        // (-width/2, height/2)
-        // e final da tela em (width/2, -height/2)
-        // projection_matrix.setOrtho(-width/2, width/2, -height/2, height/2, 1000,
-        // -1000);
-        // projection_matrix.setOrtho(-width/2, width/2, -height/2, height/2, -width,
-        // width);
+        projectionMatrix.setOrtho(0, width, -height, 0, 1000, -1000);
+        uiProjectionMatrix.setOrtho(0, width, -height, 0, 1000, -1000);
+        renderMode = RenderMode.MODE_2D;
+        dirty = true;
     }
 
     public static void orthographic3DMode(float size, float aspect) {
-        projection_matrix.setOrtho(
-                -size * aspect,
-                size * aspect,
-                -size,
-                size,
-                -1000f,
-                1000f);
+        projectionMatrix.setOrtho(-size * aspect, size * aspect, -size, size, -1000f, 1000f);
+        renderMode = RenderMode.MODE_3D;
+        dirty = true;
     }
 
     private static final int FOV = 70;
@@ -165,69 +275,83 @@ public class GameEngine {
 
     public static void perspectiveMode(int width, int height) {
         float aspectRatio = (float) width / (float) height;
-        projection_matrix.setPerspective((float) Math.toRadians(FOV), aspectRatio, Z_NEAR, Z_FAR);
+        projectionMatrix.setPerspective((float) Math.toRadians(FOV), aspectRatio, Z_NEAR, Z_FAR);
+        renderMode = RenderMode.MODE_3D;
+        dirty = true;
     }
 
-    private static Matrix4f getModelViewMatrix(Vector3f position, Vector3f rotation, Vector3f scale) {
-        Matrix4f modelMatrix = getModelMatrix(position, rotation, scale);
-        
-            return getCurrentCamera().getViewMatrix().mul(modelMatrix, new Matrix4f());
+    private static Matrix4f getCurrentProjection() {
+        return state == GameState.UI ? uiProjectionMatrix : projectionMatrix;
     }
 
     private static Matrix4f getModelMatrix(Vector3f position, Vector3f rotation, Vector3f scale) {
         Matrix4f translationMatrix = new Matrix4f().translation(position);
-        Matrix4f rotationMatrix = new Matrix4f().rotationXYZ((float) Math.toRadians(rotation.x),
-                (float) Math.toRadians(rotation.y), (float) Math.toRadians(rotation.z));
+        Matrix4f rotationMatrix = new Matrix4f().rotationXYZ(
+                (float) Math.toRadians(rotation.x),
+                (float) Math.toRadians(rotation.y),
+                (float) Math.toRadians(rotation.z));
         Matrix4f scalingMatrix = new Matrix4f().scale(scale);
 
         return translationMatrix.mul(scalingMatrix.mul(rotationMatrix));
     }
 
-    private static Matrix4f getCurrentProjection() {
-        if (state == GameState.SCENE) {
-            return projection_matrix;
-        } else if (state == GameState.UI) {
-            return ui_projection_matrix;
-        } else {
-            throw new IllegalStateException("Invalid game state: " + state);
-        }
-    }
-
     // SPRITES
 
     public static Sprite createSprite(String file, int tile, float width, float height) {
-        return Sprite.createSprite(file, tile, width, height);
+        Texture texture = TextureLoader.load(renderer, file);
+        Vector2f offset = new Vector2f();
+        Vector2f scale = new Vector2f();
+        computeTileUV(texture, tile, width, height, offset, scale);
+        return new Sprite(texture, offset, scale);
     }
 
-    public static void drawSprite(Sprite sprite, Matrix4f projection) {
-        sprite.draw(projection);
+    private static void computeTileUV(Texture texture, int tile, float tileWidth, float tileHeight,
+            Vector2f outOffset, Vector2f outScale) {
+        float hTiles = texture.getWidth() / tileWidth;
+        float vTiles = texture.getHeight() / tileHeight;
+        float sx = 1f / hTiles;
+        float sy = 1f / vTiles;
+        int tx = (int) (tile % hTiles);
+        int ty = (int) (tile / hTiles);
+        outScale.set(sx, sy);
+        outOffset.set(sx * tx, sy * ty);
     }
 
     public static void drawSprite(Sprite sprite, int x, int y, int width, int height, float rotation) {
-        Matrix4f modelViewMatrix = getModelViewMatrix(new Vector3f(x + width / 2, y - height / 2, 0),
-                new Vector3f(0, 0, rotation), new Vector3f(width / 2f, height / 2f, 1f));
+        ensurePass();
 
-        Matrix4f projection = getCurrentProjection().mul(modelViewMatrix, new Matrix4f());
+        Material material = renderer.createMaterial(spriteShader, sprite.getTexture());
+        material.setVector2f("uvOffset", sprite.getUvOffset());
+        material.setVector2f("uvScale", sprite.getUvScale());
 
-        drawSprite(sprite, projection);
+        Matrix4f modelMatrix = getModelMatrix(
+                new Vector3f(x + width / 2f, y - height / 2f, 0),
+                new Vector3f(0, 0, rotation),
+                new Vector3f(width / 2f, height / 2f, 1f));
+
+        currentPass.submit(new RenderCommand(spriteQuadMesh, material, modelMatrix));
     }
 
     public static void drawSprite(Sprite sprite, int x, int y, int width, int height) {
         drawSprite(sprite, x, y, width, height, 0f);
     }
 
-    public static void drawSprite(Sprite sprite, int tile, int tile_width, int tile_height, int x, int y, int width,
-            int height) {
-        drawSprite(sprite, tile, tile_width, tile_height, x, y, width, height, 0f);
-    }
-
-    public static void drawSprite(Sprite sprite, int tile, int tile_width, int tile_height, int x, int y, int width,
+    public static void drawSprite(Sprite sprite, int tile, int tileWidth, int tileHeight, int x, int y, int width,
             int height, float rotation) {
-        sprite.setTexCoords(Sprite.createTexCoords(sprite.getTexture(), tile, tile_width, tile_height));
+        Vector2f offset = new Vector2f();
+        Vector2f scale = new Vector2f();
+        computeTileUV(sprite.getTexture(), tile, tileWidth, tileHeight, offset, scale);
+        sprite.setUv(offset, scale);
         drawSprite(sprite, x, y, width, height, rotation);
     }
 
+    public static void drawSprite(Sprite sprite, int tile, int tileWidth, int tileHeight, int x, int y, int width,
+            int height) {
+        drawSprite(sprite, tile, tileWidth, tileHeight, x, y, width, height, 0f);
+    }
+
     // TEXT
+
     private static Sprite font;
     private static final String FONTS_FILE_NAME = "default16x16.png";
 
@@ -237,18 +361,19 @@ public class GameEngine {
                 createFontsFile();
                 font = createSprite(FONTS_FILE_NAME, 0, 16, 16);
             } catch (IOException e) {
-                java.lang.System.err.println("falha ao gravar o arquivo de fontes");
-                java.lang.System.exit(0);
+                throw new RuntimeException("falha ao gravar o arquivo de fontes", e);
             }
         }
         return font;
     }
 
     private static void createFontsFile() throws IOException {
-        InputStream initialStream = GameEngine.class.getClassLoader().getResourceAsStream("fonts/" + FONTS_FILE_NAME);
-        File targetFile = new File(FONTS_FILE_NAME);
-        Files.copy(initialStream, targetFile.toPath(), StandardCopyOption.REPLACE_EXISTING);
-        initialStream.close();
+        try (InputStream in = GameEngine.class.getClassLoader().getResourceAsStream("fonts/" + FONTS_FILE_NAME)) {
+            if (in == null) {
+                throw new IOException("fonts/" + FONTS_FILE_NAME + " nao encontrado no classpath");
+            }
+            Files.copy(in, new File(FONTS_FILE_NAME).toPath(), StandardCopyOption.REPLACE_EXISTING);
+        }
     }
 
     public static void drawText(String text, int x, int y, int width, int height) {
@@ -263,54 +388,10 @@ public class GameEngine {
         drawSprite(getFont(), c, 16, 16, x, y, width, height);
     }
 
-    // MAP
-    public static class Map {
-        private Model model;
-        private Texture texture;
-        private Shader shader;
+    // 3D TEXTURED MODELS
 
-        public Map(Texture texture, Shader shader, Model model) {
-            this.model = model;
-            this.shader = shader;
-            this.texture = texture;
-        }
-    }
-
-    public static Map createMap(String file, int tile, float width, float height) {
-        Texture texture = new Texture(file);
-        Shader shader = new Shader("shader");
-        float[] texCoords = Sprite.createTexCoords(texture, tile, width, height);
-        Model model = new Model(Sprite.VERTICES, texCoords, Sprite.INDICES);
-
-        return new Map(texture, shader, model);
-    }
-
-    public static void drawMap(Map map, int x, int y, int width, int height, int celx, int cely, int celw, int celh) {
-        map.shader.bind();
-        map.texture.bind(0);
-        map.shader.setUniform("sampler", 0);
-        for (int row = 0; row < celh; row++) {
-            for (int col = 0; col < celw; col++) {
-                Matrix4f modelViewMatrix = getModelViewMatrix(
-                        new Vector3f(x + width * col + width / 2, y + height * -row - height / 2, 0),
-                        new Vector3f(0, 0, 0), new Vector3f(width / 2, -height / 2, 1));
-
-                Matrix4f projection = getCurrentProjection().mul(modelViewMatrix, new Matrix4f());
-                map.shader.setUniform("projection", projection);
-                map.model.draw();
-            }
-        }
-    }
-
-    // TEXTURES
-
-    // 3D
     public static void drawTexturedModel(TexturedModel texturedModel) {
-        Matrix4f modelMatrix = texturedModel.getModelMatrix();
-        texturedModel.draw(
-                modelMatrix,
-                camera.getViewMatrix(),
-                getCurrentProjection());
+        submitTexturedModel(texturedModel, texturedModel.getModelMatrix());
     }
 
     public static void drawTexturedModel(TexturedModel texturedModel, float x, float y, float z, float scale,
@@ -319,38 +400,41 @@ public class GameEngine {
                 new Vector3f(x, y, z),
                 new Vector3f(rotX, rotY, rotZ),
                 new Vector3f(scale, scale, scale));
-        texturedModel.draw(
-                modelMatrix,
-                camera.getViewMatrix(),
-                getCurrentProjection());
-    }
-    
-    public static TexturedModel createPlane(String textureFile, float width, float height) {
-        float[] vertices = new float[] {
-            -width / 2, height / 2, 0, // TOP LEFT
-            width / 2, height / 2, 0, // TOP RIGHT
-            width / 2, -height / 2, 0, // BOTTOM RIGHT
-            -width / 2, -height / 2, 0, // BOTTOM LEFT
-        };
-        float[] texCoords = new float[] {
-            0, 0,
-            1, 0,
-            1, 1,
-            0, 1,
-        };
-        float[] normals = new float[] {
-            0, 0, 1
-        };
-        int[] indices = new int[] {
-            0, 3, 2,
-            2, 1, 0
-        };
-        return TexturedModel.load(textureFile, vertices, texCoords, normals, indices);
+        submitTexturedModel(texturedModel, modelMatrix);
     }
 
-    // Resource Management
+    private static void submitTexturedModel(TexturedModel texturedModel, Matrix4f modelMatrix) {
+        ensurePass();
+        currentPass.submit(new RenderCommand(texturedModel.getMesh(), texturedModel.getMaterial(), modelMatrix));
+    }
+
+    public static TexturedModel createPlane(String textureName, float width, float height) {
+        float[] vertices = {
+                -width / 2, height / 2, 0,
+                width / 2, height / 2, 0,
+                width / 2, -height / 2, 0,
+                -width / 2, -height / 2, 0,
+        };
+        float[] texCoords = { 0, 0, 1, 0, 1, 1, 0, 1 };
+        float[] normals = { 0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1 };
+        int[] indices = { 0, 3, 2, 2, 1, 0 };
+
+        Mesh mesh = renderer.createMesh(new MeshData(vertices, texCoords, normals, indices));
+        Texture texture = TextureLoader.load(renderer, "resources/textures/" + textureName + ".png");
+        Material material = createLitMaterial(texture);
+
+        return new TexturedModel(mesh, material);
+    }
+
+    public static Material createLitMaterial(Texture texture) {
+        Material material = renderer.createMaterial(litShader, texture);
+        material.setVector3f("lightDirection", new Vector3f(-1, -1, -1));
+        material.setFloat("ambientStrength", 0.2f);
+        material.setFloat("diffuseStrength", 0.8f);
+        return material;
+    }
+
     public static TexturedModel loadTexturedModel(String fileName) {
-        return ModelLoader.loadWavefrontOBJ(fileName);
+        return com.farias.rengine.util.ModelLoader.loadWavefrontOBJ(fileName);
     }
-
 }

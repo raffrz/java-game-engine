@@ -14,12 +14,17 @@ import java.util.Map;
 import org.joml.Vector2f;
 import org.joml.Vector3f;
 
+import com.farias.rengine.GameEngine;
 import com.farias.rengine.render.TexturedModel;
+import com.farias.rengine.renderer.Material;
+import com.farias.rengine.renderer.Mesh;
+import com.farias.rengine.renderer.MeshData;
+import com.farias.rengine.renderer.Texture;
 
 public class ModelLoader {
 
     public static TexturedModel loadWavefrontOBJ(String fileName) {
-        FileReader fr = null;
+        FileReader fr;
         try {
             fr = new FileReader(new File("resources/models/" + fileName + ".obj"));
         } catch (FileNotFoundException e) {
@@ -102,7 +107,11 @@ public class ModelLoader {
             indicesArray[i] = indices.get(i);
         }
 
-        return TexturedModel.load(fileName, verticesArray, textureArray, normalsArray, indicesArray);
+        Mesh mesh = GameEngine.getRenderer().createMesh(new MeshData(verticesArray, textureArray, normalsArray, indicesArray));
+        Texture texture = TextureLoader.load(GameEngine.getRenderer(), "resources/textures/" + fileName + ".png");
+        Material material = GameEngine.createLitMaterial(texture);
+
+        return new TexturedModel(mesh, material);
     }
 
     private static void processVertex(String[] vertexData, List<Vector3f> vertices, List<Vector2f> textures,
