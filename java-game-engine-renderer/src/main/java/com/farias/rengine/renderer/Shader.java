@@ -6,6 +6,7 @@ import java.util.Map;
 
 import org.joml.Matrix3f;
 import org.joml.Matrix4f;
+import org.joml.Vector2f;
 import org.joml.Vector3f;
 import org.lwjgl.BufferUtils;
 import org.lwjgl.opengl.GL20;
@@ -74,6 +75,15 @@ public class Shader implements Disposable {
         }
     }
 
+    public void setVector2f(String name, Vector2f value) {
+        int location = getUniformLocation(name);
+        if (location != -1) {
+            GL20.glUniform2f(location,
+                    value.x,
+                    value.y);
+        }
+    }
+
     public void setMatrix4f(String name, Matrix4f matrix) {
         int location = getUniformLocation(name);
         if (location == -1)
@@ -99,6 +109,7 @@ public class Shader implements Disposable {
         }
         int uniform = GL20.glGetUniformLocation(program, name);
         if (uniform == -1) {
+            uniforms.put(name, uniform);
             System.err.println("Warning: Uniform '" + name + "' not found in shader program.");
             return -1;
         }

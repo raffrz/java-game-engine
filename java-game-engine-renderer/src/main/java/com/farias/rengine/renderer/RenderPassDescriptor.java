@@ -11,6 +11,8 @@ public final class RenderPassDescriptor {
 
     private boolean depthTest = true;
     private boolean cullFace = true;
+    private boolean blend = false;
+    private Texture depthAttachment;
 
     public RenderPassDescriptor(String name) {
         this.name = name;
@@ -33,6 +35,23 @@ public final class RenderPassDescriptor {
 
     public RenderPassDescriptor cullFace(boolean value) {
         this.cullFace = value;
+        return this;
+    }
+
+    public RenderPassDescriptor blend(boolean value) {
+        this.blend = value;
+        return this;
+    }
+
+    public boolean blend() {
+        return blend;
+    }
+
+    public RenderPassDescriptor depthAttachment(Texture texture) {
+        if (texture != null && !texture.isDepthTexture()) {
+            throw new IllegalArgumentException("Render pass depth attachment must be a depth texture");
+        }
+        this.depthAttachment = texture;
         return this;
     }
 
@@ -68,5 +87,9 @@ public final class RenderPassDescriptor {
 
     public boolean cullFace() {
         return cullFace;
+    }
+
+    public Texture depthAttachment() {
+        return depthAttachment;
     }
 }
