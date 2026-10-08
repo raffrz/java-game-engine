@@ -27,7 +27,7 @@ public class SnakeGame extends Game {
 
     private static final Random random = new Random();
 
-    private static final float UPDATE_TIME = 0.2f;
+    private static final float UPDATE_TIME = 0.6f;
     private float time = 0;
     private final int rows;
     private final int cols;

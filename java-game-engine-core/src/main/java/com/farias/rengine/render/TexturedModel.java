@@ -36,7 +36,7 @@ public class TexturedModel {
                 .invert()
                 .transpose();
         shader.setUniform("normalMatrix", normalMatrix);
-        shader.setUniform("lightDirection", new Vector3f(0, -1, 0));
+        shader.setUniform("lightDirection", new Vector3f(-1, -1, -1));
         shader.setUniform("ambientStrength", 0.2f);
         shader.setUniform("diffuseStrength", 0.8f);
         texture.bind(0);
