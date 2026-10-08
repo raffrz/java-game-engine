@@ -2,20 +2,21 @@ package com.farias.rengine.renderer;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Objects;
 
 import org.joml.Matrix3f;
 import org.joml.Matrix4f;
+import org.joml.Vector2f;
 import org.joml.Vector3f;
 
 public class Material {
-    private Shader shader;
-    private Texture texture;
+    private final Shader shader;
 
     private final Map<String, Object> uniforms = new HashMap<>();
+    private final Map<String, TextureBinding> textures = new HashMap<>();
 
-    public Material(Shader shader, Texture texture) {
-        this.shader = shader;
-        this.texture = texture;
+    public Material(Shader shader) {
+        this.shader = Objects.requireNonNull(shader, "shader");
     }
 
     public void setInt(String name, int value) {
@@ -30,12 +31,22 @@ public class Material {
         uniforms.put(name, new Vector3f(value));
     }
 
+    public void setVector2f(String name, Vector2f value) {
+        uniforms.put(name, new Vector2f(value));
+    }
+
     public void setMatrix4f(String name, Matrix4f value) {
         uniforms.put(name, new Matrix4f(value));
     }
 
     public void setMatrix3f(String name, Matrix3f value) {
         uniforms.put(name, new Matrix3f(value));
+    }
+
+    public void setTexture(String uniformName, Texture texture, int sampler) {
+        textures.put(
+                Objects.requireNonNull(uniformName, "uniformName"),
+                new TextureBinding(Objects.requireNonNull(texture, "texture"), sampler));
     }
 
     public void applyUniforms() {
@@ -49,6 +60,8 @@ public class Material {
                 shader.setFloat(name, f);
             } else if (value instanceof Vector3f v) {
                 shader.setVector3f(name, v);
+            } else if (value instanceof Vector2f v) {
+                shader.setVector2f(name, v);
             } else if (value instanceof Matrix4f m) {
                 shader.setMatrix4f(name, m);
             } else if (value instanceof Matrix3f m) {
@@ -57,27 +70,30 @@ public class Material {
                 throw new IllegalArgumentException("Unsupported uniform type: " + value.getClass());
             }
         }
+
+        for (Map.Entry<String, TextureBinding> entry : textures.entrySet()) {
+            shader.setInt(entry.getKey(), entry.getValue().sampler());
+        }
     }
 
     public void bind() {
         shader.bind();
-        if (texture != null) {
-            texture.bind(0);
+        for (TextureBinding binding : textures.values()) {
+            binding.texture().bind(binding.sampler());
         }
     }
 
     public void unbind() {
-        shader.unbind();
-        if (texture != null) {
-            texture.unbind();
+        for (TextureBinding binding : textures.values()) {
+            binding.texture().unbind(binding.sampler());
         }
+        shader.unbind();
     }
 
     public Shader shader() {
         return shader;
     }
 
-    public Texture texture() {
-        return texture;
+    private record TextureBinding(Texture texture, int sampler) {
     }
 }

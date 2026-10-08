@@ -5,7 +5,6 @@ import java.util.List;
 
 import org.joml.Matrix3f;
 import org.joml.Matrix4f;
-import org.joml.Vector3f;
 
 public final class Renderer {
 
@@ -40,6 +39,13 @@ public final class Renderer {
         return texture;
     }
 
+    public Texture createDepthTexture(int width, int height) {
+        ensureInitialized();
+        Texture texture = Texture.createDepthTexture(width, height);
+        resources.add(texture);
+        return texture;
+    }
+
     public Shader createShader(String vertexSource, String fragmentSource) {
         ensureInitialized();
         Shader shader = new Shader(vertexSource, fragmentSource);
@@ -47,8 +53,16 @@ public final class Renderer {
         return shader;
     }
 
+    public Material createMaterial(Shader shader) {
+        return new Material(shader);
+    }
+
     public Material createMaterial(Shader shader, Texture texture) {
-        return new Material(shader, texture);
+        Material material = createMaterial(shader);
+        if (texture != null) {
+            material.setTexture("uTexture", texture, 0);
+        }
+        return material;
     }
 
     public RenderPassNode createPass(RenderPassDescriptor descriptor, RenderView view) {
@@ -63,7 +77,9 @@ public final class Renderer {
      */
     public void submitPass(RenderPassNode pass) {
         ensureInitialized();
-        this.renderPasses.add(pass);
+        if (!this.renderPasses.contains(pass)) {
+            this.renderPasses.add(pass);
+        }
     }
 
     public void beginFrame() {
@@ -90,7 +106,7 @@ public final class Renderer {
         }
 
         // 1. Inicializa o estado do passe (Clear, Framebuffer bind, etc.)
-        backend.beginPass(pass.descriptor());
+        backend.beginPass(pass.descriptor(), renderView);
 
         // 2. Loop de renderização dos comandos do passe
         Material lastMaterial = null;
@@ -134,6 +150,7 @@ public final class Renderer {
         }
         resources.clear();
         renderPasses.clear();
+        backend.dispose();
         initialized = false;
     }
 

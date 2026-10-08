@@ -5,12 +5,40 @@
 	<groupId>com.farias.rengine</groupId>
 	<artifactId>java-game-engine-renderer</artifactId>
 	<version>1.0.2-SNAPSHOT</version>
+	<properties>
+		<lwjgl.version>3.3.1</lwjgl.version>
+		<joml.version>1.9.20</joml.version>
+	</properties>
+
+	<dependencyManagement>
+		<dependencies>
+			<dependency>
+				<groupId>org.lwjgl</groupId>
+				<artifactId>lwjgl-bom</artifactId>
+				<version>${lwjgl.version}</version>
+				<scope>import</scope>
+				<type>pom</type>
+			</dependency>
+		</dependencies>
+	</dependencyManagement>
 
 	<dependencies>
 		<dependency>
-			<groupId>com.farias.rengine</groupId>
-			<artifactId>java-game-engine-core</artifactId>
-			<version>1.0.2-SNAPSHOT</version>
+			<groupId>org.lwjgl</groupId>
+			<artifactId>lwjgl</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.lwjgl</groupId>
+			<artifactId>lwjgl-glfw</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.lwjgl</groupId>
+			<artifactId>lwjgl-opengl</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.joml</groupId>
+			<artifactId>joml</artifactId>
+			<version>${joml.version}</version>
 		</dependency>
 		<dependency>
 			<groupId>com.farias.rengine</groupId>
@@ -33,7 +61,7 @@
 							<archive>
 							<manifest>
 								<mainClass>
-									com.farias.rengine.examples.Launcher
+									com.farias.rengine.renderer.example.Example
 								</mainClass>
 							</manifest>
 							</archive>

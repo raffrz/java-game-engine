@@ -20,6 +20,7 @@ import com.farias.rengine.renderer.RenderPassNode;
 import com.farias.rengine.renderer.RenderView;
 import com.farias.rengine.renderer.Renderer;
 import com.farias.rengine.renderer.Shader;
+import com.farias.rengine.renderer.Texture;
 
 public class Example {
 
@@ -27,21 +28,29 @@ public class Example {
     private Mesh boxMesh;
     private Mesh floorMesh;
     private Material boxMaterial;
+    private Material floorMaterial;
+    private Material shadowMaterial;
     private Transform boxTransform;
     private Transform floorTransform;
     private RenderView renderView;
+    private RenderView shadowView;
+    private Matrix4f lightSpaceMatrix;
     private float angle;
 
     // Cache de Objetos para evitar o Garbage Collector no Loop Principal
     private RenderPassDescriptor forwardDescriptor;
+    private RenderPassDescriptor shadowDescriptor;
     private RenderCommand boxCommand;
     private RenderCommand floorCommand;
+    private RenderCommand shadowBoxCommand;
 
     private void createScene(EngineContext ctx) {
         var renderer = ctx.resolve(Renderer.class);
+        var window = ctx.resolve(Window.class);
+        FramebufferSize framebufferSize = window.framebufferSize();
 
         // 1. Configuração da Câmera e Instanciação de Malhas
-        this.renderView = RenderView.createDefault(1280, 720);
+        this.renderView = RenderView.createDefault(framebufferSize.width(), framebufferSize.height());
         this.boxMesh = renderer.createMesh(MeshData.createCube());
         this.floorMesh = renderer.createMesh(MeshData.createPlane());
 
@@ -52,13 +61,51 @@ public class Example {
                 new Vector3f(10.0f, 1.0f, 10.0f)
         );
 
-        // 3. Configuração de Material e Shaders
-        this.boxMaterial = renderer.createMaterial(new Shader(VERTEX_SHADER, FRAGMENT_SHADER), null);
-        boxMaterial.setVector3f("lightDirection", new Vector3f(-1.0f, -1.0f, -1.0f));
+        // 3. Configuração da luz e do Shadow Map
+        Texture shadowMap = renderer.createDepthTexture(2048, 2048);
+        Vector3f lightDirection = new Vector3f(-0.45f, 1.0f, 0.35f).normalize();
+        Matrix4f lightView = new Matrix4f()
+                .lookAt(
+                        new Vector3f(lightDirection).mul(8.0f).add(0.0f, 0.0f, -2.0f),
+                        new Vector3f(0.0f, 0.0f, -2.0f),
+                        new Vector3f(0.0f, 1.0f, 0.0f));
+        Matrix4f lightProjection = new Matrix4f()
+                .ortho(-7.0f, 7.0f, -7.0f, 7.0f, 1.0f, 18.0f);
+        this.lightSpaceMatrix = new Matrix4f(lightProjection).mul(lightView);
+        this.shadowView = new RenderView(shadowMap.getWidth(), shadowMap.getHeight(), lightProjection, lightView);
+
+        // 4. Configuração de Material e Shaders
+        Shader forwardShader = renderer.createShader(VERTEX_SHADER, FRAGMENT_SHADER);
+        Shader shadowShader = renderer.createShader(SHADOW_VERTEX_SHADER, SHADOW_FRAGMENT_SHADER);
+
+        this.boxMaterial = renderer.createMaterial(forwardShader);
+        boxMaterial.setVector3f("objectColor", new Vector3f(1.0f, 0.5f, 0.2f));
+        boxMaterial.setVector3f("lightDirection", lightDirection);
         boxMaterial.setFloat("ambientStrength", 0.2f);
         boxMaterial.setFloat("diffuseStrength", 0.8f);
+        boxMaterial.setFloat("shadowBias", 0.004f);
+        boxMaterial.setMatrix4f("lightSpaceMatrix", lightSpaceMatrix);
+        boxMaterial.setTexture("shadowMap", shadowMap, 1);
 
-        // 4. PRÉ-ALOCAÇÃO: Objetos criados uma única vez na memória
+        this.floorMaterial = renderer.createMaterial(forwardShader);
+        floorMaterial.setVector3f("objectColor", new Vector3f(0.72f, 0.78f, 0.68f));
+        floorMaterial.setVector3f("lightDirection", lightDirection);
+        floorMaterial.setFloat("ambientStrength", 0.25f);
+        floorMaterial.setFloat("diffuseStrength", 0.75f);
+        floorMaterial.setFloat("shadowBias", 0.002f);
+        floorMaterial.setMatrix4f("lightSpaceMatrix", lightSpaceMatrix);
+        floorMaterial.setTexture("shadowMap", shadowMap, 1);
+
+        this.shadowMaterial = renderer.createMaterial(shadowShader);
+
+        // 5. PRÉ-ALOCAÇÃO: Objetos criados uma única vez na memória
+        this.shadowDescriptor = new RenderPassDescriptor("shadow")
+                .depthAttachment(shadowMap)
+                .clearColorBuffer(false)
+                .clearDepthBuffer(true)
+                .depthTest(true)
+                .cullFace(false);
+
         this.forwardDescriptor = new RenderPassDescriptor("forward")
                 .clearColor(0.1f, 0.2f, 0.3f, 1f)
                 .depthTest(true)
@@ -66,7 +113,8 @@ public class Example {
 
         // Inicializa os comandos com matrizes identidade (serão atualizadas no loop)
         this.boxCommand = new RenderCommand(boxMesh, boxMaterial, new Matrix4f());
-        this.floorCommand = new RenderCommand(floorMesh, boxMaterial, floorTransform.getTransformMatrix());
+        this.floorCommand = new RenderCommand(floorMesh, floorMaterial, floorTransform.getTransformMatrix());
+        this.shadowBoxCommand = new RenderCommand(boxMesh, shadowMaterial, new Matrix4f());
     }
 
     public void run() {
@@ -95,18 +143,22 @@ public class Example {
             if (timer.shouldRender()) {
                 renderer.beginFrame();
 
-                // O renderer consome o descritor pré-alocado
-                RenderPassNode forwardPass = renderer.createPass(forwardDescriptor, renderView);
-
                 // Reutiliza e atualiza as matrizes dos comandos em vez de dar 'new'
                 boxCommand.setModelMatrix(boxTransform.getTransformMatrix());
                 floorCommand.setModelMatrix(floorTransform.getTransformMatrix());
+                shadowBoxCommand.setModelMatrix(boxTransform.getTransformMatrix());
+
+                // Primeiro passe: renderiza profundidade do cubo do ponto de vista da luz
+                RenderPassNode shadowPass = renderer.createPass(shadowDescriptor, shadowView);
+                shadowPass.submit(shadowBoxCommand);
+
+                // Segundo passe: renderiza cena principal usando o shadow map
+                RenderPassNode forwardPass = renderer.createPass(forwardDescriptor, renderView);
 
                 // Submete os mesmos objetos reutilizados da memória
                 forwardPass.submit(boxCommand);
                 forwardPass.submit(floorCommand);
 
-                renderer.submitPass(forwardPass);
                 renderer.endFrame();
                 
                 window.swapBuffers();
@@ -131,43 +183,94 @@ public class Example {
 
         out vec2 tex_coords;
         out vec3 fragNormal;
+        out vec4 fragLightSpace;
 
         uniform mat4 uView;
         uniform mat4 uProjection;
         uniform mat4 uModel;
         uniform mat3 uNormal;
+        uniform mat4 lightSpaceMatrix;
 
         void main() {
             tex_coords = textures;
             fragNormal = normalize(uNormal * normals);
-            gl_Position = uProjection * uView * uModel * vec4(vertices, 1.0);
+            vec4 worldPosition = uModel * vec4(vertices, 1.0);
+            fragLightSpace = lightSpaceMatrix * worldPosition;
+            gl_Position = uProjection * uView * worldPosition;
         }
     """;
 
     private static final String FRAGMENT_SHADER = """
         #version 330 core
+        uniform vec3 objectColor;
         uniform vec3 lightDirection;
         uniform float ambientStrength;
         uniform float diffuseStrength;
+        uniform float shadowBias;
+        uniform sampler2D shadowMap;
 
         in vec2 tex_coords;
         in vec3 fragNormal;
+        in vec4 fragLightSpace;
         out vec4 fragColor;
 
+        float calculateShadow(vec4 lightSpacePosition, vec3 normal, vec3 lightDir) {
+            vec3 projectedCoords = lightSpacePosition.xyz / lightSpacePosition.w;
+            projectedCoords = projectedCoords * 0.5 + 0.5;
+
+            if (projectedCoords.z > 1.0) {
+                return 0.0;
+            }
+
+            float bias = max(shadowBias * (1.0 - dot(normal, lightDir)), shadowBias * 0.25);
+            float shadow = 0.0;
+            vec2 texelSize = 1.0 / textureSize(shadowMap, 0);
+
+            for (int x = -1; x <= 1; x++) {
+                for (int y = -1; y <= 1; y++) {
+                    float closestDepth = texture(shadowMap, projectedCoords.xy + vec2(x, y) * texelSize).r;
+                    shadow += projectedCoords.z - bias > closestDepth ? 1.0 : 0.0;
+                }
+            }
+
+            return shadow / 9.0;
+        }
+
         void main() {
-            vec4 texColor = vec4(1.0, 0.5, 0.2, 1.0); 
+            vec4 texColor = vec4(objectColor, 1.0); 
 
             vec3 normal = normalize(fragNormal);
             if (length(normal) == 0.0) normal = vec3(0.0, 1.0, 0.0);
 
             vec3 lightDir = lightDirection;
-            if (length(lightDir) == 0.0) lightDir = vec3(-1.0, -1.0, -1.0);
+            if (length(lightDir) == 0.0) lightDir = vec3(-0.45, 1.0, 0.35);
             lightDir = normalize(lightDir);
 
             float diffuse = max(dot(normal, lightDir), 0.0);
-            float light = ambientStrength + (diffuse * diffuseStrength);
+            float shadow = calculateShadow(fragLightSpace, normal, lightDir);
+            float light = ambientStrength + ((1.0 - shadow) * diffuse * diffuseStrength);
 
             fragColor = texColor * light;
+        }
+    """;
+
+    private static final String SHADOW_VERTEX_SHADER = """
+        #version 330 core
+        layout(location = 0) in vec3 vertices;
+
+        uniform mat4 uView;
+        uniform mat4 uProjection;
+        uniform mat4 uModel;
+
+        void main() {
+            gl_Position = uProjection * uView * uModel * vec4(vertices, 1.0);
+        }
+    """;
+
+    private static final String SHADOW_FRAGMENT_SHADER = """
+        #version 330 core
+
+        void main() {
         }
     """;
 }
@@ -342,6 +445,16 @@ class Window {
     public long getWindowHandle() {
         return windowHandle;
     }
+
+    public FramebufferSize framebufferSize() {
+        int[] width = new int[1];
+        int[] height = new int[1];
+        GLFW.glfwGetFramebufferSize(windowHandle, width, height);
+        return new FramebufferSize(width[0], height[0]);
+    }
+}
+
+record FramebufferSize(int width, int height) {
 }
 
 class UtilsModule implements Module {
