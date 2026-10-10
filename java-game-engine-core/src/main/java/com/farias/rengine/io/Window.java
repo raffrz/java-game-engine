@@ -60,6 +60,10 @@ public class Window {
 		this.height = height;
 	}
 
+	public void pollEvents() {
+		glfwPollEvents();
+	}
+
 	public boolean shouldClose() {
 		return glfwWindowShouldClose(id);
 	}

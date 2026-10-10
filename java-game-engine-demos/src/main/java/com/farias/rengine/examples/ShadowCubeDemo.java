@@ -1,6 +1,7 @@
 package com.farias.rengine.examples;
 
-import static org.lwjgl.glfw.GLFW.glfwPollEvents;
+import java.util.List;
+import java.util.function.Function;
 
 import org.joml.Matrix4f;
 import org.joml.Vector3f;
@@ -11,6 +12,7 @@ import com.farias.rengine.engine.Timer;
 import com.farias.rengine.engine.modules.RenderModule;
 import com.farias.rengine.engine.modules.WindowModule;
 import com.farias.rengine.io.Window;
+import com.farias.rengine.renderer.DirectionalLight;
 import com.farias.rengine.renderer.Material;
 import com.farias.rengine.renderer.Mesh;
 import com.farias.rengine.renderer.MeshData;
@@ -28,42 +30,58 @@ import com.farias.rengine.renderer.Texture;
  * map). Ao contrario dos outros exemplos, este nao estende Game - monta
  * Engine/EngineContext/modulos e roda o loop na mao, para mostrar esse nivel
  * mais baixo de composicao tambem (o mesmo estilo de Example.java).
+ *
+ * Estilo funcional: o estado e um valor imutavel (State), a simulacao e a
+ * geracao de comandos sao funcoes puras, e os efeitos colaterais (GPU/janela)
+ * ficam so em render e run.
  */
-public class ShadowCubeDemo {
+public final class ShadowCubeDemo {
 
-    private Mesh boxMesh;
-    private Mesh floorMesh;
-    private Material boxMaterial;
-    private Material floorMaterial;
-    private Material shadowMaterial;
-
-    private final Vector3f boxPosition = new Vector3f(0f, 0f, -2f);
-    private final Vector3f boxRotation = new Vector3f();
-    private final Vector3f boxScale = new Vector3f(1f, 1f, 1f);
-    private final Matrix4f floorModelMatrix = new Matrix4f()
+    private static final Matrix4f FLOOR_MODEL = new Matrix4f()
             .translate(0f, -1f, -2f)
             .scale(10f, 1f, 10f);
 
-    private RenderView renderView;
-    private RenderView shadowView;
-    private Matrix4f lightSpaceMatrix;
-    private float angle;
-
-    private RenderPassDescriptor forwardDescriptor;
-    private RenderPassDescriptor shadowDescriptor;
-    private RenderCommand boxCommand;
-    private RenderCommand floorCommand;
-    private RenderCommand shadowBoxCommand;
-
-    public static void launch() {
-        new ShadowCubeDemo().run();
+    private ShadowCubeDemo() {
     }
+
+    // ---- Tipos (valores imutaveis) ----
+
+    /** Todo o estado mutavel da simulacao: so o angulo do cubo. */
+    private record State(float angle) {
+        static final State INITIAL = new State(0f);
+
+        State advance(float deltaTime) {
+            return new State(angle + (float) Math.toRadians(90.0) * deltaTime);
+        }
+    }
+
+    /** Tudo que e criado uma vez so (GPU), passado explicitamente. */
+    private record Resources(
+            RenderView view,
+            RenderView shadowView,
+            RenderPassDescriptor shadowPass,
+            RenderPassDescriptor forwardPass,
+            Mesh boxMesh,
+            Mesh floorMesh,
+            Material boxMaterial,
+            Material floorMaterial,
+            Material shadowMaterial) {
+    }
+
+    private record LitParams(Vector3f color, float ambient, float diffuse, float shadowBias) {
+    }
+
+    // ---- Ponto de entrada e loop ----
 
     public static void main(String[] args) {
         launch();
     }
 
-    private void run() {
+    public static void launch() {
+        run();
+    }
+
+    private static void run() {
         Engine engine = new Engine();
         engine.registerModule(new WindowModule(1280, 720, "Shadow Cube Demo"));
         engine.registerModule(new RenderModule());
@@ -71,103 +89,100 @@ public class ShadowCubeDemo {
 
         Window window = context.resolve(Window.class);
         Renderer renderer = context.resolve(Renderer.class);
+        Resources resources = createResources(renderer, window.getFramebufferWidth(), window.getFramebufferHeight());
         Timer timer = new Timer();
 
-        createScene(renderer, window.getFramebufferWidth(), window.getFramebufferHeight());
-
+        State state = State.INITIAL;
         while (!window.shouldClose()) {
-            glfwPollEvents();
-
+            window.pollEvents();
             timer.update();
-            float deltaTime = timer.deltaTime();
-
-            angle += Math.toRadians(90.0) * deltaTime;
-            boxRotation.set(0f, angle, 0f);
-
-            renderer.beginFrame();
-
-            Matrix4f boxModelMatrix = getBoxModelMatrix();
-            boxCommand.setModelMatrix(boxModelMatrix);
-            shadowBoxCommand.setModelMatrix(boxModelMatrix);
-
-            RenderPassNode shadowPass = renderer.createPass(shadowDescriptor, shadowView);
-            shadowPass.submit(shadowBoxCommand);
-
-            RenderPassNode forwardPass = renderer.createPass(forwardDescriptor, renderView);
-            forwardPass.submit(boxCommand);
-            forwardPass.submit(floorCommand);
-
-            renderer.endFrame();
-
+            state = update(state, timer.deltaTime());
+            render(renderer, resources, state);
             window.swapBuffers();
         }
 
         engine.terminate();
     }
 
-    private Matrix4f getBoxModelMatrix() {
-        return new Matrix4f()
-                .translate(boxPosition)
-                .rotateXYZ(boxRotation.x, boxRotation.y, boxRotation.z)
-                .scale(boxScale);
+    // ---- Simulacao (pura) ----
+
+    private static State update(State state, float deltaTime) {
+        return state.advance(deltaTime);
     }
 
-    private void createScene(Renderer renderer, int width, int height) {
-        this.renderView = RenderView.createDefault(width, height);
-        this.boxMesh = renderer.createMesh(MeshData.createCube());
-        this.floorMesh = renderer.createMesh(MeshData.createPlane());
+    // ---- Renderizacao ----
 
+    private static void render(Renderer renderer, Resources r, State state) {
+        Matrix4f boxModel = boxModel(state);
+
+        renderer.beginFrame();
+        submitPass(renderer, r.shadowPass(), r.shadowView(), shadowCommands(r, boxModel));
+        submitPass(renderer, r.forwardPass(), r.view(), forwardCommands(r, boxModel));
+        renderer.endFrame();
+    }
+
+    private static void submitPass(Renderer renderer, RenderPassDescriptor descriptor, RenderView view,
+            List<RenderCommand> commands) {
+        RenderPassNode pass = renderer.createPass(descriptor, view);
+        commands.forEach(pass::submit);
+    }
+
+    private static Matrix4f boxModel(State state) {
+        return new Matrix4f()
+                .translate(0f, 0f, -2f)
+                .rotateY(state.angle());
+    }
+
+    private static List<RenderCommand> shadowCommands(Resources r, Matrix4f boxModel) {
+        return List.of(new RenderCommand(r.boxMesh(), r.shadowMaterial(), boxModel));
+    }
+
+    private static List<RenderCommand> forwardCommands(Resources r, Matrix4f boxModel) {
+        return List.of(
+                new RenderCommand(r.boxMesh(), r.boxMaterial(), boxModel),
+                new RenderCommand(r.floorMesh(), r.floorMaterial(), FLOOR_MODEL));
+    }
+
+    // ---- Criacao dos recursos (retorna um valor, nao grava em campos) ----
+
+    private static Resources createResources(Renderer renderer, int width, int height) {
         Texture shadowMap = renderer.createDepthTexture(2048, 2048);
-        Vector3f lightDirection = new Vector3f(-0.45f, 1.0f, 0.35f).normalize();
-        Matrix4f lightView = new Matrix4f()
-                .lookAt(
-                        new Vector3f(lightDirection).mul(8.0f).add(0.0f, 0.0f, -2.0f),
-                        new Vector3f(0.0f, 0.0f, -2.0f),
-                        new Vector3f(0.0f, 1.0f, 0.0f));
-        Matrix4f lightProjection = new Matrix4f()
-                .ortho(-7.0f, 7.0f, -7.0f, 7.0f, 1.0f, 18.0f);
-        this.lightSpaceMatrix = new Matrix4f(lightProjection).mul(lightView);
-        this.shadowView = new RenderView(shadowMap.getWidth(), shadowMap.getHeight(), lightProjection, lightView);
+        DirectionalLight light = new DirectionalLight(
+                new Vector3f(-0.45f, 1.0f, 0.35f), new Vector3f(0.0f, 0.0f, -2.0f), 8.0f, 7.0f, 1.0f, 18.0f);
 
         Shader forwardShader = renderer.createShader(VERTEX_SHADER, FRAGMENT_SHADER);
         Shader shadowShader = renderer.createShader(SHADOW_VERTEX_SHADER, SHADOW_FRAGMENT_SHADER);
 
-        this.boxMaterial = renderer.createMaterial(forwardShader);
-        boxMaterial.setVector3f("objectColor", new Vector3f(1.0f, 0.5f, 0.2f));
-        boxMaterial.setVector3f("lightDirection", lightDirection);
-        boxMaterial.setFloat("ambientStrength", 0.2f);
-        boxMaterial.setFloat("diffuseStrength", 0.8f);
-        boxMaterial.setFloat("shadowBias", 0.004f);
-        boxMaterial.setMatrix4f("lightSpaceMatrix", lightSpaceMatrix);
-        boxMaterial.setTexture("shadowMap", shadowMap, 1);
+        Function<LitParams, Material> lit = p -> renderer.createMaterial(forwardShader)
+                .setVector3f("objectColor", p.color())
+                .setVector3f("lightDirection", light.direction())
+                .setFloat("ambientStrength", p.ambient())
+                .setFloat("diffuseStrength", p.diffuse())
+                .setFloat("shadowBias", p.shadowBias())
+                .setMatrix4f("lightSpaceMatrix", light.lightSpaceMatrix())
+                .setTexture("shadowMap", shadowMap, 1);
 
-        this.floorMaterial = renderer.createMaterial(forwardShader);
-        floorMaterial.setVector3f("objectColor", new Vector3f(0.72f, 0.78f, 0.68f));
-        floorMaterial.setVector3f("lightDirection", lightDirection);
-        floorMaterial.setFloat("ambientStrength", 0.25f);
-        floorMaterial.setFloat("diffuseStrength", 0.75f);
-        floorMaterial.setFloat("shadowBias", 0.002f);
-        floorMaterial.setMatrix4f("lightSpaceMatrix", lightSpaceMatrix);
-        floorMaterial.setTexture("shadowMap", shadowMap, 1);
-
-        this.shadowMaterial = renderer.createMaterial(shadowShader);
-
-        this.shadowDescriptor = new RenderPassDescriptor("shadow")
-                .depthAttachment(shadowMap)
-                .clearColorBuffer(false)
-                .clearDepthBuffer(true)
-                .depthTest(true)
-                .cullFace(false);
-
-        this.forwardDescriptor = new RenderPassDescriptor("forward")
-                .clearColor(0.1f, 0.2f, 0.3f, 1f)
-                .depthTest(true)
-                .cullFace(true);
-
-        this.boxCommand = new RenderCommand(boxMesh, boxMaterial, new Matrix4f());
-        this.floorCommand = new RenderCommand(floorMesh, floorMaterial, floorModelMatrix);
-        this.shadowBoxCommand = new RenderCommand(boxMesh, shadowMaterial, new Matrix4f());
+        return new Resources(
+                RenderView.createDefault(width, height),
+                light.shadowView(shadowMap),
+                new RenderPassDescriptor("shadow")
+                        .depthAttachment(shadowMap)
+                        .clearColorBuffer(false)
+                        .clearDepthBuffer(true)
+                        .depthTest(true)
+                        .cullFace(false),
+                new RenderPassDescriptor("forward")
+                        .clearColor(0.1f, 0.2f, 0.3f, 1f)
+                        .depthTest(true)
+                        .cullFace(true),
+                renderer.createMesh(MeshData.createCube()),
+                renderer.createMesh(MeshData.createPlane()),
+                lit.apply(new LitParams(new Vector3f(1.0f, 0.5f, 0.2f), 0.2f, 0.8f, 0.004f)),
+                lit.apply(new LitParams(new Vector3f(0.72f, 0.78f, 0.68f), 0.25f, 0.75f, 0.002f)),
+                renderer.createMaterial(shadowShader));
     }
+
+    // ---- Shaders ----
 
     private static final String VERTEX_SHADER = """
             #version 330 core
