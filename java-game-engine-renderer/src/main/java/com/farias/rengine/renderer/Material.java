@@ -19,34 +19,41 @@ public class Material {
         this.shader = Objects.requireNonNull(shader, "shader");
     }
 
-    public void setInt(String name, int value) {
+    public Material setInt(String name, int value) {
         uniforms.put(name, value);
+        return this;
     }
 
-    public void setFloat(String name, float value) {
+    public Material setFloat(String name, float value) {
         uniforms.put(name, value);
+        return this;
     }
 
-    public void setVector3f(String name, Vector3f value) {
+    public Material setVector3f(String name, Vector3f value) {
         uniforms.put(name, new Vector3f(value));
+        return this;
     }
 
-    public void setVector2f(String name, Vector2f value) {
+    public Material setVector2f(String name, Vector2f value) {
         uniforms.put(name, new Vector2f(value));
+        return this;
     }
 
-    public void setMatrix4f(String name, Matrix4f value) {
+    public Material setMatrix4f(String name, Matrix4f value) {
         uniforms.put(name, new Matrix4f(value));
+        return this;
     }
 
-    public void setMatrix3f(String name, Matrix3f value) {
+    public Material setMatrix3f(String name, Matrix3f value) {
         uniforms.put(name, new Matrix3f(value));
+        return this;
     }
 
-    public void setTexture(String uniformName, Texture texture, int sampler) {
+    public Material setTexture(String uniformName, Texture texture, int sampler) {
         textures.put(
                 Objects.requireNonNull(uniformName, "uniformName"),
                 new TextureBinding(Objects.requireNonNull(texture, "texture"), sampler));
+        return this;
     }
 
     public void applyUniforms() {
