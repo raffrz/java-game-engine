@@ -12,7 +12,7 @@ profiles de natives.
 
 | Módulo | Papel | Depende de |
 |---|---|---|
-| `java-game-engine-renderer` | Renderer modular: `Renderer`, `RenderPassDescriptor`, `RenderView`, `RenderCommand`, `Material`, `Mesh`, `Shader`, `Texture`, `OpenGLBackend` | LWJGL (API), JOML |
+| `java-game-engine-renderer` | Renderer modular: `Renderer`, `RenderPassDescriptor`, `RenderView`, `RenderCommand`, `Material`, `Mesh`, `Shader`, `Texture` | LWJGL (API), JOML |
 | `java-game-engine-core` | `Engine`/`Module`, janela, input, helpers `gfx`, loaders | renderer |
 | `java-game-engine-demos` | 5 exemplos + `Launcher` | core (+ natives, em runtime) |
 
@@ -26,9 +26,13 @@ profiles de natives.
 - Um frame é descrito por dados: `RenderPassDescriptor` (clear, depth, cull, blend, depth
   attachment) + `RenderView` (viewport, view, projection) + `RenderCommand`s (mesh, material,
   model matrix). O `Renderer` agrupa por material e executa.
-- `RenderBackend` (hoje só `OpenGLBackend`) cuida do estado de pass e do framebuffer de depth.
-  `Mesh`, `Shader` e `Texture` ainda chamam OpenGL diretamente, então o backend não é trocável de
-  fato (ver pendências).
+- O renderer é **OpenGL-only, sem interface de backend** (decisão consciente, ver
+  [Ideia futura](#ideia-futura-backend-de-render-como-módulo)). `OpenGLBackend` é um detalhe
+  interno do `Renderer` (package-private) que cuida do estado de pass e do framebuffer de depth.
+  `Mesh`, `Shader` e `Texture` chamam OpenGL diretamente.
+- Hot path do draw call sem alocação: `Shader` reutiliza `FloatBuffer`s para matrizes, `Renderer`
+  reutiliza a `Matrix3f` normal (`Matrix4f.normal`) e `Material` guarda uniforms já tipados
+  (sem `instanceof`).
 - `DirectionalLight`: volume ortográfico + matrizes de light-space para shadow mapping.
 - `Material` tem setters encadeáveis (`setFloat(...).setTexture(...)`).
 
@@ -36,7 +40,10 @@ profiles de natives.
 
 - `engine.Engine` registra `Module`s, chama `onRegister` na ordem e `onTerminate` na ordem
   inversa. É biblioteca, não framework: quem tem o loop é o jogo.
-- `engine.EngineContext` é o registro de serviços (`registerService` / `resolve` por tipo).
+- `engine.EngineContext` é o registro de serviços. `require(Class)` devolve o serviço ou lança
+  `IllegalStateException` com mensagem clara; módulos que dependem de outros chamam isso na
+  primeira linha de `onRegister`, então registrar na ordem errada falha ali. `resolve(Class)`
+  continua existindo e devolve `null` (serviço opcional).
 - Módulos: `WindowModule` (GLFW + contexto GL; **deve ser o primeiro**), `InputModule`,
   `RenderModule` (depende de contexto GL corrente).
 - `Game` é uma casca fina: monta os três módulos, resolve `Window`/`InputSystem`/`Renderer` e
@@ -74,7 +81,8 @@ export JAVA_HOME=$(/usr/libexec/java_home -v 17)
 ./mvnw -pl java-game-engine-demos exec:exec \
     -Dexec.mainClass=com.farias.rengine.examples.SnakeGame
 
-# ou pelo jar fino + lib/ gerados em `package`
+# ou distribuição executável: jar fino + lib/ (profile opt-in)
+./mvnw -Pdist -DskipTests package
 cd java-game-engine-demos
 java -XstartOnFirstThread -jar target/java-game-engine-demos-1.0.2-SNAPSHOT.jar   # tire a flag fora do macOS
 ```
@@ -98,8 +106,10 @@ trabalho em `java-game-engine-demos/` (o `exec:exec` já faz isso).
 - `.mvn/maven.config` desliga o progresso de download e imprime a versão do Maven.
 
 - **Sem uber jar.** O `jar-with-dependencies` embutia os natives de uma única plataforma, então só
-  rodava nela. Agora o `demos` gera um jar fino com `Class-Path: lib/...` e copia as dependências
-  de runtime para `target/lib/` (`maven-jar-plugin` + `maven-dependency-plugin`).
+  rodava nela. A distribuição agora é opt-in (`-Pdist`): jar fino com `Class-Path: lib/...` e as
+  dependências de runtime copiadas para `target/lib/`. Fica fora do `package` padrão porque só
+  interessa a quem vai empacotar (e o `copy-dependencies` não funciona no build incremental da
+  IDE, onde o `core` resolve para `target/classes`).
 - **Natives por profile, não por módulo.** Os módulos `java-game-engine-deps-{macos,linux,win}`
   foram removidos (o do Linux estava em LWJGL 3.2.3, e o `renderer` dependia direto do de macOS).
   O POM raiz tem profiles ativados por SO/arquitetura que definem `lwjgl.natives`; só o `demos`
@@ -133,22 +143,29 @@ Coisas que custaram caro e valem lembrar ao mexer em renderização:
 ## Pendências
 
 **Verificação**
-- Rodar e olhar de verdade **SnakeGame**, **SpriteEditor** e **ShadowCubeDemo**.
+- Rodar e olhar de verdade **SnakeGame**, **SpriteEditor** e **ShadowCubeDemo**. Depois da
+  otimização de uniforms/matrizes só houve smoke test (abre e roda sem exceção) dos demos.
 - Rodar um demo em Linux/Windows para validar os profiles de natives.
 - O warning `Uniform 'uNormal' not found in shader program` aparece nos demos 2D e no
   ShadowCubeDemo. O `Renderer` seta `uNormal` em todo draw, e shaders que não o declaram (os 2D e
   o de shadow) geram o aviso. É ruído de log, não foi investigado a fundo.
 
-**Design (ver revisão de arquitetura)**
-- `RenderBackend` é parcial: `Mesh`/`Shader`/`Texture` falam com GL direto. Ou o backend passa a
-  criar os recursos, ou a interface sai.
-- `EngineContext.resolve` devolve `null` para serviço ausente; falta um `require` que falhe com
-  mensagem clara. A ordem dos módulos é só convenção documentada.
-- `Game` fixa os três módulos; não há como compor um conjunto diferente.
-- Custo por draw call: `Matrix3f` alocada por comando e `instanceof` em cadeia em
-  `Material.applyUniforms`.
-- Não há testes. `Engine`, `Material` e `RenderPassNode` são testáveis sem contexto GL.
+**Design**
+- `Game` fixa os três módulos (`Window`, `Input`, `Render`) e não é composável. Decisão: não vai
+  mudar, a classe será descontinuada; quem precisar de outra composição monta o `Engine` direto
+  (como o `ShadowCubeDemo`).
+- Testes: `Engine`, `EngineContext`, `Material` e `RenderPassNode` são testáveis sem contexto GL.
+  Ficam para outro momento (exige adicionar JUnit ao build).
 
 **Modelos de xadrez:** se forem reexportados corretamente, reverter para `cullFace(true)` em
 `IsometricChess.onCreate` e tirar o `flipNormals` da chamada de `ModelLoader.loadWavefrontOBJ` em
 `ChessBoard.createAndPlace`.
+
+**Ideia futura: backend de render como módulo**
+
+Hoje não há necessidade de trocar a API gráfica (Vulkan, etc.), então a interface `RenderBackend`
+foi removida. Se a necessidade surgir, a ideia é reaproveitar o mesmo design de módulos da engine:
+o módulo `renderer` teria só classes comuns (`Renderer`, `Material`, `RenderPassDescriptor`, ...,
+sem GL) e falaria com um backend registrado no `EngineContext` (por exemplo
+`context.require(RenderBackend.class)`), sem saber se é OpenGL ou Vulkan. O backend também teria que
+criar `Mesh`/`Shader`/`Texture`, que hoje chamam GL direto.
