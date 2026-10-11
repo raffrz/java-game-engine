@@ -6,10 +6,11 @@ import com.farias.rengine.engine.Module;
 import com.farias.rengine.io.Window;
 import com.farias.rengine.renderer.Renderer;
 import com.farias.rengine.toolkit2d.draw.SpriteRenderer;
+import com.farias.rengine.toolkit2d.ui.Ui;
 
 /**
- * Registra os servicos 2D: {@link Canvas} e o {@link SpriteRenderer} de baixo
- * nivel. Deve vir depois de WindowModule, RenderModule e AssetsModule.
+ * Registra os servicos 2D: {@link Canvas}, {@link Ui} (overlay) e o
+ * {@link SpriteRenderer} de baixo nivel. Deve vir depois de WindowModule, RenderModule e AssetsModule.
  *
  * <p>O tamanho virtual e o espaco de coordenadas que o jogo usa; ele e
  * escalado para o framebuffer da janela.
@@ -42,6 +43,7 @@ public final class Toolkit2DModule implements Module {
 
         context.registerService(SpriteRenderer.class, sprites);
         context.registerService(Canvas.class, canvas);
+        context.registerService(Ui.class, new Ui(renderer, window, sprites, font, virtualWidth, virtualHeight));
     }
 
     @Override
