@@ -1,6 +1,5 @@
 package com.farias.rengine.engine3d;
 
-import static org.lwjgl.glfw.GLFW.GLFW_KEY_ESCAPE;
 import static org.lwjgl.glfw.GLFW.glfwTerminate;
 
 import java.nio.file.Path;
@@ -14,6 +13,7 @@ import com.farias.rengine.engine.modules.InputModule;
 import com.farias.rengine.engine.modules.RenderModule;
 import com.farias.rengine.engine.modules.WindowModule;
 import com.farias.rengine.io.InputSystem;
+import com.farias.rengine.io.Key;
 import com.farias.rengine.io.Window;
 import com.farias.rengine.renderer.Renderer;
 
@@ -61,7 +61,7 @@ public abstract class Game {
         onCreate();
 
         while (!window.shouldClose()) {
-            if (input.isKeyPressed(GLFW_KEY_ESCAPE)) {
+            if (input.isKeyPressed(Key.ESCAPE)) {
                 break;
             }
 

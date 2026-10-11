@@ -1,11 +1,5 @@
 package com.farias.rengine.examples;
 
-import static org.lwjgl.glfw.GLFW.GLFW_KEY_DOWN;
-import static org.lwjgl.glfw.GLFW.GLFW_KEY_ENTER;
-import static org.lwjgl.glfw.GLFW.GLFW_KEY_LEFT;
-import static org.lwjgl.glfw.GLFW.GLFW_KEY_RIGHT;
-import static org.lwjgl.glfw.GLFW.GLFW_KEY_UP;
-
 import java.util.Deque;
 import java.util.LinkedList;
 import java.util.List;
@@ -18,6 +12,7 @@ import org.joml.Matrix4f;
 import org.joml.Vector2i;
 
 import com.farias.rengine.engine3d.Game;
+import com.farias.rengine.io.Key;
 import com.farias.rengine.toolkit2d.legacy.BitmapFont;
 import com.farias.rengine.toolkit2d.legacy.Projections2D;
 import com.farias.rengine.toolkit2d.legacy.Sprite;
@@ -95,16 +90,16 @@ public class SnakeGame extends Game {
     protected void onUpdate(float deltaTime) {
         this.time += deltaTime;
         if (!this.gameOver) {
-            if (input.isKeyPressed(GLFW_KEY_UP)) {
+            if (input.isKeyPressed(Key.UP)) {
                 this.changeDirection(Direction.UP);
             }
-            if (input.isKeyPressed(GLFW_KEY_DOWN)) {
+            if (input.isKeyPressed(Key.DOWN)) {
                 this.changeDirection(Direction.DOWN);
             }
-            if (input.isKeyPressed(GLFW_KEY_LEFT)) {
+            if (input.isKeyPressed(Key.LEFT)) {
                 this.changeDirection(Direction.LEFT);
             }
-            if (input.isKeyPressed(GLFW_KEY_RIGHT)) {
+            if (input.isKeyPressed(Key.RIGHT)) {
                 this.changeDirection(Direction.RIGHT);
             }
             if (time >= UPDATE_TIME) {
@@ -113,7 +108,7 @@ public class SnakeGame extends Game {
                 this.time = 0;
             }
         } else {
-            if (input.isKeyPressed(GLFW_KEY_ENTER)) {
+            if (input.isKeyPressed(Key.ENTER)) {
                 this.gameOver = false;
                 this.resetGame();
             }

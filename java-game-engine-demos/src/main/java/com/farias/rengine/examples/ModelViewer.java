@@ -1,17 +1,10 @@
 package com.farias.rengine.examples;
 
-import static org.lwjgl.glfw.GLFW.GLFW_KEY_A;
-import static org.lwjgl.glfw.GLFW.GLFW_KEY_DOWN;
-import static org.lwjgl.glfw.GLFW.GLFW_KEY_LEFT;
-import static org.lwjgl.glfw.GLFW.GLFW_KEY_LEFT_SHIFT;
-import static org.lwjgl.glfw.GLFW.GLFW_KEY_RIGHT;
-import static org.lwjgl.glfw.GLFW.GLFW_KEY_UP;
-import static org.lwjgl.glfw.GLFW.GLFW_KEY_Z;
-
 import org.joml.Matrix4f;
 
 import com.farias.rengine.engine3d.Game;
 import com.farias.rengine.engine3d.Camera;
+import com.farias.rengine.io.Key;
 import com.farias.rengine.toolkit2d.legacy.BitmapFont;
 import com.farias.rengine.engine3d.Projections;
 import com.farias.rengine.toolkit2d.legacy.Projections2D;
@@ -111,9 +104,9 @@ public class ModelViewer extends Game {
         }
 
         // tamanho da atmosfera
-        if (input.isKeyDown(GLFW_KEY_A)) {
+        if (input.isKeyDown(Key.A)) {
 
-            if (input.isKeyDown(GLFW_KEY_LEFT_SHIFT)) {
+            if (input.isKeyDown(Key.LEFT_SHIFT)) {
                 clouds.getScale().sub(0.1f, 0.1f, 0.1f);
             } else {
                 clouds.getScale().add(0.1f, 0.1f, 0.1f);
@@ -131,39 +124,39 @@ public class ModelViewer extends Game {
          * → = sudeste
          */
 
-        if (input.isKeyDown(GLFW_KEY_UP)) {
+        if (input.isKeyDown(Key.UP)) {
             targetX += move;
             targetZ += move;
         }
 
-        if (input.isKeyDown(GLFW_KEY_DOWN)) {
+        if (input.isKeyDown(Key.DOWN)) {
             targetX -= move;
             targetZ -= move;
         }
 
-        if (input.isKeyDown(GLFW_KEY_LEFT)) {
+        if (input.isKeyDown(Key.LEFT)) {
             targetX -= move;
             targetZ += move;
         }
 
-        if (input.isKeyDown(GLFW_KEY_RIGHT)) {
+        if (input.isKeyDown(Key.RIGHT)) {
             targetX += move;
             targetZ -= move;
         }
 
         // sobe/desce a câmera
-        if (input.isKeyDown(GLFW_KEY_UP)) {
+        if (input.isKeyDown(Key.UP)) {
             targetY += move;
         }
 
-        if (input.isKeyDown(GLFW_KEY_DOWN)) {
+        if (input.isKeyDown(Key.DOWN)) {
             targetY -= move;
         }
 
         // zoom (aproxima/afasta a câmera do alvo)
-        if (input.isKeyDown(GLFW_KEY_Z)) {
+        if (input.isKeyDown(Key.Z)) {
 
-            if (input.isKeyDown(GLFW_KEY_LEFT_SHIFT)) {
+            if (input.isKeyDown(Key.LEFT_SHIFT)) {
                 cameraDistance += 2f * deltaTime * CAMERA_SPEED;
             } else {
                 cameraDistance -= 2f * deltaTime * CAMERA_SPEED;
