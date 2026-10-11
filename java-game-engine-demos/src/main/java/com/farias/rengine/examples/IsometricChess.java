@@ -1,12 +1,5 @@
 package com.farias.rengine.examples;
 
-import static org.lwjgl.glfw.GLFW.GLFW_KEY_DOWN;
-import static org.lwjgl.glfw.GLFW.GLFW_KEY_LEFT;
-import static org.lwjgl.glfw.GLFW.GLFW_KEY_LEFT_SHIFT;
-import static org.lwjgl.glfw.GLFW.GLFW_KEY_RIGHT;
-import static org.lwjgl.glfw.GLFW.GLFW_KEY_UP;
-import static org.lwjgl.glfw.GLFW.GLFW_KEY_Z;
-
 import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.IntStream;
@@ -16,6 +9,8 @@ import org.joml.Vector3f;
 
 import com.farias.rengine.engine3d.Game;
 import com.farias.rengine.engine3d.Camera;
+import com.farias.rengine.io.Key;
+import com.farias.rengine.io.MouseButton;
 import com.farias.rengine.toolkit2d.legacy.BitmapFont;
 import com.farias.rengine.engine3d.Materials;
 import com.farias.rengine.engine3d.Meshes;
@@ -129,7 +124,7 @@ public class IsometricChess extends Game {
     @Override
     protected void onUpdate(float deltaTime) {
         // BOARD CONTROLS
-        if (input.isMouseButtonDown(0)) {
+        if (input.isMouseButtonDown(MouseButton.LEFT)) {
             double mouseX = input.getMouseX();
             double mouseY = input.getMouseY();
 
@@ -143,23 +138,23 @@ public class IsometricChess extends Game {
 
         // CAMERA CONTROLS
         float move = CAMERA_SPEED * deltaTime;
-        if (input.isKeyDown(GLFW_KEY_LEFT)) {
+        if (input.isKeyDown(Key.LEFT)) {
             targetX -= move / 2f;
             targetZ += move / 2f;
         }
-        if (input.isKeyDown(GLFW_KEY_RIGHT)) {
+        if (input.isKeyDown(Key.RIGHT)) {
             targetX += move / 2f;
             targetZ -= move / 2f;
         }
-        if (input.isKeyDown(GLFW_KEY_UP)) {
+        if (input.isKeyDown(Key.UP)) {
             targetY += move;
         }
-        if (input.isKeyDown(GLFW_KEY_DOWN)) {
+        if (input.isKeyDown(Key.DOWN)) {
             targetY -= move;
         }
         // zoom
-        if (input.isKeyDown(GLFW_KEY_Z)) {
-            if (input.isKeyDown(GLFW_KEY_LEFT_SHIFT)) {
+        if (input.isKeyDown(Key.Z)) {
+            if (input.isKeyDown(Key.LEFT_SHIFT)) {
                 fov += 2f * deltaTime * CAMERA_SPEED;
             } else {
                 fov -= 2f * deltaTime * CAMERA_SPEED;

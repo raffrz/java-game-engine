@@ -26,20 +26,40 @@ public class InputSystem {
 		this.keys = new boolean[KEY_LAST];
 	}
 	
+	@Deprecated
 	public boolean isKeyDown(int key) {
 		return glfwGetKey(handle, key) == 1;
 	}
 	
+	@Deprecated
 	public boolean isKeyPressed(int key) {
 		return isKeyDown(key) && !keys[key];
 	}
 	
+	@Deprecated
 	public boolean isKeyReleased(int key) {
 		return !isKeyDown(key) && keys[key];
 	}
 	
+	@Deprecated
 	public boolean isMouseButtonDown(int button) {
 		return glfwGetMouseButton(handle, button) == 1;
+	}
+
+	public boolean isKeyDown(Key key) {
+		return isKeyDown(key.getGlfwCode());
+	}
+
+	public boolean isKeyPressed(Key key) {
+		return isKeyPressed(key.getGlfwCode());
+	}
+
+	public boolean isKeyReleased(Key key) {
+		return isKeyReleased(key.getGlfwCode());
+	}
+
+	public boolean isMouseButtonDown(MouseButton button) {
+		return isMouseButtonDown(button.getGlfwCode());
 	}
 
 	public double getMouseX() {

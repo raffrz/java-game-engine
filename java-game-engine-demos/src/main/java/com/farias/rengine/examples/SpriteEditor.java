@@ -1,9 +1,5 @@
 package com.farias.rengine.examples;
 
-import static org.lwjgl.glfw.GLFW.GLFW_KEY_ENTER;
-import static org.lwjgl.glfw.GLFW.GLFW_KEY_F1;
-import static org.lwjgl.glfw.GLFW.GLFW_KEY_S;
-
 import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.IOException;
@@ -13,6 +9,8 @@ import javax.imageio.ImageIO;
 import org.joml.Matrix4f;
 
 import com.farias.rengine.engine3d.Game;
+import com.farias.rengine.io.Key;
+import com.farias.rengine.io.MouseButton;
 import com.farias.rengine.toolkit2d.legacy.BitmapFont;
 import com.farias.rengine.toolkit2d.legacy.Projections2D;
 import com.farias.rengine.toolkit2d.legacy.Sprite;
@@ -80,7 +78,7 @@ public class SpriteEditor extends Game {
         hover_x = mouse_x * 8;
         hover_y = mouse_y * 8;
 
-        if (input.isMouseButtonDown(0)) {
+        if (input.isMouseButtonDown(MouseButton.LEFT)) {
             int x = mouse_x - 4;
             int y = -mouse_y - 2;
             selected = 8 * y + x;
@@ -90,18 +88,18 @@ public class SpriteEditor extends Game {
                 color = selected - 72;
         }
 
-        if (input.isKeyPressed(GLFW_KEY_F1)) {
+        if (input.isKeyPressed(Key.F1)) {
             System.out.println("hoverx=" + hover_x);
             System.out.println("hovery=" + hover_y);
             System.out.println("selected=" + selected);
             System.out.println("color=" + color);
         }
 
-        if (input.isKeyPressed(GLFW_KEY_S)) {
+        if (input.isKeyPressed(Key.S)) {
             save();
         }
         // clear messages
-        if (input.isKeyPressed(GLFW_KEY_ENTER)) {
+        if (input.isKeyPressed(Key.ENTER)) {
             message = "";
         }
     }
