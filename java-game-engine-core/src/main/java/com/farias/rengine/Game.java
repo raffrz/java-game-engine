@@ -60,7 +60,7 @@ public abstract class Game {
             timer.update();
             float deltaTime = timer.deltaTime();
 
-            input.update(this, deltaTime);
+            input.update();
             onUpdate(deltaTime);
 
             renderer.beginFrame();
