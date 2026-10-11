@@ -1,4 +1,4 @@
-package com.farias.rengine;
+package com.farias.rengine.engine3d;
 
 import static org.lwjgl.glfw.GLFW.GLFW_KEY_ESCAPE;
 import static org.lwjgl.glfw.GLFW.glfwTerminate;

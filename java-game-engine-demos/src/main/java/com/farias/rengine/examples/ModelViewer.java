@@ -10,19 +10,20 @@ import static org.lwjgl.glfw.GLFW.GLFW_KEY_Z;
 
 import org.joml.Matrix4f;
 
-import com.farias.rengine.Game;
-import com.farias.rengine.camera.Camera;
-import com.farias.rengine.gfx.BitmapFont;
-import com.farias.rengine.gfx.Projections;
-import com.farias.rengine.gfx.Shaders;
-import com.farias.rengine.gfx.SpriteBatch2D;
-import com.farias.rengine.gfx.TexturedModel;
+import com.farias.rengine.engine3d.Game;
+import com.farias.rengine.engine3d.Camera;
+import com.farias.rengine.toolkit2d.legacy.BitmapFont;
+import com.farias.rengine.engine3d.Projections;
+import com.farias.rengine.toolkit2d.legacy.Projections2D;
+import com.farias.rengine.engine3d.Shaders;
+import com.farias.rengine.toolkit2d.legacy.SpriteBatch2D;
+import com.farias.rengine.engine3d.TexturedModel;
 import com.farias.rengine.renderer.RenderCommand;
 import com.farias.rengine.renderer.RenderPassDescriptor;
 import com.farias.rengine.renderer.RenderPassNode;
 import com.farias.rengine.renderer.RenderView;
 import com.farias.rengine.renderer.Shader;
-import com.farias.rengine.util.ModelLoader;
+import com.farias.rengine.engine3d.ModelLoader;
 
 public class ModelViewer extends Game {
 
@@ -187,7 +188,7 @@ public class ModelViewer extends Game {
         scenePass.submit(new RenderCommand(clouds.getMesh(), clouds.getMaterial(), clouds.getModelMatrix()));
 
         // UI
-        Matrix4f projectionUI = Projections.orthographic2D(WINDOW_WIDTH, WINDOW_HEIGHT);
+        Matrix4f projectionUI = Projections2D.orthographic2D(WINDOW_WIDTH, WINDOW_HEIGHT);
         RenderView viewUI = new RenderView(window.getFramebufferWidth(), window.getFramebufferHeight(),
                 projectionUI, new Matrix4f());
         RenderPassNode uiPass = renderer.createPass(uiDescriptor, viewUI);

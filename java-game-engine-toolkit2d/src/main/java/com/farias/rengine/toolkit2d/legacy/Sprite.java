@@ -1,4 +1,4 @@
-package com.farias.rengine.gfx;
+package com.farias.rengine.toolkit2d.legacy;
 
 import org.joml.Vector2f;
 

@@ -1,4 +1,4 @@
-package com.farias.rengine.gfx;
+package com.farias.rengine.engine3d;
 
 import com.farias.rengine.renderer.Mesh;
 import com.farias.rengine.renderer.MeshData;

@@ -1,4 +1,4 @@
-package com.farias.rengine.util;
+package com.farias.rengine.assets;
 
 import java.nio.ByteBuffer;
 
