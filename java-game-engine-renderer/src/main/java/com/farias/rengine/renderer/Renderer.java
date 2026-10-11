@@ -13,6 +13,9 @@ public final class Renderer {
     private final List<RenderPassNode> renderPasses = new ArrayList<>();
     private final List<Disposable> resources = new ArrayList<>();
 
+    // Scratch reutilizado a cada draw call (evita uma Matrix3f por comando).
+    private final Matrix3f normalMatrix = new Matrix3f();
+
     public void initialize() {
         if (initialized) {
             return;
@@ -117,7 +120,7 @@ public final class Renderer {
             }
 
             Matrix4f modelMatrix = command.modelMatrix();
-            Matrix3f normalMatrix = new Matrix3f(modelMatrix).invert().transpose();
+            modelMatrix.normal(normalMatrix);
             currentShader.setMatrix4f("uModel", modelMatrix);
             currentShader.setMatrix3f("uNormal", normalMatrix);
 
