@@ -87,8 +87,8 @@ public final class ShadowCubeDemo {
         engine.registerModule(new RenderModule());
         EngineContext context = engine.start();
 
-        Window window = context.resolve(Window.class);
-        Renderer renderer = context.resolve(Renderer.class);
+        Window window = context.require(Window.class);
+        Renderer renderer = context.require(Renderer.class);
         Resources resources = createResources(renderer, window.getFramebufferWidth(), window.getFramebufferHeight());
         Timer timer = new Timer();
 

@@ -6,12 +6,15 @@ import static org.lwjgl.opengl.GL30.*;
 import java.util.HashMap;
 import java.util.Map;
 
-public final class OpenGLBackend implements RenderBackend {
+/**
+ * Estado de pass e framebuffers de depth em OpenGL. Detalhe interno do
+ * {@link Renderer}; hoje e o unico backend, entao nao ha interface.
+ */
+final class OpenGLBackend {
 
     private final Map<Texture, Integer> framebuffers = new HashMap<>();
 
-    @Override
-    public void beginPass(RenderPassDescriptor descriptor, RenderView view) {
+    void beginPass(RenderPassDescriptor descriptor, RenderView view) {
         bindRenderTarget(descriptor);
         glViewport(0, 0, view.getWidth(), view.getHeight());
 
@@ -56,15 +59,13 @@ public final class OpenGLBackend implements RenderBackend {
         glClear(clearMask);
     }
 
-    @Override
-    public void endPass() {
+    void endPass() {
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
         glDrawBuffer(GL_BACK);
         glReadBuffer(GL_BACK);
     }
 
-    @Override
-    public void dispose() {
+    void dispose() {
         for (int framebuffer : framebuffers.values()) {
             glDeleteFramebuffers(framebuffer);
         }
