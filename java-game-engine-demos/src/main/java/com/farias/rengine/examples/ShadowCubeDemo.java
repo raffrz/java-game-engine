@@ -98,7 +98,6 @@ public final class ShadowCubeDemo {
             timer.update();
             state = update(state, timer.deltaTime());
             render(renderer, resources, state);
-            window.swapBuffers();
         }
 
         engine.terminate();

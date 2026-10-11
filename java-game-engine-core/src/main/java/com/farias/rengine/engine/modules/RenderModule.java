@@ -14,10 +14,11 @@ public final class RenderModule implements Module {
 
     @Override
     public void onRegister(EngineContext context) {
-        context.require(Window.class);
+        Window window = context.require(Window.class);
 
         renderer = new Renderer();
         renderer.initialize();
+        renderer.setPresent(window::swapBuffers);
         context.registerService(Renderer.class, renderer);
     }
 

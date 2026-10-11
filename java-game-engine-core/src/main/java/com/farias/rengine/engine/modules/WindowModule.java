@@ -1,5 +1,7 @@
 package com.farias.rengine.engine.modules;
 
+import static org.lwjgl.glfw.GLFW.glfwTerminate;
+
 import org.lwjgl.opengl.GL;
 
 import com.farias.rengine.engine.EngineContext;
@@ -32,5 +34,18 @@ public final class WindowModule implements Module {
         window.bind();
         GL.createCapabilities();
         context.registerService(Window.class, window);
+    }
+
+    /**
+     * Roda depois dos modulos que dependem da janela (ordem inversa do
+     * registro), entao o Renderer ja liberou seus recursos com o contexto GL
+     * ainda vivo.
+     */
+    @Override
+    public void onTerminate(EngineContext context) {
+        if (window != null) {
+            window.destroy();
+            glfwTerminate();
+        }
     }
 }
