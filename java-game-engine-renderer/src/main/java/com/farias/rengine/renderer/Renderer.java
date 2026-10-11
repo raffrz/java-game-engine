@@ -2,6 +2,7 @@ package com.farias.rengine.renderer;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 
 import org.joml.Matrix3f;
 import org.joml.Matrix4f;
@@ -10,6 +11,10 @@ public final class Renderer {
 
     private final OpenGLBackend backend = new OpenGLBackend();
     private boolean initialized;
+    private boolean inFrame;
+    private long frameIndex;
+    private Runnable present = () -> {
+    };
     private final List<RenderPassNode> renderPasses = new ArrayList<>();
     private final List<Disposable> resources = new ArrayList<>();
 
@@ -70,6 +75,10 @@ public final class Renderer {
      */
     public RenderPassNode createPass(RenderPassDescriptor descriptor, RenderView view) {
         ensureInitialized();
+        if (!inFrame) {
+            throw new IllegalStateException(
+                    "createPass called outside a frame: call beginFrame() first (passes created earlier are discarded)");
+        }
         var node = new RenderPassNode(descriptor, view);
         renderPasses.add(node);
         return node;
@@ -77,16 +86,49 @@ public final class Renderer {
 
     public void beginFrame() {
         ensureInitialized();
+        if (inFrame) {
+            throw new IllegalStateException("beginFrame called twice without endFrame");
+        }
         this.renderPasses.clear();
+        inFrame = true;
+        frameIndex++;
     }
 
     public void endFrame() {
         ensureInitialized();
-        
+        if (!inFrame) {
+            throw new IllegalStateException("endFrame called without beginFrame");
+        }
+
         // Renderiza cada passe sequencialmente
         for (RenderPassNode pass : renderPasses) {
             executePass(pass);
         }
+
+        inFrame = false;
+        present.run();
+    }
+
+    /**
+     * Define o que apresenta o frame ao fim de {@link #endFrame()} (ex.: trocar
+     * os buffers da janela). O renderer nao conhece a janela: quem o monta
+     * liga isso. Por padrao nao faz nada.
+     */
+    public void setPresent(Runnable present) {
+        this.present = Objects.requireNonNull(present, "present");
+    }
+
+    /** true entre beginFrame() e endFrame(). */
+    public boolean inFrame() {
+        return inFrame;
+    }
+
+    /**
+     * Contador que incrementa a cada beginFrame(); permite a quem guarda estado
+     * por frame (pools, caches) saber que um novo frame comecou.
+     */
+    public long frameIndex() {
+        return frameIndex;
     }
 
     private void executePass(RenderPassNode pass) {
@@ -143,6 +185,7 @@ public final class Renderer {
         }
         resources.clear();
         renderPasses.clear();
+        inFrame = false;
         backend.dispose();
         initialized = false;
     }

@@ -93,6 +93,17 @@ public class Window {
 		return height;
 	}
 
+	/**
+	 * Destroi a janela nativa. Nao encerra o GLFW (isso e feito por quem
+	 * criou a janela, ao fim do ciclo de vida).
+	 */
+	public void destroy() {
+		if (id != 0) {
+			glfwDestroyWindow(id);
+			id = 0;
+		}
+	}
+
 	public void setTitle(String title) {
 		glfwSetWindowTitle(id, title);
 	}

@@ -1,7 +1,5 @@
 package com.farias.rengine.engine3d;
 
-import static org.lwjgl.glfw.GLFW.glfwTerminate;
-
 import java.nio.file.Path;
 
 import com.farias.rengine.assets.Assets;
@@ -74,12 +72,9 @@ public abstract class Game {
             renderer.beginFrame();
             onRender(deltaTime);
             renderer.endFrame();
-
-            window.swapBuffers();
         }
 
         engine.terminate();
-        glfwTerminate();
     }
 
     protected abstract void onCreate();
