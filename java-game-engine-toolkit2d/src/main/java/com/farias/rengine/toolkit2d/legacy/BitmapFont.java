@@ -1,4 +1,4 @@
-package com.farias.rengine.gfx;
+package com.farias.rengine.toolkit2d.legacy;
 
 import java.io.File;
 import java.io.IOException;

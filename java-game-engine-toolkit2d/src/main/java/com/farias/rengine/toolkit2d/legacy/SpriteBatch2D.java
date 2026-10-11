@@ -1,4 +1,4 @@
-package com.farias.rengine.gfx;
+package com.farias.rengine.toolkit2d.legacy;
 
 import org.joml.Matrix4f;
 import org.joml.Vector2f;
@@ -11,7 +11,8 @@ import com.farias.rengine.renderer.RenderPassNode;
 import com.farias.rengine.renderer.Renderer;
 import com.farias.rengine.renderer.Shader;
 import com.farias.rengine.renderer.Texture;
-import com.farias.rengine.util.TextureLoader;
+import com.farias.rengine.assets.TextureLoader;
+import com.farias.rengine.toolkit2d.draw.SpriteShaders;
 
 /**
  * Helper de instancia (nao singleton) para desenhar sprites 2D/texto/tiles.
@@ -26,7 +27,7 @@ public final class SpriteBatch2D {
 
     public SpriteBatch2D(Renderer renderer) {
         this.renderer = renderer;
-        this.shader = renderer.createShader(Shaders.SPRITE_VERTEX, Shaders.SPRITE_FRAGMENT);
+        this.shader = renderer.createShader(SpriteShaders.SPRITE_VERTEX, SpriteShaders.SPRITE_FRAGMENT);
         this.quad = renderer.createMesh(quadData());
     }
 

@@ -13,6 +13,9 @@
 	<modules>
 		<module>java-game-engine-renderer</module>
 		<module>java-game-engine-core</module>
+		<module>java-game-engine-assets</module>
+		<module>java-game-engine-toolkit2d</module>
+		<module>java-game-engine-engine3d</module>
 		<module>java-game-engine-demos</module>
 	</modules>
 
@@ -52,6 +55,21 @@
 			<dependency>
 				<groupId>com.farias.rengine</groupId>
 				<artifactId>java-game-engine-core</artifactId>
+				<version>${project.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>com.farias.rengine</groupId>
+				<artifactId>java-game-engine-assets</artifactId>
+				<version>${project.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>com.farias.rengine</groupId>
+				<artifactId>java-game-engine-toolkit2d</artifactId>
+				<version>${project.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>com.farias.rengine</groupId>
+				<artifactId>java-game-engine-engine3d</artifactId>
 				<version>${project.version}</version>
 			</dependency>
 		</dependencies>

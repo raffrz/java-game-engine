@@ -1,4 +1,4 @@
-package com.farias.rengine.gfx;
+package com.farias.rengine.engine3d;
 
 import org.joml.Matrix4f;
 
@@ -9,14 +9,6 @@ import org.joml.Matrix4f;
 public final class Projections {
 
     private Projections() {
-    }
-
-    /**
-     * Ortografica 2D "tela": origem (0,0) no canto superior esquerdo, Y
-     * crescendo para baixo, em pixels logicos (width x height).
-     */
-    public static Matrix4f orthographic2D(float width, float height) {
-        return new Matrix4f().setOrtho(0, width, -height, 0, 1000, -1000);
     }
 
     /**

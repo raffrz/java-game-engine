@@ -31,10 +31,6 @@
 			<artifactId>lwjgl-opengl</artifactId>
 		</dependency>
 		<dependency>
-			<groupId>org.lwjgl</groupId>
-			<artifactId>lwjgl-stb</artifactId>
-		</dependency>
-		<dependency>
 			<groupId>org.joml</groupId>
 			<artifactId>joml</artifactId>
 		</dependency>

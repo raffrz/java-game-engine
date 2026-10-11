@@ -12,11 +12,11 @@ import javax.imageio.ImageIO;
 
 import org.joml.Matrix4f;
 
-import com.farias.rengine.Game;
-import com.farias.rengine.gfx.BitmapFont;
-import com.farias.rengine.gfx.Projections;
-import com.farias.rengine.gfx.Sprite;
-import com.farias.rengine.gfx.SpriteBatch2D;
+import com.farias.rengine.engine3d.Game;
+import com.farias.rengine.toolkit2d.legacy.BitmapFont;
+import com.farias.rengine.toolkit2d.legacy.Projections2D;
+import com.farias.rengine.toolkit2d.legacy.Sprite;
+import com.farias.rengine.toolkit2d.legacy.SpriteBatch2D;
 import com.farias.rengine.renderer.RenderPassDescriptor;
 import com.farias.rengine.renderer.RenderPassNode;
 import com.farias.rengine.renderer.RenderView;
@@ -109,7 +109,7 @@ public class SpriteEditor extends Game {
     @Override
     protected void onRender(float deltaTime) {
         RenderView view = new RenderView(window.getFramebufferWidth(), window.getFramebufferHeight(),
-                Projections.orthographic2D(VIRTUAL_SIZE, VIRTUAL_SIZE), new Matrix4f());
+                Projections2D.orthographic2D(VIRTUAL_SIZE, VIRTUAL_SIZE), new Matrix4f());
         RenderPassNode pass = renderer.createPass(passDescriptor, view);
 
         // title

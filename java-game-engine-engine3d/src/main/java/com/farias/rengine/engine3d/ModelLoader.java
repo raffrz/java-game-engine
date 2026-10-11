@@ -1,4 +1,4 @@
-package com.farias.rengine.util;
+package com.farias.rengine.engine3d;
 
 import static java.lang.Integer.parseInt;
 import static java.lang.Float.parseFloat;
@@ -14,8 +14,7 @@ import java.util.Map;
 import org.joml.Vector2f;
 import org.joml.Vector3f;
 
-import com.farias.rengine.gfx.Materials;
-import com.farias.rengine.gfx.TexturedModel;
+import com.farias.rengine.assets.TextureLoader;
 import com.farias.rengine.renderer.Material;
 import com.farias.rengine.renderer.Mesh;
 import com.farias.rengine.renderer.MeshData;

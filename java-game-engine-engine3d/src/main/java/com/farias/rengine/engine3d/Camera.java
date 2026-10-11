@@ -1,4 +1,4 @@
-package com.farias.rengine.camera;
+package com.farias.rengine.engine3d;
 
 import org.joml.Matrix4f;
 import org.joml.Vector3f;
