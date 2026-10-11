@@ -11,7 +11,7 @@ import com.farias.rengine.io.Window;
 public final class InputModule implements Module {
     @Override
     public void onRegister(EngineContext context) {
-        Window window = context.resolve(Window.class);
+        Window window = context.require(Window.class);
         InputSystem inputSystem = new InputSystem(window);
         context.registerService(InputSystem.class, inputSystem);
     }

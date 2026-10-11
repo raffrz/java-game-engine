@@ -8,14 +8,10 @@ import org.joml.Matrix4f;
 
 public final class Renderer {
 
-    private final RenderBackend backend;
+    private final OpenGLBackend backend = new OpenGLBackend();
     private boolean initialized;
     private final List<RenderPassNode> renderPasses = new ArrayList<>();
     private final List<Disposable> resources = new ArrayList<>();
-
-    public Renderer(RenderBackend backend) {
-        this.backend = backend;
-    }
 
     public void initialize() {
         if (initialized) {

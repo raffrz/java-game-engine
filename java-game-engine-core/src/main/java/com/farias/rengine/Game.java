@@ -45,9 +45,9 @@ public abstract class Game {
         engine.registerModule(new RenderModule());
         context = engine.start();
 
-        window = context.resolve(Window.class);
-        input = context.resolve(InputSystem.class);
-        renderer = context.resolve(Renderer.class);
+        window = context.require(Window.class);
+        input = context.require(InputSystem.class);
+        renderer = context.require(Renderer.class);
         timer = new Timer();
 
         onCreate();
