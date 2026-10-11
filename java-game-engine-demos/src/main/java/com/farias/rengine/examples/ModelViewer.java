@@ -57,10 +57,11 @@ public class ModelViewer extends Game {
     @Override
     protected void onCreate() {
         Shader litShader = renderer.createShader(Shaders.LIT_VERTEX, Shaders.LIT_FRAGMENT);
-        earth = ModelLoader.loadWavefrontOBJ("earth", renderer, litShader);
-        clouds = ModelLoader.loadWavefrontOBJ("clouds", renderer, litShader);
+        ModelLoader models = context.require(ModelLoader.class);
+        earth = models.loadWavefrontOBJ("earth", litShader);
+        clouds = models.loadWavefrontOBJ("clouds", litShader);
 
-        batch = new SpriteBatch2D(renderer);
+        batch = new SpriteBatch2D(renderer, assets);
         font = new BitmapFont(batch);
 
         scene3DDescriptor = new RenderPassDescriptor("model-viewer-3d")

@@ -8,8 +8,10 @@ import com.farias.rengine.renderer.Renderer;
  * Fabrica de primitivas de Mesh simples.
  */
 public final class Meshes {
+    private final Renderer renderer;
 
-    private Meshes() {
+    public Meshes(Renderer renderer) {
+        this.renderer = renderer;
     }
 
     /**
@@ -17,7 +19,7 @@ public final class Meshes {
      * origem - util para "planos" texturizados como pisos/tiles 3D (ex:
      * tabuleiro isometrico), rotacionando +90 graus em X pra deitar.
      */
-    public static Mesh plane(Renderer renderer, float width, float height) {
+    public Mesh plane(float width, float height) {
         float[] vertices = {
                 -width / 2, height / 2, 0,
                 width / 2, height / 2, 0,

@@ -1,27 +1,39 @@
 package com.farias.rengine.assets;
 
+import java.io.IOException;
+import java.io.InputStream;
 import java.nio.ByteBuffer;
 
+import org.lwjgl.BufferUtils;
 import org.lwjgl.stb.STBImage;
 
 import com.farias.rengine.renderer.Renderer;
 import com.farias.rengine.renderer.Texture;
 import com.farias.rengine.renderer.TextureData;
 
-public final class TextureLoader {
+/**
+ * Decodifica uma imagem (STB) e a sobe como Texture. Detalhe interno de
+ * {@link Assets}: ninguem mais carrega textura direto do disco.
+ */
+final class TextureLoader {
 
     private TextureLoader() {
     }
 
-    public static Texture load(Renderer renderer, String filename) {
+    static Texture load(Renderer renderer, InputStream in, String name) throws IOException {
+        byte[] bytes = in.readAllBytes();
+        // STB so le de buffers diretos.
+        ByteBuffer encoded = BufferUtils.createByteBuffer(bytes.length);
+        encoded.put(bytes).flip();
+
         int[] width = new int[1];
         int[] height = new int[1];
         int[] channels = new int[1];
 
-        ByteBuffer pixels = STBImage.stbi_load(filename, width, height, channels, 4);
+        ByteBuffer pixels = STBImage.stbi_load_from_memory(encoded, width, height, channels, 4);
         if (pixels == null) {
-            throw new RuntimeException(
-                    "Failed to load texture: " + filename + " - " + STBImage.stbi_failure_reason());
+            throw new IOException(
+                    "Failed to load texture: " + name + " - " + STBImage.stbi_failure_reason());
         }
 
         try {

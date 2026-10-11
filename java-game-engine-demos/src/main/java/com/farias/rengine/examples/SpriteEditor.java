@@ -61,9 +61,9 @@ public class SpriteEditor extends Game {
 
     @Override
     protected void onCreate() {
-        batch = new SpriteBatch2D(renderer);
+        batch = new SpriteBatch2D(renderer, assets);
         font = new BitmapFont(batch);
-        pallete = batch.createSprite("resources/palletes/default.png", 0, 256, 64);
+        pallete = batch.createSprite("palletes/default.png", 0, 256, 64);
 
         passDescriptor = new RenderPassDescriptor("sprite-editor")
                 .clearColor(0f, 0f, 0f, 1f)
