@@ -1,148 +1,154 @@
-# Checkpoint: migração do core pro renderer modular
+# Checkpoint: engine modular (core sobre renderer)
 
-Branch: `feature/migrate-core-to-render-module` (a partir de `feature/render-module`).
+Branch: `feature/migrate-core-to-render-module`.
 
-## O que foi feito
+Estado: a migração do `core` e dos demos para o renderer modular está feita e compila. O que
+resta está em [Pendências](#pendências).
 
-Reescrita completa de `java-game-engine-core` e dos exemplos em `java-game-engine-demos` por cima
-do renderer modular de `java-game-engine-renderer` (`Renderer`/`Material`/`Mesh`/`RenderPassDescriptor`
-etc., que já existia). Não sobrou nenhuma classe da engine antiga (`GameEngine`, `GameState`, o
-pacote `render.*` antigo, o subsistema ECS inteiro).
+## Estrutura
 
-### Arquitetura nova do `core`
+Build Maven multi-módulo, com POM raiz (`java-game-engine`) que centraliza versões, plugins e os
+profiles de natives.
 
-- **`com.farias.rengine.engine`**: `Engine`, `EngineContext`, `Module`, `Timer` — o padrão de
-  registro de módulos que já existia só dentro de `renderer/example/Example.java`, promovido a
-  classes reutilizáveis de verdade.
-- **`com.farias.rengine.engine.modules`**: `WindowModule`, `InputModule`, `RenderModule` — criam
-  `Window`/`InputSystem`/`Renderer` e registram no `EngineContext`.
-- **`Game`** (em `com.farias.rengine`): casca fina sobre `Engine`/`EngineContext`/`Timer`.
-  `onCreate()` → `onUpdate(dt)` → `onRender(dt)`, sem `GameState`, sem passes implícitos. Cada jogo
-  monta seus próprios `RenderPassDescriptor`/`RenderView`/`RenderCommand` em `onRender` (mesmo
-  estilo do `Example.java`).
-- **`com.farias.rengine.gfx`**: helpers de instância (não singleton) pra não duplicar lógica em
-  cada demo — `SpriteBatch2D` (quad compartilhado + uniforms `uvOffset`/`uvScale` pra recorte de
-  spritesheet, em vez de reescrever o buffer de UV do mesh), `BitmapFont`, `TexturedModel`,
-  `Materials` (fábrica de material "lit" com luz direcional), `Meshes` (primitivas, hoje só
-  `plane`), `Projections` (ortho2D/ortho3D/perspectiva), `Shaders` (fonte GLSL embutido).
-- **`util.ModelLoader`**: parser de `.obj` (inalterado na lógica), agora recebendo
-  `Renderer`/`Shader` explícitos em vez de puxar de um facade estático. Ganhou um parâmetro opcional
-  `flipNormals` (ver `java-game-engine-demos/CHESS_MODELS.md`).
-- **`util.TextureLoader`**: carrega PNG via STB e cria `Texture` do renderer modular.
+| Módulo | Papel | Depende de |
+|---|---|---|
+| `java-game-engine-renderer` | Renderer modular: `Renderer`, `RenderPassDescriptor`, `RenderView`, `RenderCommand`, `Material`, `Mesh`, `Shader`, `Texture`, `OpenGLBackend` | LWJGL (API), JOML |
+| `java-game-engine-core` | `Engine`/`Module`, janela, input, helpers `gfx`, loaders | renderer |
+| `java-game-engine-demos` | 5 exemplos + `Launcher` | core (+ natives, em runtime) |
 
-### Os 5 exemplos (`java-game-engine-demos`)
+## Arquitetura
 
-Removidos: `Simple2DGame`, `BasicTopDownMovement`, `SpriteMovement`, `TopDownCamera2D` (ECS, sem
-substituto — não tem mais ECS no motor).
+### `renderer`
 
-Mantidos, todos reescritos contra a API nova:
+- `Renderer` é a única porta de entrada: cria recursos (`createMesh/Texture/Shader/Material`) e
+  passes. `createPass` cria **e enfileira** o passe no frame corrente; `beginFrame` limpa a fila,
+  então os passes são criados a cada frame, em `onRender`. Não existe `submitPass`.
+- Um frame é descrito por dados: `RenderPassDescriptor` (clear, depth, cull, blend, depth
+  attachment) + `RenderView` (viewport, view, projection) + `RenderCommand`s (mesh, material,
+  model matrix). O `Renderer` agrupa por material e executa.
+- `RenderBackend` (hoje só `OpenGLBackend`) cuida do estado de pass e do framebuffer de depth.
+  `Mesh`, `Shader` e `Texture` ainda chamam OpenGL diretamente, então o backend não é trocável de
+  fato (ver pendências).
+- `DirectionalLight`: volume ortográfico + matrizes de light-space para shadow mapping.
+- `Material` tem setters encadeáveis (`setFloat(...).setTexture(...)`).
 
-- **`SnakeGame`** — 2D, uma pass só (sprites + texto, sem depth test).
-- **`SpriteEditor`** — 2D, editor de pixel art via mouse, mesma ideia.
-- **`ModelViewer`** — 3D: pass de câmera em perspectiva (`earth`/`clouds`, modelos OBJ) + pass de UI
-  (ortho2D flat) por cima.
-- **`IsometricChess`** — 3D: pass isométrica (tabuleiro + peças) + pass de UI. Precisou de ajustes
-  extras nos modelos de peças (ver seção de pendências).
-- **`ShadowCubeDemo`** — novo exemplo, migrado de `renderer/example/Example.java`. Não usa `Game`
-  nem a fachada nenhuma — monta `Engine`/`WindowModule`/`RenderModule` e fala com o `Renderer`
-  direto, pra mostrar o nível mais baixo de composição também (shadow mapping multi-pass).
+### `core`
 
-`Launcher` atualizado pra listar os 5.
+- `engine.Engine` registra `Module`s, chama `onRegister` na ordem e `onTerminate` na ordem
+  inversa. É biblioteca, não framework: quem tem o loop é o jogo.
+- `engine.EngineContext` é o registro de serviços (`registerService` / `resolve` por tipo).
+- Módulos: `WindowModule` (GLFW + contexto GL; **deve ser o primeiro**), `InputModule`,
+  `RenderModule` (depende de contexto GL corrente).
+- `Game` é uma casca fina: monta os três módulos, resolve `Window`/`InputSystem`/`Renderer` e
+  roda `onCreate` → (`onUpdate` → `onRender`)*. Sem estado de jogo nem passes implícitos.
+- `InputSystem.update()` amostra teclas/mouse e delega o polling de eventos a
+  `Window.pollEvents()`. Não há mais a interface `System`.
+- `gfx`: helpers de instância, não singletons — `SpriteBatch2D`, `BitmapFont`, `TexturedModel`,
+  `Materials`, `Meshes`, `Projections`, `Shaders`.
+- `util`: `ModelLoader` (`.obj`, com `flipNormals` opcional) e `TextureLoader` (PNG via STB).
 
-## Estado de verificação visual
+### `demos`
 
-Rodei todos os 5 (sem crash, smoke test de alguns segundos cada) logo após a reescrita. Depois,
-**verificação visual de verdade (rodando e olhando)** só aconteceu pra:
+| Demo | O que mostra | Verificado visualmente |
+|---|---|---|
+| `ModelViewer` | 3D em perspectiva + passe de UI | sim |
+| `IsometricChess` | 3D isométrico + UI | sim |
+| `SnakeGame` | 2D, um passe | não |
+| `SpriteEditor` | 2D, editor de pixel art | não |
+| `ShadowCubeDemo` | sem `Game`; `Engine` + `Renderer` direto, shadow mapping em 2 passes, estilo funcional | não |
 
-- ✅ **ModelViewer** — confirmado funcionando (mundo visível, UI legível, câmera em perspectiva,
-  zoom funcionando via `cameraDistance`).
-- ✅ **IsometricChess** — confirmado funcionando (tabuleiro visível, peças opacas e do lado certo
-  pra fora, iluminação correta) depois de uma sequência de bugs (ver abaixo).
+"Não" significa só smoke test (abre e roda alguns segundos sem exceção), sem alguém olhar a tela.
 
-**Nunca verificados visualmente nesta sessão** (só smoke test, sem crash, mas ninguém olhou a tela):
+## Build e execução
 
-- ⚠️ **SnakeGame**
-- ⚠️ **SpriteEditor**
-- ⚠️ **ShadowCubeDemo**
-
-Vale a pena rodar os três e conferir antes de considerar o port 100% fechado — a sequência de bugs
-no ModelViewer/IsometricChess (abaixo) mostra que "compila e não crasha" não significa "renderiza
-certo".
-
-## Bugs encontrados e corrigidos (nessa ordem)
-
-1. Viewport calculado com o tamanho lógico da janela em vez do framebuffer real — em tela HiDPI
-   (Retina) só aparecia 1/4 da cena. Corrigido com `Window.getFramebufferWidth/Height`.
-2. Culling 3D desligado globalmente (tentativa de corrigir o item 1) quebrou o `ModelViewer`: a
-   esfera de nuvem semi-transparente desenhava frente e verso, dando artefato visual. Culling
-   voltou a ligado por padrão.
-3. `ModelViewer` desenhava o texto de UI dentro de `onGfxUpdate` (câmera 3D isométrica ainda ativa)
-   em vez de `onUIUpdate` — texto saía "torto" (deformado pela view 3D).
-4. Luz direcional padrão (`Materials.lit`) apontava pro lado oposto da câmera isométrica usada por
-   `ModelViewer`/`IsometricChess` — o lado visível do modelo não recebia luz difusa, ficava quase
-   preto.
-5. (Depois da reescrita pro padrão `Engine`/`Module`) Texto do `ModelViewer` sumiu de novo: posição
-   Y positiva ficava fora da área visível da projeção ortho2D (que vai de `0` a `-height`).
-   Corrigido pra Y negativo.
-6. Texto do `ModelViewer` aparecia cortado: a convenção de `BitmapFont.drawText` centraliza o texto
-   em X, e `x=20` era perto demais da borda esquerda pra uma string longa. Corrigido centralizando
-   em `WINDOW_WIDTH/2` (mesma convenção que `IsometricChess` já usava).
-7. Trocado o mundo do `ModelViewer` de ortho3D pra perspectiva (pedido explícito) — precisou reduzir
-   `cameraDistance` (a Terra tem raio ~1) e reconectar o zoom (`Z`/`Shift+Z`) pra mexer em
-   `cameraDistance` em vez de um `fov` que não existe mais em projeção perspectiva.
-8. `IsometricChess`: chão do tabuleiro invisível com culling ligado. Causa: `Meshes.plane` tem
-   normal fixa, e a rotação de +90° em X usada pra deitar o quad como piso jogava a normal pra
-   baixo (longe da câmera/luz) em vez de pra cima.
-9. Depois de corrigir só a normal do chão (sem mexer no winding), ele ficou consistente o
-   suficiente pra aparecer escurecido mas visível com culling desligado — precisou corrigir também
-   o **winding** (ordem dos índices) de `Meshes.plane` pra bater com a normal corrigida, permitindo
-   religar culling sem perder o chão.
-10. Peças de xadrez apareciam "de dentro pra fora" com culling ligado (winding do `.obj` ao
-    contrário do `earth`/`clouds`).
-11. Peças de xadrez ficaram "transparentes"/ver-através mesmo com textura 100% opaca confirmada.
-    Causa raiz: o shader `LIT_FRAGMENT` fazia `fragColor = texColor * light`, multiplicando o canal
-    alpha pela luminosidade — fragmentos escuros ficavam com alpha baixo e, com blending ligado,
-    pareciam transparentes. Corrigido pra só multiplicar RGB, alpha vem direto da textura.
-    `IsometricChess` também teve blending desligado de vez (não precisa).
-12. Depois de corrigir a transparência, ainda via "por dentro" das peças com culling ligado —
-    confirmado que o winding delas é mesmo invertido (não é só a transparência mascarando).
-    Desligar culling só nessa pass resolve, porque sem blending o depth test sozinho já escolhe a
-    superfície certa independente de winding.
-13. Iluminação das peças ainda errada (maior parte escura) mesmo com a geometria certa. Tentei um
-    fix via `gl_FrontFacing` no shader (inverter a normal do lado "de trás") — não resolveu, porque
-    o problema não é o winding, são as **normais do arquivo .obj em si** apontando pra dentro,
-    independente de qual lado a GPU classifica como frente. Medido contra o centroide da malha:
-    ~75% das normais de `pawn_white.obj` apontam pra dentro. Corrigido com um parâmetro
-    `flipNormals` em `ModelLoader.loadWavefrontOBJ`, usado só pros modelos de peça.
-
-## Pendências
-
-- **`java-game-engine-demos/CHESS_MODELS.md`** (não commitado ainda): documento explicando a causa
-  raiz dos bugs #10–13 (normais/winding invertidos nos `.obj` das peças, não um bug do motor) e os
-  passos pra reexportar os modelos certos no Blender, se/quando isso for feito. Até lá, o motor
-  segue com o `cullFace(false)` + `flipNormals=true` como contorno funcional (custo: ~2x triângulos
-  rasterizados nas peças, já que os dois lados são desenhados).
-- Rodar e verificar visualmente **SnakeGame**, **SpriteEditor** e **ShadowCubeDemo** (só tiveram
-  smoke test, nunca foram olhados na tela nesta sessão).
-- Se os modelos de xadrez forem reexportados corretamente: reverter `cullFace(false)` →
-  `cullFace(true)` em `IsometricChess.onCreate` e tirar o `true` de `flipNormals` na chamada de
-  `ModelLoader.loadWavefrontOBJ` em `ChessBoard.createAndPlace`.
-
-## Como rodar
+Requisitos: JDK 17+. O Maven vem do wrapper do projeto (`./mvnw`, fixado em 3.10.0); o `mvn` do
+sistema não é usado (o enforcer exige 3.9+). O `java` padrão desta máquina é o 11; use o 17:
 
 ```bash
 export JAVA_HOME=$(/usr/libexec/java_home -v 17)
-export PATH="$JAVA_HOME/bin:$PATH"
 
-cd java-game-engine-renderer && mvn -q -DskipTests install
-cd ../java-game-engine-core && mvn -q -DskipTests install
-cd ../java-game-engine-demos && mvn -q -DskipTests compile
-mvn -q dependency:build-classpath -Dmdep.outputFile=/tmp/cp.txt
-java -XstartOnFirstThread -cp "target/classes:$(cat /tmp/cp.txt)" com.farias.rengine.examples.Launcher
-# ou direto uma classe, ex:
-java -XstartOnFirstThread -cp "target/classes:$(cat /tmp/cp.txt)" com.farias.rengine.examples.SnakeGame
+./mvnw -DskipTests install                                # builda os 3 módulos (a partir da raiz)
+
+# rodar um demo (usa -XstartOnFirstThread automaticamente no macOS)
+./mvnw -pl java-game-engine-demos exec:exec               # Launcher
+./mvnw -pl java-game-engine-demos exec:exec \
+    -Dexec.mainClass=com.farias.rengine.examples.SnakeGame
+
+# ou pelo jar fino + lib/ gerados em `package`
+cd java-game-engine-demos
+java -XstartOnFirstThread -jar target/java-game-engine-demos-1.0.2-SNAPSHOT.jar   # tire a flag fora do macOS
 ```
 
-(`-XstartOnFirstThread` é necessário no macOS pro GLFW/OpenGL funcionar.)
+Os demos leem `resources/...` por caminho relativo, então precisam rodar com o diretório de
+trabalho em `java-game-engine-demos/` (o `exec:exec` já faz isso).
 
-Todos os módulos são Java 17 agora (eram Java 11 antes da migração).
+### Decisões de build
+
+- **Maven fixado pelo wrapper** (`mvnw`, `.mvn/wrapper/`, tipo `only-script`, sem jar no repo):
+  3.10.0, a última estável. Maven 4.0.0 ainda está em `rc-7` e os plugins core dele em `beta`;
+  o build passa com `4.0.0-rc-7` também (testado), então migrar é trocar `distributionUrl` em
+  `.mvn/wrapper/maven-wrapper.properties` quando o 4.0 sair em GA.
+- **Plugins** todos na última estável, versionados no `pluginManagement` do POM raiz (compiler
+  3.16.0, jar 3.5.1, dependency 3.11.0, surefire 3.6.0, resources 3.5.0, install 3.2.0, clean
+  3.5.0, enforcer 3.6.3, exec 3.6.4, site/deploy fixados só por exigência do enforcer).
+  `versions-maven-plugin` está disponível: `./mvnw versions:display-plugin-updates`.
+- **Enforcer:** JDK 17+, Maven 3.9+, todo plugin com versão fixa (sem SNAPSHOT), sem versão
+  duplicada de dependência e `dependencyConvergence`.
+- **Jars reproduzíveis** via `project.build.outputTimestamp` (dois builds, mesmo hash).
+- `.mvn/maven.config` desliga o progresso de download e imprime a versão do Maven.
+
+- **Sem uber jar.** O `jar-with-dependencies` embutia os natives de uma única plataforma, então só
+  rodava nela. Agora o `demos` gera um jar fino com `Class-Path: lib/...` e copia as dependências
+  de runtime para `target/lib/` (`maven-jar-plugin` + `maven-dependency-plugin`).
+- **Natives por profile, não por módulo.** Os módulos `java-game-engine-deps-{macos,linux,win}`
+  foram removidos (o do Linux estava em LWJGL 3.2.3, e o `renderer` dependia direto do de macOS).
+  O POM raiz tem profiles ativados por SO/arquitetura que definem `lwjgl.natives`; só o `demos`
+  declara os natives, como `runtime`. `renderer` e `core` dependem apenas das APIs.
+- LWJGL 3.3.6, JOML 1.10.8 (há 3.4.3 e 1.10.9, não adotados), `maven.compiler.release=17`,
+  encoding UTF-8. `lwjgl-assimp` e
+  `lwjgl-openal` saíram: nada no código os usa.
+- Os profiles de Linux/Windows foram escritos mas **nunca executados** (só macOS arm64 foi
+  testado).
+
+## Lições dos bugs já resolvidos
+
+Coisas que custaram caro e valem lembrar ao mexer em renderização:
+
+- **HiDPI:** o viewport vem de `Window.getFramebufferWidth/Height`, não do tamanho lógico da
+  janela; em Retina o tamanho lógico mostra 1/4 da cena.
+- **UI vs. mundo:** texto de UI tem que ser desenhado num passe próprio com projeção ortho2D
+  (`onUIUpdate`), senão sai deformado pela câmera 3D. Na ortho2D do `BitmapFont`, Y vai de `0` a
+  `-height` e `drawText` centraliza o texto em X.
+- **Alpha no shader lit:** multiplicar só RGB pela luz. Multiplicar o alpha fazia fragmentos
+  escuros parecerem transparentes com blending ligado.
+- **Normal/winding de `Meshes.plane`:** a rotação usada para deitar o quad como piso virava a
+  normal para baixo; normal e winding precisam ser corrigidos juntos para o culling funcionar.
+- **Luz padrão** (`Materials.lit`) tem que apontar para o lado visível da câmera isométrica, senão
+  o modelo fica quase preto.
+- **Modelos de xadrez:** os `.obj` das peças têm normais e winding invertidos (≈75% das normais
+  apontam para dentro, medido contra o centroide). Não é bug do motor. O contorno atual é
+  `cullFace(false)` + `flipNormals=true` (custo: ~2x triângulos nas peças). Detalhes e como
+  reexportar no Blender em `java-game-engine-demos/CHESS_MODELS.md`.
+
+## Pendências
+
+**Verificação**
+- Rodar e olhar de verdade **SnakeGame**, **SpriteEditor** e **ShadowCubeDemo**.
+- Rodar um demo em Linux/Windows para validar os profiles de natives.
+- O warning `Uniform 'uNormal' not found in shader program` aparece nos demos 2D e no
+  ShadowCubeDemo. O `Renderer` seta `uNormal` em todo draw, e shaders que não o declaram (os 2D e
+  o de shadow) geram o aviso. É ruído de log, não foi investigado a fundo.
+
+**Design (ver revisão de arquitetura)**
+- `RenderBackend` é parcial: `Mesh`/`Shader`/`Texture` falam com GL direto. Ou o backend passa a
+  criar os recursos, ou a interface sai.
+- `EngineContext.resolve` devolve `null` para serviço ausente; falta um `require` que falhe com
+  mensagem clara. A ordem dos módulos é só convenção documentada.
+- `Game` fixa os três módulos; não há como compor um conjunto diferente.
+- Custo por draw call: `Matrix3f` alocada por comando e `instanceof` em cadeia em
+  `Material.applyUniforms`.
+- Não há testes. `Engine`, `Material` e `RenderPassNode` são testáveis sem contexto GL.
+
+**Modelos de xadrez:** se forem reexportados corretamente, reverter para `cullFace(true)` em
+`IsometricChess.onCreate` e tirar o `flipNormals` da chamada de `ModelLoader.loadWavefrontOBJ` em
+`ChessBoard.createAndPlace`.
