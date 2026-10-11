@@ -53,42 +53,6 @@
 
 	<build>
 		<plugins>
-			<!--
-				Jar fino: so as classes dos demos, com Class-Path apontando para
-				lib/. Substitui o uber jar (que embutia os natives de uma unica
-				plataforma e portanto so rodava nela).
-			-->
-			<plugin>
-				<groupId>org.apache.maven.plugins</groupId>
-				<artifactId>maven-jar-plugin</artifactId>
-				<configuration>
-					<archive>
-						<manifest>
-							<mainClass>${exec.mainClass}</mainClass>
-							<addClasspath>true</addClasspath>
-							<classpathPrefix>lib/</classpathPrefix>
-						</manifest>
-					</archive>
-				</configuration>
-			</plugin>
-			<plugin>
-				<groupId>org.apache.maven.plugins</groupId>
-				<artifactId>maven-dependency-plugin</artifactId>
-				<executions>
-					<execution>
-						<id>copy-runtime-libs</id>
-						<phase>package</phase>
-						<goals>
-							<goal>copy-dependencies</goal>
-						</goals>
-						<configuration>
-							<outputDirectory>${project.build.directory}/lib</outputDirectory>
-							<includeScope>runtime</includeScope>
-						</configuration>
-					</execution>
-				</executions>
-			</plugin>
-
 			<!-- mvn -pl java-game-engine-demos exec:exec -->
 			<plugin>
 				<groupId>org.codehaus.mojo</groupId>
@@ -100,4 +64,49 @@
 			</plugin>
 		</plugins>
 	</build>
+
+	<profiles>
+		<!--
+			Distribuicao executavel: jar fino com Class-Path para lib/, e as
+			dependencias de runtime copiadas para target/lib. Opt-in
+			(./mvnw -Pdist package) porque so interessa a quem vai empacotar.
+		-->
+		<profile>
+			<id>dist</id>
+			<build>
+				<plugins>
+					<plugin>
+						<groupId>org.apache.maven.plugins</groupId>
+						<artifactId>maven-jar-plugin</artifactId>
+						<configuration>
+							<archive>
+								<manifest>
+									<mainClass>${exec.mainClass}</mainClass>
+									<addClasspath>true</addClasspath>
+									<classpathPrefix>lib/</classpathPrefix>
+								</manifest>
+							</archive>
+						</configuration>
+					</plugin>
+					<plugin>
+						<groupId>org.apache.maven.plugins</groupId>
+						<artifactId>maven-dependency-plugin</artifactId>
+						<executions>
+							<execution>
+								<id>copy-runtime-libs</id>
+								<phase>package</phase>
+								<goals>
+									<goal>copy-dependencies</goal>
+								</goals>
+								<configuration>
+									<outputDirectory>${project.build.directory}/lib</outputDirectory>
+									<includeScope>runtime</includeScope>
+								</configuration>
+							</execution>
+						</executions>
+					</plugin>
+				</plugins>
+			</build>
+		</profile>
+	</profiles>
 </project>
