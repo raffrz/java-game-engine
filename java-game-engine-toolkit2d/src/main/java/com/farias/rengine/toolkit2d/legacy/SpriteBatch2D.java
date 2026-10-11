@@ -11,7 +11,7 @@ import com.farias.rengine.renderer.RenderPassNode;
 import com.farias.rengine.renderer.Renderer;
 import com.farias.rengine.renderer.Shader;
 import com.farias.rengine.renderer.Texture;
-import com.farias.rengine.assets.TextureLoader;
+import com.farias.rengine.assets.Assets;
 import com.farias.rengine.toolkit2d.draw.SpriteShaders;
 
 /**
@@ -22,11 +22,13 @@ import com.farias.rengine.toolkit2d.draw.SpriteShaders;
  */
 public final class SpriteBatch2D {
     private final Renderer renderer;
+    private final Assets assets;
     private final Shader shader;
     private final Mesh quad;
 
-    public SpriteBatch2D(Renderer renderer) {
+    public SpriteBatch2D(Renderer renderer, Assets assets) {
         this.renderer = renderer;
+        this.assets = assets;
         this.shader = renderer.createShader(SpriteShaders.SPRITE_VERTEX, SpriteShaders.SPRITE_FRAGMENT);
         this.quad = renderer.createMesh(quadData());
     }
@@ -55,7 +57,7 @@ public final class SpriteBatch2D {
     }
 
     public Sprite createSprite(String file, int tile, float tileWidth, float tileHeight) {
-        Texture texture = TextureLoader.load(renderer, file);
+        Texture texture = assets.texture(file);
         Vector2f offset = new Vector2f();
         Vector2f scale = new Vector2f();
         computeTileUV(texture, tile, tileWidth, tileHeight, offset, scale);

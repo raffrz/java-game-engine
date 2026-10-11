@@ -3,9 +3,10 @@ package com.farias.rengine.engine3d;
 import static java.lang.Integer.parseInt;
 import static java.lang.Float.parseFloat;
 import java.io.BufferedReader;
-import java.io.File;
-import java.io.FileNotFoundException;
-import java.io.FileReader;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.io.UncheckedIOException;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -14,7 +15,7 @@ import java.util.Map;
 import org.joml.Vector2f;
 import org.joml.Vector3f;
 
-import com.farias.rengine.assets.TextureLoader;
+import com.farias.rengine.assets.Assets;
 import com.farias.rengine.renderer.Material;
 import com.farias.rengine.renderer.Mesh;
 import com.farias.rengine.renderer.MeshData;
@@ -22,10 +23,24 @@ import com.farias.rengine.renderer.Renderer;
 import com.farias.rengine.renderer.Shader;
 import com.farias.rengine.renderer.Texture;
 
-public class ModelLoader {
+/**
+ * Carrega modelos Wavefront OBJ (e a textura de mesmo nome) via {@link Assets}:
+ * {@code models/<nome>.obj} e {@code textures/<nome>.png}, relativos a raiz
+ * de assets. Falhas de leitura/parse viram excecao, nunca um modelo nulo.
+ */
+public final class ModelLoader {
+    private final Assets assets;
+    private final Renderer renderer;
+    private final Materials materials;
 
-    public static TexturedModel loadWavefrontOBJ(String fileName, Renderer renderer, Shader litShader) {
-        return loadWavefrontOBJ(fileName, renderer, litShader, false);
+    public ModelLoader(Assets assets, Renderer renderer, Materials materials) {
+        this.assets = assets;
+        this.renderer = renderer;
+        this.materials = materials;
+    }
+
+    public TexturedModel loadWavefrontOBJ(String fileName, Shader litShader) {
+        return loadWavefrontOBJ(fileName, litShader, false);
     }
 
     /**
@@ -35,17 +50,7 @@ public class ModelLoader {
      *                     corretas); nesses casos a iluminacao fica invertida
      *                     a menos que as normais sejam invertidas aqui.
      */
-    public static TexturedModel loadWavefrontOBJ(String fileName, Renderer renderer, Shader litShader,
-            boolean flipNormals) {
-        FileReader fr;
-        try {
-            fr = new FileReader(new File("resources/models/" + fileName + ".obj"));
-        } catch (FileNotFoundException e) {
-            System.err.println("Couldn't load the file!");
-            return null;
-        }
-
-        BufferedReader reader = new BufferedReader(fr);
+    public TexturedModel loadWavefrontOBJ(String fileName, Shader litShader, boolean flipNormals) {
         String line;
         List<Vector3f> vertices = new ArrayList<>();
         List<Vector2f> textures = new ArrayList<>();
@@ -56,7 +61,8 @@ public class ModelLoader {
         List<Integer> indices = new ArrayList<>();
         Map<String, Integer> vertexCache = new HashMap<>();
 
-        try {
+        try (BufferedReader reader = new BufferedReader(
+                new InputStreamReader(assets.open("models/" + fileName + ".obj"), StandardCharsets.UTF_8))) {
             while ((line = reader.readLine()) != null) {
                 line = line.trim();
                 if (line.isEmpty() || line.startsWith("#")) {
@@ -86,9 +92,8 @@ public class ModelLoader {
                             vertexCache);
                 }
             }
-            reader.close();
-        } catch (Exception e) {
-            e.printStackTrace();
+        } catch (IOException e) {
+            throw new UncheckedIOException("Failed to read model '" + fileName + "'", e);
         }
 
         float[] verticesArray = new float[outVertices.size() * 3];
@@ -122,8 +127,8 @@ public class ModelLoader {
         }
 
         Mesh mesh = renderer.createMesh(new MeshData(verticesArray, textureArray, normalsArray, indicesArray));
-        Texture texture = TextureLoader.load(renderer, "resources/textures/" + fileName + ".png");
-        Material material = Materials.lit(renderer, litShader, texture);
+        Texture texture = assets.texture("textures/" + fileName + ".png");
+        Material material = materials.lit(litShader, texture);
 
         return new TexturedModel(mesh, material);
     }

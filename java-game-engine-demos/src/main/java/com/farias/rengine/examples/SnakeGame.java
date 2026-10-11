@@ -80,7 +80,7 @@ public class SnakeGame extends Game {
 
     @Override
     protected void onCreate() {
-        batch = new SpriteBatch2D(renderer);
+        batch = new SpriteBatch2D(renderer, assets);
         font = new BitmapFont(batch);
         renderer2D = new SnakeGameRenderer(batch, WIDTH, HEIGHT, rows, cols);
 
@@ -248,11 +248,11 @@ public class SnakeGame extends Game {
             this.width = width;
             this.height = height;
 
-            this.palleteSprite = batch.createSprite("resources/palletes/default.png", PALLETE_SPRITE_INDEX,
+            this.palleteSprite = batch.createSprite("palletes/default.png", PALLETE_SPRITE_INDEX,
                     PALLETE_SPRITE_WIDTH, PALLETE_SPRITE_HEIGHT);
-            this.snakeSprite = batch.createSprite("resources/snakegame/snake-pixel-art.png", SNAKE_SPRITE_INDEX,
+            this.snakeSprite = batch.createSprite("snakegame/snake-pixel-art.png", SNAKE_SPRITE_INDEX,
                     SNAKE_SPRITE_WIDTH, SNAKE_SPRITE_HEIGHT);
-            this.appleSprite = batch.createSprite("resources/snakegame/apple-pixel-art.png", APPLE_SPRITE_INDEX,
+            this.appleSprite = batch.createSprite("snakegame/apple-pixel-art.png", APPLE_SPRITE_INDEX,
                     APPLE_SPRITE_WIDTH, APPLE_SPRITE_HEIGHT);
         }
 

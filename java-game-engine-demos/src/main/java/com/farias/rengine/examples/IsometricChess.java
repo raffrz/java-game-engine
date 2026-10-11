@@ -32,7 +32,6 @@ import com.farias.rengine.renderer.RenderPassNode;
 import com.farias.rengine.renderer.RenderView;
 import com.farias.rengine.renderer.Shader;
 import com.farias.rengine.engine3d.ModelLoader;
-import com.farias.rengine.assets.TextureLoader;
 
 public class IsometricChess extends Game {
 
@@ -45,6 +44,9 @@ public class IsometricChess extends Game {
 
     private final Camera camera = new Camera();
     private Shader litShader;
+    private Meshes meshes;
+    private Materials materials;
+    private ModelLoader modelLoader;
     private TexturedModel whiteTile;
     private TexturedModel blackTile;
     private ChessBoard chessBoard;
@@ -70,6 +72,9 @@ public class IsometricChess extends Game {
     @Override
     protected void onCreate() {
         litShader = renderer.createShader(Shaders.LIT_VERTEX, Shaders.LIT_FRAGMENT);
+        meshes = context.require(Meshes.class);
+        materials = context.require(Materials.class);
+        modelLoader = context.require(ModelLoader.class);
 
         // Inicializa os pisos do tabuleiro
         whiteTile = createPlane("yellow_sprite", 1, 1);
@@ -79,7 +84,7 @@ public class IsometricChess extends Game {
         chessBoard = new ChessBoard();
         chessBoard.setupDefaultBoard();
 
-        batch = new SpriteBatch2D(renderer);
+        batch = new SpriteBatch2D(renderer, assets);
         font = new BitmapFont(batch);
 
         scene3DDescriptor = new RenderPassDescriptor("isometric-chess-3d")
@@ -105,9 +110,8 @@ public class IsometricChess extends Game {
     }
 
     private TexturedModel createPlane(String textureName, float width, float height) {
-        Mesh mesh = Meshes.plane(renderer, width, height);
-        Material material = Materials.lit(renderer, litShader,
-                TextureLoader.load(renderer, "resources/textures/" + textureName + ".png"));
+        Mesh mesh = meshes.plane(width, height);
+        Material material = materials.lit(litShader, assets.texture("textures/" + textureName + ".png"));
         return new TexturedModel(mesh, material);
     }
 
@@ -278,7 +282,7 @@ public class IsometricChess extends Game {
             String pieceName = PIECE_TYPES[pieceId] + "_" + color;
             // as normais desses .obj apontam pra dentro (confirmado medindo
             // contra o centroide da malha), senao a iluminacao fica invertida
-            TexturedModel model = ModelLoader.loadWavefrontOBJ(pieceName, renderer, litShader, true);
+            TexturedModel model = modelLoader.loadWavefrontOBJ(pieceName, litShader, true);
 
             // Regra de rotação original: Cavalos brancos rotacionam em -180f, pretos em 0f. O resto usa 90f.
             float rotation = DEFAULT_PIECE_ROTATION;

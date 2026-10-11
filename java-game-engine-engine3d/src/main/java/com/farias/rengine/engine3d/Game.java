@@ -3,6 +3,10 @@ package com.farias.rengine.engine3d;
 import static org.lwjgl.glfw.GLFW.GLFW_KEY_ESCAPE;
 import static org.lwjgl.glfw.GLFW.glfwTerminate;
 
+import java.nio.file.Path;
+
+import com.farias.rengine.assets.Assets;
+import com.farias.rengine.assets.AssetsModule;
 import com.farias.rengine.engine.Engine;
 import com.farias.rengine.engine.EngineContext;
 import com.farias.rengine.engine.Timer;
@@ -30,6 +34,7 @@ public abstract class Game {
     protected Window window;
     protected InputSystem input;
     protected Renderer renderer;
+    protected Assets assets;
     protected Timer timer;
 
     protected Game(String title, int width, int height) {
@@ -43,11 +48,14 @@ public abstract class Game {
         engine.registerModule(new WindowModule(width, height, title));
         engine.registerModule(new InputModule());
         engine.registerModule(new RenderModule());
+        engine.registerModule(new AssetsModule(Path.of("resources")));
+        engine.registerModule(new Engine3DModule());
         context = engine.start();
 
         window = context.require(Window.class);
         input = context.require(InputSystem.class);
         renderer = context.require(Renderer.class);
+        assets = context.require(Assets.class);
         timer = new Timer();
 
         onCreate();
