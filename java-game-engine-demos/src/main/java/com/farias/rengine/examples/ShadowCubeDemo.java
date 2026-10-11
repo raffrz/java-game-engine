@@ -29,7 +29,7 @@ import com.farias.rengine.renderer.Texture;
  * profundidade do ponto de vista da luz + pass forward que amostra o shadow
  * map). Ao contrario dos outros exemplos, este nao estende Game - monta
  * Engine/EngineContext/modulos e roda o loop na mao, para mostrar esse nivel
- * mais baixo de composicao tambem (o mesmo estilo de Example.java).
+ * mais baixo de composicao tambem.
  *
  * Estilo funcional: o estado e um valor imutavel (State), a simulacao e a
  * geracao de comandos sao funcoes puras, e os efeitos colaterais (GPU/janela)

@@ -65,21 +65,15 @@ public final class Renderer {
         return material;
     }
 
+    /**
+     * Cria um passe e o enfileira no frame corrente. A fila e limpa em
+     * {@link #beginFrame()}, entao passes devem ser criados a cada frame.
+     */
     public RenderPassNode createPass(RenderPassDescriptor descriptor, RenderView view) {
+        ensureInitialized();
         var node = new RenderPassNode(descriptor, view);
         renderPasses.add(node);
-
         return node;
-    }
-
-    /**
-     * Adiciona um passe inteiro na fila de execução do frame
-     */
-    public void submitPass(RenderPassNode pass) {
-        ensureInitialized();
-        if (!this.renderPasses.contains(pass)) {
-            this.renderPasses.add(pass);
-        }
     }
 
     public void beginFrame() {
