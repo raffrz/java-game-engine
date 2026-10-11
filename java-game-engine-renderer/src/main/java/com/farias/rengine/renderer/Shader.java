@@ -16,6 +16,11 @@ public class Shader implements Disposable {
     private final int program;
     private final Map<String, Integer> uniforms = new HashMap<>();
 
+    // Reutilizados a cada uniform de matriz: alocar um direct buffer por draw
+    // call e caro. Seguro porque o contexto GL e de uma thread so.
+    private final FloatBuffer matrix4Buffer = BufferUtils.createFloatBuffer(16);
+    private final FloatBuffer matrix3Buffer = BufferUtils.createFloatBuffer(9);
+
     public Shader(String vertexSource, String fragmentSource) {
         // 1. Compile Vertex Shader
         int vertexShader = createShader(vertexSource, GL20.GL_VERTEX_SHADER);
@@ -88,18 +93,16 @@ public class Shader implements Disposable {
         int location = getUniformLocation(name);
         if (location == -1)
             return;
-        FloatBuffer buffer = BufferUtils.createFloatBuffer(16);
-        matrix.get(buffer);
-        GL20.glUniformMatrix4fv(location, false, buffer);
+        matrix.get(matrix4Buffer);
+        GL20.glUniformMatrix4fv(location, false, matrix4Buffer);
     }
 
     public void setMatrix3f(String name, Matrix3f matrix) {
         int location = getUniformLocation(name);
         if (location == -1)
             return;
-        FloatBuffer buffer = BufferUtils.createFloatBuffer(9);
-        matrix.get(buffer);
-        GL20.glUniformMatrix3fv(location, false, buffer);
+        matrix.get(matrix3Buffer);
+        GL20.glUniformMatrix3fv(location, false, matrix3Buffer);
     }
     
     private int getUniformLocation(String name) {

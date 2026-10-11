@@ -12,7 +12,7 @@ import org.joml.Vector3f;
 public class Material {
     private final Shader shader;
 
-    private final Map<String, Object> uniforms = new HashMap<>();
+    private final Map<String, UniformValue> uniforms = new HashMap<>();
     private final Map<String, TextureBinding> textures = new HashMap<>();
 
     public Material(Shader shader) {
@@ -20,32 +20,36 @@ public class Material {
     }
 
     public Material setInt(String name, int value) {
-        uniforms.put(name, value);
+        uniforms.put(name, (s, n) -> s.setInt(n, value));
         return this;
     }
 
     public Material setFloat(String name, float value) {
-        uniforms.put(name, value);
+        uniforms.put(name, (s, n) -> s.setFloat(n, value));
         return this;
     }
 
     public Material setVector3f(String name, Vector3f value) {
-        uniforms.put(name, new Vector3f(value));
+        Vector3f copy = new Vector3f(value);
+        uniforms.put(name, (s, n) -> s.setVector3f(n, copy));
         return this;
     }
 
     public Material setVector2f(String name, Vector2f value) {
-        uniforms.put(name, new Vector2f(value));
+        Vector2f copy = new Vector2f(value);
+        uniforms.put(name, (s, n) -> s.setVector2f(n, copy));
         return this;
     }
 
     public Material setMatrix4f(String name, Matrix4f value) {
-        uniforms.put(name, new Matrix4f(value));
+        Matrix4f copy = new Matrix4f(value);
+        uniforms.put(name, (s, n) -> s.setMatrix4f(n, copy));
         return this;
     }
 
     public Material setMatrix3f(String name, Matrix3f value) {
-        uniforms.put(name, new Matrix3f(value));
+        Matrix3f copy = new Matrix3f(value);
+        uniforms.put(name, (s, n) -> s.setMatrix3f(n, copy));
         return this;
     }
 
@@ -57,25 +61,8 @@ public class Material {
     }
 
     public void applyUniforms() {
-        for (Map.Entry<String, Object> entry : uniforms.entrySet()) {
-            String name = entry.getKey();
-            Object value = entry.getValue();
-
-            if (value instanceof Integer i) {
-                shader.setInt(name, i);
-            } else if (value instanceof Float f) {
-                shader.setFloat(name, f);
-            } else if (value instanceof Vector3f v) {
-                shader.setVector3f(name, v);
-            } else if (value instanceof Vector2f v) {
-                shader.setVector2f(name, v);
-            } else if (value instanceof Matrix4f m) {
-                shader.setMatrix4f(name, m);
-            } else if (value instanceof Matrix3f m) {
-                shader.setMatrix3f(name, m);
-            } else {
-                throw new IllegalArgumentException("Unsupported uniform type: " + value.getClass());
-            }
+        for (Map.Entry<String, UniformValue> entry : uniforms.entrySet()) {
+            entry.getValue().apply(shader, entry.getKey());
         }
 
         for (Map.Entry<String, TextureBinding> entry : textures.entrySet()) {
@@ -99,6 +86,12 @@ public class Material {
 
     public Shader shader() {
         return shader;
+    }
+
+    /** Um valor de uniform ja tipado: aplicar e uma chamada virtual, sem instanceof. */
+    @FunctionalInterface
+    private interface UniformValue {
+        void apply(Shader shader, String name);
     }
 
     private record TextureBinding(Texture texture, int sampler) {
