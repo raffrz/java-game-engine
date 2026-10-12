@@ -33,6 +33,7 @@ public final class Mesh implements Disposable {
     private final int normalVbo;
 
     private final int indexCount;
+    private final Bounds bounds;
 
     public Mesh(MeshData data) {
         // 1. Gerar e vincular o VAO global
@@ -73,6 +74,12 @@ public final class Mesh implements Disposable {
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
 
         this.indexCount = data.indices().length;
+        this.bounds = Bounds.of(data.vertices());
+    }
+
+    /** Limites do mesh no espaço local (antes da matriz de modelo); vazios se não houver vértices. */
+    public Bounds bounds() {
+        return bounds;
     }
 
     public void draw() {

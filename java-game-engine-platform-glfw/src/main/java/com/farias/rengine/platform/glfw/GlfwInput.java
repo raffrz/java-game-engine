@@ -19,6 +19,7 @@ final class GlfwInput implements InputSystem {
     private final long handle;
 
     private final boolean[] keys = new boolean[KEY_LAST];
+    private final boolean[] mouseButtons = new boolean[MouseButton.values().length];
 
     private final DoubleBuffer mouseX = BufferUtils.createDoubleBuffer(1);
     private final DoubleBuffer mouseY = BufferUtils.createDoubleBuffer(1);
@@ -51,6 +52,11 @@ final class GlfwInput implements InputSystem {
     }
 
     @Override
+    public boolean isMouseButtonPressed(MouseButton button) {
+        return isMouseButtonDown(button) && !mouseButtons[button.ordinal()];
+    }
+
+    @Override
     public double getMouseX() {
         return mouseX.get(0);
     }
@@ -64,6 +70,10 @@ final class GlfwInput implements InputSystem {
     public void update() {
         for (int i = KEY_FIRST; i < KEY_LAST; i++) {
             keys[i] = isDown(i);
+        }
+
+        for (MouseButton button : MouseButton.values()) {
+            mouseButtons[button.ordinal()] = isMouseButtonDown(button);
         }
 
         glfwGetCursorPos(handle, mouseX, mouseY);

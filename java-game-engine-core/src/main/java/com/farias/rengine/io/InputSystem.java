@@ -16,6 +16,9 @@ public interface InputSystem {
 
     boolean isMouseButtonDown(MouseButton button);
 
+    /** true no frame em que o botao passou de solto para pressionado. */
+    boolean isMouseButtonPressed(MouseButton button);
+
     double getMouseX();
 
     double getMouseY();
