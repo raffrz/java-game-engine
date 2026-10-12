@@ -71,7 +71,7 @@ public class IsometricChess {
     private float fov = 5f;
 
     // distância da câmera para visão isométrica
-    private float cameraDistance = 10f;
+    private final float cameraDistance = 10f;
 
     public IsometricChess(EngineContext context) {
         window = context.require(Window.class);

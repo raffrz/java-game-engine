@@ -5,7 +5,7 @@ package com.farias.rengine.toolkit2d.draw;
  * com.farias.rengine.renderer.Shader recebe o source direto (sem ler arquivo
  * de classpath), entao o source fica aqui como texto.
  */
-public final class SpriteShaders {
+final class SpriteShaders {
 
     private SpriteShaders() {
     }
