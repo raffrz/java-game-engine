@@ -7,7 +7,7 @@ import com.farias.rengine.engine.Engine;
 import com.farias.rengine.engine.EngineContext;
 import com.farias.rengine.engine.Timer;
 import com.farias.rengine.engine.modules.InputModule;
-import com.farias.rengine.engine.modules.RenderModule;
+import com.farias.rengine.renderer.RenderModule;
 import com.farias.rengine.engine.modules.WindowModule;
 import com.farias.rengine.engine3d.Camera;
 import com.farias.rengine.engine3d.Engine3DModule;

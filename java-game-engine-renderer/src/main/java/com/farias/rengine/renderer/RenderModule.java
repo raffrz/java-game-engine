@@ -1,13 +1,15 @@
-package com.farias.rengine.engine.modules;
+package com.farias.rengine.renderer;
+
+import org.lwjgl.opengl.GL;
 
 import com.farias.rengine.engine.EngineContext;
 import com.farias.rengine.engine.Module;
 import com.farias.rengine.io.Window;
-import com.farias.rengine.renderer.Renderer;
 
 /**
- * Cria o Renderer modular. Precisa de um contexto GL ja corrente, ou seja,
- * exige a Window registrada por {@link WindowModule}.
+ * Cria o Renderer modular (OpenGL). Precisa de um contexto GL ja corrente
+ * (a Window registrada por WindowModule, com o contexto tornado corrente), e
+ * inicializa as capabilities do LWJGL para esse contexto.
  */
 public final class RenderModule implements Module {
     private Renderer renderer;
@@ -16,6 +18,7 @@ public final class RenderModule implements Module {
     public void onRegister(EngineContext context) {
         Window window = context.require(Window.class);
 
+        GL.createCapabilities();
         renderer = new Renderer();
         renderer.initialize();
         renderer.setPresent(window::swapBuffers);

@@ -2,17 +2,14 @@ package com.farias.rengine.engine.modules;
 
 import static org.lwjgl.glfw.GLFW.glfwTerminate;
 
-import org.lwjgl.opengl.GL;
-
 import com.farias.rengine.engine.EngineContext;
 import com.farias.rengine.engine.Module;
 import com.farias.rengine.io.Window;
 
 /**
- * Cria a janela GLFW, torna o contexto GL corrente e inicializa as
- * capabilities do LWJGL. Deve ser o primeiro modulo registrado, ja que
- * RenderModule/InputModule dependem de um contexto GL corrente e do
- * Window.class ja resolvido.
+ * Cria a janela GLFW e torna seu contexto corrente. Deve ser o primeiro
+ * modulo registrado, ja que os demais dependem do Window.class ja resolvido
+ * (e o RenderModule, de um contexto corrente).
  */
 public final class WindowModule implements Module {
     private final int width;
@@ -32,7 +29,6 @@ public final class WindowModule implements Module {
         window.create();
         window.setTitle(title);
         window.bind();
-        GL.createCapabilities();
         context.registerService(Window.class, window);
     }
 
