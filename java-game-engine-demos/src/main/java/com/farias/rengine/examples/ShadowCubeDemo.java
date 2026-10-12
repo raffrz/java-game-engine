@@ -10,7 +10,7 @@ import com.farias.rengine.engine.Engine;
 import com.farias.rengine.engine.EngineContext;
 import com.farias.rengine.engine.Timer;
 import com.farias.rengine.renderer.RenderModule;
-import com.farias.rengine.engine.modules.WindowModule;
+import com.farias.rengine.platform.glfw.GlfwModule;
 import com.farias.rengine.io.Window;
 import com.farias.rengine.renderer.DirectionalLight;
 import com.farias.rengine.renderer.Material;
@@ -83,7 +83,7 @@ public final class ShadowCubeDemo {
 
     private static void run() {
         Engine engine = new Engine();
-        engine.registerModule(new WindowModule(1280, 720, "Shadow Cube Demo"));
+        engine.registerModule(new GlfwModule(1280, 720, "Shadow Cube Demo"));
         engine.registerModule(new RenderModule());
         EngineContext context = engine.start();
 

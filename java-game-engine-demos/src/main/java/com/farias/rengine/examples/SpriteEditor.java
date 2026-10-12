@@ -13,9 +13,8 @@ import com.farias.rengine.assets.AssetsModule;
 import com.farias.rengine.engine.Engine;
 import com.farias.rengine.engine.EngineContext;
 import com.farias.rengine.engine.Timer;
-import com.farias.rengine.engine.modules.InputModule;
 import com.farias.rengine.renderer.RenderModule;
-import com.farias.rengine.engine.modules.WindowModule;
+import com.farias.rengine.platform.glfw.GlfwModule;
 import com.farias.rengine.io.InputSystem;
 import com.farias.rengine.io.Key;
 import com.farias.rengine.io.MouseButton;
@@ -192,8 +191,7 @@ public class SpriteEditor {
 
     public static void launch() {
         Engine engine = new Engine()
-                .registerModule(new WindowModule(WINDOW_SIZE, WINDOW_SIZE, "Sprite Editor"))
-                .registerModule(new InputModule())
+                .registerModule(new GlfwModule(WINDOW_SIZE, WINDOW_SIZE, "Sprite Editor"))
                 .registerModule(new RenderModule())
                 .registerModule(new AssetsModule(Path.of("resources")))
                 .registerModule(new Toolkit2DModule(VIRTUAL_SIZE, VIRTUAL_SIZE));

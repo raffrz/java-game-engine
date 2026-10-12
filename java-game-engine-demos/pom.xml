@@ -25,6 +25,10 @@
 		</dependency>
 		<dependency>
 			<groupId>com.farias.rengine</groupId>
+			<artifactId>java-game-engine-platform-glfw</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>com.farias.rengine</groupId>
 			<artifactId>java-game-engine-toolkit2d</artifactId>
 		</dependency>
 		<dependency>

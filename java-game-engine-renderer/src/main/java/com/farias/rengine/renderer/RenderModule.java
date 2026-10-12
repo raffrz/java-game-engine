@@ -8,7 +8,7 @@ import com.farias.rengine.io.Window;
 
 /**
  * Cria o Renderer modular (OpenGL). Precisa de um contexto GL ja corrente
- * (a Window registrada por WindowModule, com o contexto tornado corrente), e
+ * (a Window registrada pelo modulo de plataforma, com o contexto tornado corrente), e
  * inicializa as capabilities do LWJGL para esse contexto.
  */
 public final class RenderModule implements Module {

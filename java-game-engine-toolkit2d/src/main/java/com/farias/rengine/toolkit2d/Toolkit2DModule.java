@@ -10,7 +10,7 @@ import com.farias.rengine.toolkit2d.ui.Ui;
 
 /**
  * Registra os servicos 2D: {@link Canvas}, {@link Ui} (overlay) e o
- * {@link SpriteRenderer} de baixo nivel. Deve vir depois de WindowModule, RenderModule e AssetsModule.
+ * {@link SpriteRenderer} de baixo nivel. Deve vir depois do modulo de plataforma (GlfwModule), RenderModule e AssetsModule.
  *
  * <p>O tamanho virtual e o espaco de coordenadas que o jogo usa; ele e
  * escalado para o framebuffer da janela.
