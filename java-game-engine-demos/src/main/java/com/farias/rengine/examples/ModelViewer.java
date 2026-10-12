@@ -1,24 +1,33 @@
 package com.farias.rengine.examples;
 
-import org.joml.Matrix4f;
+import java.nio.file.Path;
 
-import com.farias.rengine.engine3d.Game;
+import com.farias.rengine.assets.AssetsModule;
+import com.farias.rengine.engine.Engine;
+import com.farias.rengine.engine.EngineContext;
+import com.farias.rengine.engine.Timer;
+import com.farias.rengine.engine.modules.InputModule;
+import com.farias.rengine.engine.modules.RenderModule;
+import com.farias.rengine.engine.modules.WindowModule;
 import com.farias.rengine.engine3d.Camera;
-import com.farias.rengine.io.Key;
-import com.farias.rengine.toolkit2d.legacy.BitmapFont;
+import com.farias.rengine.engine3d.Engine3DModule;
+import com.farias.rengine.engine3d.ModelLoader;
 import com.farias.rengine.engine3d.Projections;
-import com.farias.rengine.toolkit2d.legacy.Projections2D;
 import com.farias.rengine.engine3d.Shaders;
-import com.farias.rengine.toolkit2d.legacy.SpriteBatch2D;
 import com.farias.rengine.engine3d.TexturedModel;
+import com.farias.rengine.io.InputSystem;
+import com.farias.rengine.io.Key;
+import com.farias.rengine.io.Window;
 import com.farias.rengine.renderer.RenderCommand;
 import com.farias.rengine.renderer.RenderPassDescriptor;
 import com.farias.rengine.renderer.RenderPassNode;
 import com.farias.rengine.renderer.RenderView;
+import com.farias.rengine.renderer.Renderer;
 import com.farias.rengine.renderer.Shader;
-import com.farias.rengine.engine3d.ModelLoader;
+import com.farias.rengine.toolkit2d.Toolkit2DModule;
+import com.farias.rengine.toolkit2d.ui.Ui;
 
-public class ModelViewer extends Game {
+public class ModelViewer {
 
     private static final int WINDOW_WIDTH = 960;
     private static final int WINDOW_HEIGHT = 960;
@@ -27,13 +36,14 @@ public class ModelViewer extends Game {
     private static final float ROTATION_SPEED = 16f;
 
     private final Camera camera = new Camera();
-    private TexturedModel earth;
-    private TexturedModel clouds;
+    private final TexturedModel earth;
+    private final TexturedModel clouds;
 
-    private SpriteBatch2D batch;
-    private BitmapFont font;
-    private RenderPassDescriptor scene3DDescriptor;
-    private RenderPassDescriptor uiDescriptor;
+    private final Window window;
+    private final InputSystem input;
+    private final Renderer renderer;
+    private final Ui ui;
+    private final RenderPassDescriptor scene3DDescriptor;
 
     // ponto observado pela câmera
     private float targetX = 0;
@@ -43,19 +53,16 @@ public class ModelViewer extends Game {
     // distância da câmera (terra tem raio ~1, entao perto o bastante pra preencher a tela)
     private float cameraDistance = 3f;
 
-    public ModelViewer() {
-        super("Model Viewer - Isometric", WINDOW_WIDTH, WINDOW_HEIGHT);
-    }
+    public ModelViewer(EngineContext context) {
+        window = context.require(Window.class);
+        input = context.require(InputSystem.class);
+        renderer = context.require(Renderer.class);
+        ui = context.require(Ui.class);
 
-    @Override
-    protected void onCreate() {
         Shader litShader = renderer.createShader(Shaders.LIT_VERTEX, Shaders.LIT_FRAGMENT);
         ModelLoader models = context.require(ModelLoader.class);
         earth = models.loadWavefrontOBJ("earth", litShader);
         clouds = models.loadWavefrontOBJ("clouds", litShader);
-
-        batch = new SpriteBatch2D(renderer, assets);
-        font = new BitmapFont(batch);
 
         scene3DDescriptor = new RenderPassDescriptor("model-viewer-3d")
                 .clearColor(0f, 0f, 0f, 1f)
@@ -63,14 +70,20 @@ public class ModelViewer extends Game {
                 .cullFace(true)
                 .blend(true);
 
-        uiDescriptor = new RenderPassDescriptor("model-viewer-ui")
-                .clearColorBuffer(false)
-                .clearDepthBuffer(false)
-                .depthTest(false)
-                .cullFace(true)
-                .blend(true);
-
         updateIsometricCamera();
+    }
+
+    private void run() {
+        Timer timer = new Timer();
+        while (!window.shouldClose() && !input.isKeyPressed(Key.ESCAPE)) {
+            timer.update();
+            input.update();
+            update(timer.deltaTime());
+
+            renderer.beginFrame();
+            render();
+            renderer.endFrame();
+        }
     }
 
     private void updateIsometricCamera() {
@@ -86,8 +99,7 @@ public class ModelViewer extends Game {
                 0, 1, 0);
     }
 
-    @Override
-    protected void onUpdate(float deltaTime) {
+    private void update(float deltaTime) {
 
         // rotação da terra
         earth.getRotation().y -= 0.7f * deltaTime * ROTATION_SPEED;
@@ -170,29 +182,36 @@ public class ModelViewer extends Game {
         updateIsometricCamera();
     }
 
-    @Override
-    protected void onRender(float deltaTime) {
+    private void render() {
         // Renderização 3D em perspectiva (era ortográfica/isométrica)
-        Matrix4f projection3D = Projections.perspective(WINDOW_WIDTH, WINDOW_HEIGHT);
         RenderView view3D = new RenderView(window.getFramebufferWidth(), window.getFramebufferHeight(),
-                projection3D, camera.getViewMatrix());
+                Projections.perspective(WINDOW_WIDTH, WINDOW_HEIGHT), camera.getViewMatrix());
         RenderPassNode scenePass = renderer.createPass(scene3DDescriptor, view3D);
 
         scenePass.submit(new RenderCommand(earth.getMesh(), earth.getMaterial(), earth.getModelMatrix()));
         scenePass.submit(new RenderCommand(clouds.getMesh(), clouds.getMaterial(), clouds.getModelMatrix()));
 
-        // UI
-        Matrix4f projectionUI = Projections2D.orthographic2D(WINDOW_WIDTH, WINDOW_HEIGHT);
-        RenderView viewUI = new RenderView(window.getFramebufferWidth(), window.getFramebufferHeight(),
-                projectionUI, new Matrix4f());
-        RenderPassNode uiPass = renderer.createPass(uiDescriptor, viewUI);
-
-        font.drawText(uiPass, "ISOMETRIC VIEW", WINDOW_WIDTH / 2, -20, FONT_SIZE, FONT_SIZE);
-        font.drawText(uiPass, "ARROWS = MOVE | Z = ZOOM | SHIFT+Z = ZOOM OUT", WINDOW_WIDTH / 2, -50, 14, 14);
+        // UI (depois da cena: os passes executam na ordem de criacao)
+        ui.begin();
+        ui.textCentered(ui.defaultFont(), "ISOMETRIC VIEW", WINDOW_WIDTH / 2, 20, FONT_SIZE);
+        ui.textCentered(ui.defaultFont(), "ARROWS = MOVE | Z = ZOOM | SHIFT+Z = ZOOM OUT", WINDOW_WIDTH / 2, 50, 14);
     }
 
     public static void launch() {
-        new ModelViewer().run();
+        Engine engine = new Engine()
+                .registerModule(new WindowModule(WINDOW_WIDTH, WINDOW_HEIGHT, "Model Viewer - Isometric"))
+                .registerModule(new InputModule())
+                .registerModule(new RenderModule())
+                .registerModule(new AssetsModule(Path.of("resources")))
+                .registerModule(new Engine3DModule())
+                .registerModule(new Toolkit2DModule(WINDOW_WIDTH, WINDOW_HEIGHT));
+
+        EngineContext context = engine.start();
+        try {
+            new ModelViewer(context).run();
+        } finally {
+            engine.terminate();
+        }
     }
 
     public static void main(String[] args) {
