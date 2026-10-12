@@ -1,5 +1,6 @@
 package com.farias.rengine.examples;
 
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.IntStream;
@@ -7,49 +8,61 @@ import java.util.stream.IntStream;
 import org.joml.Matrix4f;
 import org.joml.Vector3f;
 
-import com.farias.rengine.engine3d.Game;
+import com.farias.rengine.assets.Assets;
+import com.farias.rengine.assets.AssetsModule;
+import com.farias.rengine.engine.Engine;
+import com.farias.rengine.engine.EngineContext;
+import com.farias.rengine.engine.Timer;
+import com.farias.rengine.engine.modules.InputModule;
+import com.farias.rengine.engine.modules.RenderModule;
+import com.farias.rengine.engine.modules.WindowModule;
 import com.farias.rengine.engine3d.Camera;
-import com.farias.rengine.io.Key;
-import com.farias.rengine.io.MouseButton;
-import com.farias.rengine.toolkit2d.legacy.BitmapFont;
+import com.farias.rengine.engine3d.Engine3DModule;
 import com.farias.rengine.engine3d.Materials;
 import com.farias.rengine.engine3d.Meshes;
+import com.farias.rengine.engine3d.ModelLoader;
 import com.farias.rengine.engine3d.Projections;
-import com.farias.rengine.toolkit2d.legacy.Projections2D;
 import com.farias.rengine.engine3d.Shaders;
-import com.farias.rengine.toolkit2d.legacy.SpriteBatch2D;
 import com.farias.rengine.engine3d.TexturedModel;
+import com.farias.rengine.io.InputSystem;
+import com.farias.rengine.io.Key;
+import com.farias.rengine.io.MouseButton;
+import com.farias.rengine.io.Window;
 import com.farias.rengine.renderer.Material;
 import com.farias.rengine.renderer.Mesh;
 import com.farias.rengine.renderer.RenderCommand;
 import com.farias.rengine.renderer.RenderPassDescriptor;
 import com.farias.rengine.renderer.RenderPassNode;
 import com.farias.rengine.renderer.RenderView;
+import com.farias.rengine.renderer.Renderer;
 import com.farias.rengine.renderer.Shader;
-import com.farias.rengine.engine3d.ModelLoader;
+import com.farias.rengine.toolkit2d.Toolkit2DModule;
+import com.farias.rengine.toolkit2d.ui.Ui;
 
-public class IsometricChess extends Game {
+public class IsometricChess {
 
     private static final int WINDOW_WIDTH = 960;
     private static final int WINDOW_HEIGHT = 960;
     private static final int FONT_SIZE = 20;
     private static final float CAMERA_SPEED = 5.0f;
 
-    float rotationAngle = 0f;
-
     private final Camera camera = new Camera();
-    private Shader litShader;
-    private Meshes meshes;
-    private Materials materials;
-    private ModelLoader modelLoader;
-    private TexturedModel whiteTile;
-    private TexturedModel blackTile;
-    private ChessBoard chessBoard;
 
-    private SpriteBatch2D batch;
-    private BitmapFont font;
-    private RenderPassDescriptor scene3DDescriptor;
-    private RenderPassDescriptor uiDescriptor;
+    private final Window window;
+    private final InputSystem input;
+    private final Renderer renderer;
+    private final Assets assets;
+    private final Ui ui;
+
+    private final Shader litShader;
+    private final Meshes meshes;
+    private final Materials materials;
+    private final ModelLoader modelLoader;
+    private final TexturedModel whiteTile;
+    private final TexturedModel blackTile;
+    private final ChessBoard chessBoard;
+
+    private final RenderPassDescriptor scene3DDescriptor;
 
     // ponto observado pela câmera
     private float targetX = 0;
@@ -60,12 +73,13 @@ public class IsometricChess extends Game {
     // distância da câmera para visão isométrica
     private float cameraDistance = 10f;
 
-    public IsometricChess() {
-        super("Isometric Chess", WINDOW_WIDTH, WINDOW_HEIGHT);
-    }
+    public IsometricChess(EngineContext context) {
+        window = context.require(Window.class);
+        input = context.require(InputSystem.class);
+        renderer = context.require(Renderer.class);
+        assets = context.require(Assets.class);
+        ui = context.require(Ui.class);
 
-    @Override
-    protected void onCreate() {
         litShader = renderer.createShader(Shaders.LIT_VERTEX, Shaders.LIT_FRAGMENT);
         meshes = context.require(Meshes.class);
         materials = context.require(Materials.class);
@@ -79,9 +93,6 @@ public class IsometricChess extends Game {
         chessBoard = new ChessBoard();
         chessBoard.setupDefaultBoard();
 
-        batch = new SpriteBatch2D(renderer, assets);
-        font = new BitmapFont(batch);
-
         scene3DDescriptor = new RenderPassDescriptor("isometric-chess-3d")
                 .clearColor(0f, 0f, 0f, 1f)
                 .depthTest(true)
@@ -94,14 +105,20 @@ public class IsometricChess extends Game {
                 .cullFace(false)
                 .blend(false);
 
-        uiDescriptor = new RenderPassDescriptor("isometric-chess-ui")
-                .clearColorBuffer(false)
-                .clearDepthBuffer(false)
-                .depthTest(false)
-                .cullFace(true)
-                .blend(true);
-
         updateIsometricCamera();
+    }
+
+    private void run() {
+        Timer timer = new Timer();
+        while (!window.shouldClose() && !input.isKeyPressed(Key.ESCAPE)) {
+            timer.update();
+            input.update();
+            update(timer.deltaTime());
+
+            renderer.beginFrame();
+            render();
+            renderer.endFrame();
+        }
     }
 
     private TexturedModel createPlane(String textureName, float width, float height) {
@@ -121,8 +138,7 @@ public class IsometricChess extends Game {
                 0, 1, 0);
     }
 
-    @Override
-    protected void onUpdate(float deltaTime) {
+    private void update(float deltaTime) {
         // BOARD CONTROLS
         if (input.isMouseButtonDown(MouseButton.LEFT)) {
             double mouseX = input.getMouseX();
@@ -159,30 +175,22 @@ public class IsometricChess extends Game {
             } else {
                 fov -= 2f * deltaTime * CAMERA_SPEED;
             }
-            if (cameraDistance < 2f) {
-                cameraDistance = 2f;
-            }
         }
         updateIsometricCamera();
     }
 
-    @Override
-    protected void onRender(float deltaTime) {
-        Matrix4f projection3D = Projections.orthographic3D(fov, (float) WINDOW_WIDTH / WINDOW_HEIGHT);
+    private void render() {
         RenderView view3D = new RenderView(window.getFramebufferWidth(), window.getFramebufferHeight(),
-                projection3D, camera.getViewMatrix());
+                Projections.orthographic3D(fov, (float) WINDOW_WIDTH / WINDOW_HEIGHT), camera.getViewMatrix());
         RenderPassNode scenePass = renderer.createPass(scene3DDescriptor, view3D);
 
         drawBoard(scenePass);
         chessBoard.drawPieces(scenePass);
 
-        Matrix4f projectionUI = Projections2D.orthographic2D(WINDOW_WIDTH, WINDOW_HEIGHT);
-        RenderView viewUI = new RenderView(window.getFramebufferWidth(), window.getFramebufferHeight(),
-                projectionUI, new Matrix4f());
-        RenderPassNode uiPass = renderer.createPass(uiDescriptor, viewUI);
-
-        font.drawText(uiPass, "ISOMETRIC CHESS - LWJGL RENDER ENGINE", WINDOW_WIDTH / 2, -20, FONT_SIZE, FONT_SIZE);
-        font.drawText(uiPass, "ARROWS = MOVE | Z = ZOOM | SHIFT+Z = ZOOM OUT", WINDOW_WIDTH / 2, -50, 14, 14);
+        // UI (depois da cena: os passes executam na ordem de criacao)
+        ui.begin();
+        ui.textCentered(ui.defaultFont(), "ISOMETRIC CHESS - LWJGL RENDER ENGINE", WINDOW_WIDTH / 2, 20, FONT_SIZE);
+        ui.textCentered(ui.defaultFont(), "ARROWS = MOVE | Z = ZOOM | SHIFT+Z = ZOOM OUT", WINDOW_WIDTH / 2, 50, 14);
     }
 
     private void drawBoard(RenderPassNode pass) {
@@ -209,7 +217,20 @@ public class IsometricChess extends Game {
     }
 
     public static void launch() {
-        new IsometricChess().run();
+        Engine engine = new Engine()
+                .registerModule(new WindowModule(WINDOW_WIDTH, WINDOW_HEIGHT, "Isometric Chess"))
+                .registerModule(new InputModule())
+                .registerModule(new RenderModule())
+                .registerModule(new AssetsModule(Path.of("resources")))
+                .registerModule(new Engine3DModule())
+                .registerModule(new Toolkit2DModule(WINDOW_WIDTH, WINDOW_HEIGHT));
+
+        EngineContext context = engine.start();
+        try {
+            new IsometricChess(context).run();
+        } finally {
+            engine.terminate();
+        }
     }
 
     public static void main(String[] args) {
