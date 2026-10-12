@@ -1,11 +1,50 @@
-# Checkpoint: engine modular (core, assets, toolkit2d, engine3d sobre o renderer)
+# Desenvolvimento
 
-Branch: `refactor/toolkit2d-assets`.
+Notas de trabalho de quem mexe na engine: estrutura dos módulos, decisões de build, lições de
+bugs passados e pendências. As **regras de arquitetura** (o que não pode ser quebrado) estão no
+[README](README.md); este arquivo descreve o estado atual e o que falta.
 
-Estado: o `core` deixou de conter gfx/loaders/`Game`; o 2D (`toolkit2d`), o 3D (`engine3d`) e o
-carregamento de assets (`assets`) são módulos próprios, e os cinco demos montam o `Engine` e têm o
-próprio loop. Tudo compila. O que resta está em [Pendências](#pendências); o próximo passo
-estrutural (core sem gfx/OpenGL) está descrito em `PLANO-toolkit2d-assets.md`, Commit 9.
+## Regras de arquitetura: o porquê
+
+A lista curta está no [README](README.md#architecture-rules). Aqui, a justificativa de cada uma.
+
+1. **Biblioteca, não framework.** O jogo é dono do `main` e do loop. A engine nunca chama o jogo
+   de volta e não oferece classe base (não existe `Game`/`Application` para estender). O `Engine`
+   só registra módulos, inicia-os em ordem e os encerra em ordem inversa. Isso permite pausa,
+   vários passes, loop de passo fixo, loop sem janela (testes) e misturar 2D com 3D sem pontos de
+   extensão numa hierarquia.
+2. **Composição por módulos.** Uma capacidade só existe se o jogo registrar o módulo que a
+   fornece. Serviços são obtidos do `EngineContext` com `require(Class)`, que falha com mensagem
+   clara se o módulo não foi registrado ou foi registrado na ordem errada. Trocar uma capacidade
+   é trocar uma linha do `main`.
+3. **Componentes com dependência vêm do módulo.** Tudo que precisa de serviço (`Renderer`,
+   `Assets`, ...) é criado e registrado por um módulo, e o jogo faz `context.require(...)`. O
+   jogo não faz `new` desses componentes. `static` fica para funções **puras** (sem serviço, GPU
+   ou disco): `Projections`, `SpriteRenderer.orthographic`. Um `static` que carrega arquivo ou
+   cria recurso de GPU esconde a dependência e impede cache.
+4. **Direção de dependência.** `core` não depende de nada (sem gráficos, sem biblioteca de
+   janela, sem LWJGL). Módulos da biblioteca nunca dependem de `platform-*`; só o jogo (ou um
+   demo) depende. `toolkit2d` e `engine3d` são irmãos e nunca dependem um do outro: um jogo 3D
+   que quer HUD registra o `Toolkit2DModule` e usa `Ui`. Nada específico de uma API gráfica entra
+   no `core` nem na API pública dos toolkits.
+5. **Plataforma é contrato.** `Window` e `InputSystem` são interfaces no `core`. Um módulo de
+   plataforma (hoje `platform-glfw`) as implementa e registra. `Key` e `MouseButton` são enums
+   puros; traduzi-los para códigos GLFW é trabalho do módulo de plataforma.
+6. **Um frame, um ciclo de vida.** `renderer.beginFrame()` → criar/preencher passes →
+   `renderer.endFrame()` (executa os passes e apresenta). Os passes executam na ordem de
+   criação, então um overlay (`Ui`) precisa começar depois do pass da cena. O `Renderer` impõe
+   isso: chamar fora de ordem lança exceção.
+7. **Posse de recursos.** O `Renderer` é dono dos recursos de GPU e os libera. `Assets` resolve
+   caminhos (raiz, depois classpath) e cacheia texturas, então o mesmo arquivo é uma textura na
+   GPU. Tipos de valor (`SpriteSheet`, `BitmapFont`) são dados sobre uma `Texture`, sem I/O.
+8. **Convenções não vazam.** Convenções internas (clip space, projeção do motor, winding/UV do
+   quad) ficam atrás do toolkit. O jogo vê Y para baixo e positivo, e rotação horária.
+9. **Onde vai o código novo.**
+   1. Precisa de API gráfica? → `renderer` (ou um futuro módulo de backend), nunca o `core`.
+   2. Precisa de biblioteca de janela/SO? → um módulo `platform-*`, atrás dos contratos do `core`.
+   3. É só 2D ou só 3D? → `toolkit2d` ou `engine3d`; nunca os dois.
+   4. Precisa de serviço? → exponha por um módulo e use `require`; sem `new` escondido.
+   5. É matemática/dado puro? → tipo de valor ou função `static` no módulo dono.
 
 ## Estrutura
 
@@ -14,14 +53,15 @@ profiles de natives.
 
 | Módulo | Papel | Depende de |
 |---|---|---|
-| `java-game-engine-renderer` | Renderer modular: `Renderer`, `RenderPassDescriptor`, `RenderView`, `RenderCommand`, `Material`, `Mesh`, `Shader`, `Texture` | LWJGL (API), JOML |
-| `java-game-engine-core` | `Engine`/`Module`/`EngineContext`, `Timer`, janela (`Window`), input (`InputSystem`, `Key`, `MouseButton`), módulos de janela/input/render | renderer |
+| `java-game-engine-renderer` | Renderer modular (OpenGL): `Renderer`, `RenderModule`, `RenderPassDescriptor`, `RenderView`, `RenderCommand`, `Material`, `Mesh`, `Shader`, `Texture` | core, LWJGL (OpenGL), JOML |
+| `java-game-engine-core` | `Engine`/`Module`/`EngineContext`, `Timer`, contratos `Window` e `InputSystem` (interfaces), `Key`, `MouseButton` | nada |
+| `java-game-engine-platform-glfw` | `GlfwModule` (janela + input via GLFW; registra `Window`/`InputSystem`) | core |
 | `java-game-engine-assets` | `Assets` (resolução raiz → classpath, cache de texturas), `AssetsModule`, `TextureLoader` (STB, interno) | core, renderer |
 | `java-game-engine-toolkit2d` | `Canvas`, `Ui` (overlay), `SpriteSheet`, `BitmapFont`, `SpriteRenderer`, `Toolkit2DModule` | core, renderer, assets |
 | `java-game-engine-engine3d` | `Camera`, `TexturedModel`, `Meshes`, `Materials`, `ModelLoader`, `Shaders` (lit), `Projections`, `Engine3DModule` | core, renderer, assets |
-| `java-game-engine-demos` | 5 exemplos + `Launcher` | toolkit2d, engine3d (+ natives, em runtime) |
+| `java-game-engine-demos` | 5 exemplos + `Launcher` | platform-glfw, toolkit2d, engine3d (+ natives, em runtime) |
 
-`toolkit2d` e `engine3d` não dependem um do outro.
+`toolkit2d` e `engine3d` não dependem um do outro; nenhum módulo da biblioteca depende de `platform-glfw`.
 
 ## Arquitetura
 
@@ -51,15 +91,18 @@ profiles de natives.
   `IllegalStateException` com mensagem clara; módulos que dependem de outros chamam isso na
   primeira linha de `onRegister`, então registrar na ordem errada falha ali. `resolve(Class)`
   continua existindo e devolve `null` (serviço opcional).
-- Módulos: `WindowModule` (GLFW + contexto GL; **deve ser o primeiro**; em `onTerminate` destrói a
-  janela e encerra o GLFW), `InputModule`, `RenderModule` (depende de contexto GL corrente; liga
-  `Renderer.setPresent(window::swapBuffers)`).
-- Ordem usual: Window → Input → Render → Assets → Engine3D → Toolkit2D.
+- `Window` e `InputSystem` são interfaces; quem as implementa e registra é um módulo de
+  plataforma (hoje `platform-glfw`). `Key`/`MouseButton` são enums puros.
+- `GlfwModule` (em `platform-glfw`): cria a janela com o contexto corrente e o input; **deve ser o
+  primeiro**; em `onTerminate` destrói a janela e encerra o GLFW. Ainda pede um contexto OpenGL 3.3
+  core (parametrizar isso só faz sentido com outro backend).
+- `RenderModule` (no módulo `renderer`): `GL.createCapabilities()` e liga
+  `Renderer.setPresent(window::swapBuffers)`.
+- Ordem usual: Glfw → Render → Assets → Engine3D → Toolkit2D.
 - `Renderer` tem estado de frame (`inFrame()`, `frameIndex()`): `beginFrame` duplo, `endFrame`
   sem `beginFrame` e `createPass` fora de um frame lançam `IllegalStateException`. `endFrame`
   executa os passes e apresenta (hook `Present`).
-- `InputSystem` aceita `Key`/`MouseButton` (enums com o código GLFW); os métodos por `int` são
-  privados. `update()` amostra teclas/mouse e delega o polling a `Window.pollEvents()`.
+- `InputSystem.update()` amostra teclas/mouse e delega o polling a `Window.pollEvents()`.
 - Não existe mais `Game`: cada demo escreve o `main` (módulos) e o loop.
 
 ### `assets`
@@ -110,7 +153,7 @@ sistema não é usado (o enforcer exige 3.9+). O `java` padrão desta máquina �
 ```bash
 export JAVA_HOME=$(/usr/libexec/java_home -v 17)
 
-./mvnw -DskipTests install                                # builda os 6 módulos (a partir da raiz)
+./mvnw -DskipTests install                                # builda os módulos (a partir da raiz)
 
 # rodar um demo (usa -XstartOnFirstThread automaticamente no macOS)
 ./mvnw -pl java-game-engine-demos exec:exec               # Launcher
@@ -188,6 +231,10 @@ Coisas que custaram caro e valem lembrar ao mexer em renderização:
   o de shadow) geram o aviso. É ruído de log, não foi investigado a fundo.
 
 **Design**
+- Adiado de propósito (só se surgir outro backend de render): `Mesh`/`Shader`/`Texture` ainda são
+  classes OpenGL concretas e o `Renderer` chama `bind`/uniforms/`draw` diretamente (handles
+  opacos + SPI `RenderBackend` com `execute(frame)`); hints de contexto OpenGL em `GlfwWindow`;
+  uniforms como dados e shaders portáveis (GLSL 330 em `toolkit2d`/`engine3d`).
 - `Game` foi removido; cada demo monta o `Engine` e tem o próprio loop (concluído).
 - `SnakeGame`: se uma seta for pressionada antes do primeiro movimento, `changeDirection` lê
   `direction == null` e lança NPE (pré-existente, não corrigido).
