@@ -53,12 +53,12 @@ profiles de natives.
 
 | Módulo | Papel | Depende de |
 |---|---|---|
-| `java-game-engine-renderer` | Renderer modular (OpenGL): `Renderer`, `RenderModule`, `RenderPassDescriptor`, `RenderView`, `RenderCommand`, `Material`, `Mesh`, `Shader`, `Texture` | core, LWJGL (OpenGL), JOML |
+| `java-game-engine-renderer` | Renderer modular (OpenGL): `Renderer`, `RenderModule`, `RenderPassDescriptor`, `RenderView`, `RenderCommand`, `Material`, `Mesh`, `Bounds`, `Shader`, `Texture` | core, LWJGL (OpenGL), JOML |
 | `java-game-engine-core` | `Engine`/`Module`/`EngineContext`, `Timer`, contratos `Window` e `InputSystem` (interfaces), `Key`, `MouseButton` | nada |
 | `java-game-engine-platform-glfw` | `GlfwModule` (janela + input via GLFW; registra `Window`/`InputSystem`) | core |
 | `java-game-engine-assets` | `Assets` (resolução raiz → classpath, cache de texturas), `AssetsModule`, `TextureLoader` (STB, interno) | core, renderer |
 | `java-game-engine-toolkit2d` | `Canvas`, `Ui` (overlay), `SpriteSheet`, `BitmapFont`, `SpriteRenderer`, `Toolkit2DModule` | core, renderer, assets |
-| `java-game-engine-engine3d` | `Camera`, `TexturedModel`, `Meshes`, `Materials`, `ModelLoader`, `Shaders` (lit), `Projections`, `Engine3DModule` | core, renderer, assets |
+| `java-game-engine-engine3d` | `Camera`, `TexturedModel`, `Meshes`, `Materials`, `ModelLoader`, `Shaders` (lit), `Projections`, `Ray`, `Picking`, `Engine3DModule` | core, renderer, assets |
 | `java-game-engine-demos` | 5 exemplos + `Launcher` | platform-glfw, toolkit2d, engine3d (+ natives, em runtime) |
 
 `toolkit2d` e `engine3d` não dependem um do outro; nenhum módulo da biblioteca depende de `platform-glfw`.
@@ -130,13 +130,20 @@ profiles de natives.
   `Materials` e `ModelLoader`; o jogo faz `context.require(...)`.
 - `ModelLoader` lê `models/<nome>.obj` e `textures/<nome>.png` pelo `Assets`; erro de leitura
   ou parse lança exceção (não devolve mais `null`).
+- `TexturedModel.getModelMatrix()` é a **única fonte** da matriz de modelo: o que desenha (o
+  `RenderCommand`) e o que testa picking usam a mesma. Rotação em graus, ordem XYZ, sentido
+  **positivo** (antes era negativo; o `ModelViewer` foi ajustado, mesmo giro visual).
+- **Picking** (`Ray`, `Picking`): funções `static` puras, no estilo de `Projections` (regra 3).
+  `Mesh.bounds()` (renderer) guarda a caixa local calculada na criação; `Bounds` é um tipo de valor
+  sem GPU. O `InputSystem` ganhou `isMouseButtonPressed` (borda de subida do botão). Ver
+  [Picking](#picking).
 
 ### `demos`
 
 | Demo | O que mostra | Verificado visualmente |
 |---|---|---|
 | `ModelViewer` | 3D em perspectiva + `Ui` | sim |
-| `IsometricChess` | 3D isométrico + `Ui` | sim |
+| `IsometricChess` | 3D isométrico + `Ui`, seleção de peças por picking | sim |
 | `SnakeGame` | 2D com `Canvas` | comparado por pixel com o desenho anterior |
 | `SpriteEditor` | 2D com `Canvas` (editor de pixel art) | comparado por pixel com o desenho anterior |
 | `ShadowCubeDemo` | `Engine` + `Renderer` direto, shadow mapping em 2 passes, estilo funcional | não |
@@ -219,12 +226,35 @@ Coisas que custaram caro e valem lembrar ao mexer em renderização:
   `cullFace(false)` + `flipNormals=true` (custo: ~2x triângulos nas peças). Detalhes e como
   reexportar no Blender em `java-game-engine-demos/CHESS_MODELS.md`.
 
+## Picking
+
+Clicar em objetos 3D por raycasting, usado pelo `IsometricChess` para selecionar peças.
+
+Fluxo: pixel lógico do mouse → `Picking.toNdc` → `Picking.ray(view, ndc)` → `Picking.rayBounds`
+(objeto, contra o `Mesh.bounds()` e a matriz do `TexturedModel`) ou `Picking.rayPlaneY` +
+`Ray.pointAt` (ponto num plano, como a casa do tabuleiro).
+
+Decisões:
+
+- Matemática pura em `engine3d` (`Picking`, `Ray`), no estilo de `Projections`; sem módulo nem
+  serviço.
+- Os limites (`Bounds`) vivem no `Mesh`, calculados na criação; um mesh sem vértices tem caixa
+  vazia e nunca é atingido, em vez de falhar na criação.
+- O raio sai da mesma view que desenha, e o objeto é testado com a mesma matriz de modelo
+  (`TexturedModel.getModelMatrix()`), então a caixa acompanha qualquer animação do modelo.
+- "O botão foi pressionado neste frame" faz parte do contrato `InputSystem`
+  (`isMouseButtonPressed`).
+- Coordenadas: o mouse chega em pixels lógicos; `toNdc` normaliza pelo tamanho lógico da janela,
+  então a escala HiDPI não interfere.
+- Hoje o teste é raio × caixa alinhada aos eixos (no espaço local do modelo). Interseção por
+  triângulo ficaria como refinamento, se algum jogo precisar.
+
 ## Pendências
 
 **Verificação**
 - Olhar de verdade o **ShadowCubeDemo**: só houve smoke test (abre e roda sem exceção).
-- A interação (mouse/teclado) dos demos migrados não foi exercitada por um humano nesta
-  migração; só o render foi comparado por pixel.
+- A interação (mouse/teclado) dos demos migrados, exceto o clique/seleção do `IsometricChess`,
+  não foi exercitada por um humano nesta migração; só o render foi comparado por pixel.
 - Rodar um demo em Linux/Windows para validar os profiles de natives.
 - O warning `Uniform 'uNormal' not found in shader program` aparece nos demos 2D e no
   ShadowCubeDemo. O `Renderer` seta `uNormal` em todo draw, e shaders que não o declaram (os 2D e
