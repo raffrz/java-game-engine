@@ -1,9 +1,11 @@
-# Checkpoint: engine modular (core sobre renderer)
+# Checkpoint: engine modular (core, assets, toolkit2d, engine3d sobre o renderer)
 
-Branch: `feature/migrate-core-to-render-module`.
+Branch: `refactor/toolkit2d-assets`.
 
-Estado: a migração do `core` e dos demos para o renderer modular está feita e compila. O que
-resta está em [Pendências](#pendências).
+Estado: o `core` deixou de conter gfx/loaders/`Game`; o 2D (`toolkit2d`), o 3D (`engine3d`) e o
+carregamento de assets (`assets`) são módulos próprios, e os cinco demos montam o `Engine` e têm o
+próprio loop. Tudo compila. O que resta está em [Pendências](#pendências); o próximo passo
+estrutural (core sem gfx/OpenGL) está descrito em `PLANO-toolkit2d-assets.md`, Commit 9.
 
 ## Estrutura
 
@@ -13,8 +15,13 @@ profiles de natives.
 | Módulo | Papel | Depende de |
 |---|---|---|
 | `java-game-engine-renderer` | Renderer modular: `Renderer`, `RenderPassDescriptor`, `RenderView`, `RenderCommand`, `Material`, `Mesh`, `Shader`, `Texture` | LWJGL (API), JOML |
-| `java-game-engine-core` | `Engine`/`Module`, janela, input, helpers `gfx`, loaders | renderer |
-| `java-game-engine-demos` | 5 exemplos + `Launcher` | core (+ natives, em runtime) |
+| `java-game-engine-core` | `Engine`/`Module`/`EngineContext`, `Timer`, janela (`Window`), input (`InputSystem`, `Key`, `MouseButton`), módulos de janela/input/render | renderer |
+| `java-game-engine-assets` | `Assets` (resolução raiz → classpath, cache de texturas), `AssetsModule`, `TextureLoader` (STB, interno) | core, renderer |
+| `java-game-engine-toolkit2d` | `Canvas`, `Ui` (overlay), `SpriteSheet`, `BitmapFont`, `SpriteRenderer`, `Toolkit2DModule` | core, renderer, assets |
+| `java-game-engine-engine3d` | `Camera`, `TexturedModel`, `Meshes`, `Materials`, `ModelLoader`, `Shaders` (lit), `Projections`, `Engine3DModule` | core, renderer, assets |
+| `java-game-engine-demos` | 5 exemplos + `Launcher` | toolkit2d, engine3d (+ natives, em runtime) |
+
+`toolkit2d` e `engine3d` não dependem um do outro.
 
 ## Arquitetura
 
@@ -44,27 +51,56 @@ profiles de natives.
   `IllegalStateException` com mensagem clara; módulos que dependem de outros chamam isso na
   primeira linha de `onRegister`, então registrar na ordem errada falha ali. `resolve(Class)`
   continua existindo e devolve `null` (serviço opcional).
-- Módulos: `WindowModule` (GLFW + contexto GL; **deve ser o primeiro**), `InputModule`,
-  `RenderModule` (depende de contexto GL corrente).
-- `Game` é uma casca fina: monta os três módulos, resolve `Window`/`InputSystem`/`Renderer` e
-  roda `onCreate` → (`onUpdate` → `onRender`)*. Sem estado de jogo nem passes implícitos.
-- `InputSystem.update()` amostra teclas/mouse e delega o polling de eventos a
-  `Window.pollEvents()`. Não há mais a interface `System`.
-- `gfx`: helpers de instância, não singletons — `SpriteBatch2D`, `BitmapFont`, `TexturedModel`,
-  `Materials`, `Meshes`, `Projections`, `Shaders`.
-- `util`: `ModelLoader` (`.obj`, com `flipNormals` opcional) e `TextureLoader` (PNG via STB).
+- Módulos: `WindowModule` (GLFW + contexto GL; **deve ser o primeiro**; em `onTerminate` destrói a
+  janela e encerra o GLFW), `InputModule`, `RenderModule` (depende de contexto GL corrente; liga
+  `Renderer.setPresent(window::swapBuffers)`).
+- Ordem usual: Window → Input → Render → Assets → Engine3D → Toolkit2D.
+- `Renderer` tem estado de frame (`inFrame()`, `frameIndex()`): `beginFrame` duplo, `endFrame`
+  sem `beginFrame` e `createPass` fora de um frame lançam `IllegalStateException`. `endFrame`
+  executa os passes e apresenta (hook `Present`).
+- `InputSystem` aceita `Key`/`MouseButton` (enums com o código GLFW); os métodos por `int` são
+  privados. `update()` amostra teclas/mouse e delega o polling a `Window.pollEvents()`.
+- Não existe mais `Game`: cada demo escreve o `main` (módulos) e o loop.
+
+### `assets`
+
+- `Assets.texture(path)` resolve o caminho relativo primeiro na raiz de `AssetsModule(Path)` e
+  depois no classpath; cacheia por caminho normalizado (o mesmo arquivo devolve a mesma
+  `Texture`). `Assets.open(path)` abre um `InputStream` com a mesma resolução. Falha lança
+  `UncheckedIOException` com a raiz e o caminho. Limpar o cache não libera GPU (as texturas são
+  do `Renderer`).
+
+### `toolkit2d`
+
+- `Toolkit2DModule(virtualW, virtualH)` registra `Canvas`, `Ui` e o `SpriteRenderer`.
+- Convenção exposta ao jogo: origem no canto superior esquerdo, Y para baixo (positivo), rotação
+  em graus no sentido horário. A projeção interna continua "Y negativo para baixo"; a inversão
+  é feita em `SpriteRenderer`, nunca vaza.
+- `Canvas`: um pass que limpa a tela (`begin()`, `spr`, `text`, `textCentered`).
+  `Ui`: overlay sem clear, para HUD por cima de uma cena (`begin()` depois do pass da cena).
+- `SpriteRenderer` cacheia um `Material` por (textura, tile) e reaproveita um pool de
+  `Matrix4f` por frame (`RenderCommand` guarda a matriz por referência até o `endFrame`).
+
+### `engine3d`
+
+- Componentes com dependência de serviço vêm do módulo: `Engine3DModule` registra `Meshes`,
+  `Materials` e `ModelLoader`; o jogo faz `context.require(...)`.
+- `ModelLoader` lê `models/<nome>.obj` e `textures/<nome>.png` pelo `Assets`; erro de leitura
+  ou parse lança exceção (não devolve mais `null`).
 
 ### `demos`
 
 | Demo | O que mostra | Verificado visualmente |
 |---|---|---|
-| `ModelViewer` | 3D em perspectiva + passe de UI | sim |
-| `IsometricChess` | 3D isométrico + UI | sim |
-| `SnakeGame` | 2D, um passe | não |
-| `SpriteEditor` | 2D, editor de pixel art | não |
-| `ShadowCubeDemo` | sem `Game`; `Engine` + `Renderer` direto, shadow mapping em 2 passes, estilo funcional | não |
+| `ModelViewer` | 3D em perspectiva + `Ui` | sim |
+| `IsometricChess` | 3D isométrico + `Ui` | sim |
+| `SnakeGame` | 2D com `Canvas` | comparado por pixel com o desenho anterior |
+| `SpriteEditor` | 2D com `Canvas` (editor de pixel art) | comparado por pixel com o desenho anterior |
+| `ShadowCubeDemo` | `Engine` + `Renderer` direto, shadow mapping em 2 passes, estilo funcional | não |
 
-"Não" significa só smoke test (abre e roda alguns segundos sem exceção), sem alguém olhar a tela.
+"Comparado por pixel" = na migração, o framebuffer do desenho novo foi comparado com o do código
+anterior para a mesma cena (0 bytes diferentes), com harness descartável fora do repositório.
+`scripts/run-demos.sh` abre cada demo por alguns segundos e só prova que ele fica de pé.
 
 ## Build e execução
 
@@ -74,7 +110,7 @@ sistema não é usado (o enforcer exige 3.9+). O `java` padrão desta máquina �
 ```bash
 export JAVA_HOME=$(/usr/libexec/java_home -v 17)
 
-./mvnw -DskipTests install                                # builda os 3 módulos (a partir da raiz)
+./mvnw -DskipTests install                                # builda os 6 módulos (a partir da raiz)
 
 # rodar um demo (usa -XstartOnFirstThread automaticamente no macOS)
 ./mvnw -pl java-game-engine-demos exec:exec               # Launcher
@@ -127,8 +163,8 @@ Coisas que custaram caro e valem lembrar ao mexer em renderização:
 - **HiDPI:** o viewport vem de `Window.getFramebufferWidth/Height`, não do tamanho lógico da
   janela; em Retina o tamanho lógico mostra 1/4 da cena.
 - **UI vs. mundo:** texto de UI tem que ser desenhado num passe próprio com projeção ortho2D
-  (`onUIUpdate`), senão sai deformado pela câmera 3D. Na ortho2D do `BitmapFont`, Y vai de `0` a
-  `-height` e `drawText` centraliza o texto em X.
+  (`Ui`/`Canvas`), senão sai deformado pela câmera 3D. A ortho2D interna vai de `0` a `-height`
+  em Y; o `SpriteRenderer` inverte isso, então o jogo usa Y positivo para baixo.
 - **Alpha no shader lit:** multiplicar só RGB pela luz. Multiplicar o alpha fazia fragmentos
   escuros parecerem transparentes com blending ligado.
 - **Normal/winding de `Meshes.plane`:** a rotação usada para deitar o quad como piso virava a
@@ -143,22 +179,25 @@ Coisas que custaram caro e valem lembrar ao mexer em renderização:
 ## Pendências
 
 **Verificação**
-- Rodar e olhar de verdade **SnakeGame**, **SpriteEditor** e **ShadowCubeDemo**. Depois da
-  otimização de uniforms/matrizes só houve smoke test (abre e roda sem exceção) dos demos.
+- Olhar de verdade o **ShadowCubeDemo**: só houve smoke test (abre e roda sem exceção).
+- A interação (mouse/teclado) dos demos migrados não foi exercitada por um humano nesta
+  migração; só o render foi comparado por pixel.
 - Rodar um demo em Linux/Windows para validar os profiles de natives.
 - O warning `Uniform 'uNormal' not found in shader program` aparece nos demos 2D e no
   ShadowCubeDemo. O `Renderer` seta `uNormal` em todo draw, e shaders que não o declaram (os 2D e
   o de shadow) geram o aviso. É ruído de log, não foi investigado a fundo.
 
 **Design**
-- `Game` fixa os três módulos (`Window`, `Input`, `Render`) e não é composável. Decisão: não vai
-  mudar, a classe será descontinuada; quem precisar de outra composição monta o `Engine` direto
-  (como o `ShadowCubeDemo`).
+- `Game` foi removido; cada demo monta o `Engine` e tem o próprio loop (concluído).
+- `SnakeGame`: se uma seta for pressionada antes do primeiro movimento, `changeDirection` lê
+  `direction == null` e lança NPE (pré-existente, não corrigido).
+- Componentes com `new` solto: `Shaders.LIT_*` (shader lit) ainda é criado pelos demos; a ideia é
+  `Materials` ser dono dele (muda assinaturas de `ModelLoader`/`Materials.lit`).
 - Testes: `Engine`, `EngineContext`, `Material` e `RenderPassNode` são testáveis sem contexto GL.
   Ficam para outro momento (exige adicionar JUnit ao build).
 
 **Modelos de xadrez:** se forem reexportados corretamente, reverter para `cullFace(true)` em
-`IsometricChess.onCreate` e tirar o `flipNormals` da chamada de `ModelLoader.loadWavefrontOBJ` em
+`IsometricChess` (construtor) e tirar o `flipNormals` da chamada de `ModelLoader.loadWavefrontOBJ` em
 `ChessBoard.createAndPlace`.
 
 **Ideia futura: backend de render como módulo**
