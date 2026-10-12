@@ -16,9 +16,8 @@ import com.farias.rengine.assets.AssetsModule;
 import com.farias.rengine.engine.Engine;
 import com.farias.rengine.engine.EngineContext;
 import com.farias.rengine.engine.Timer;
-import com.farias.rengine.engine.modules.InputModule;
 import com.farias.rengine.renderer.RenderModule;
-import com.farias.rengine.engine.modules.WindowModule;
+import com.farias.rengine.platform.glfw.GlfwModule;
 import com.farias.rengine.io.InputSystem;
 import com.farias.rengine.io.Key;
 import com.farias.rengine.io.Window;
@@ -71,8 +70,7 @@ public class SnakeGame {
 
     public static void launch() {
         Engine engine = new Engine()
-                .registerModule(new WindowModule(WIDTH, HEIGHT, "New Snake Game"))
-                .registerModule(new InputModule())
+                .registerModule(new GlfwModule(WIDTH, HEIGHT, "New Snake Game"))
                 .registerModule(new RenderModule())
                 .registerModule(new AssetsModule(Path.of("resources")))
                 .registerModule(new Toolkit2DModule(WIDTH, HEIGHT));

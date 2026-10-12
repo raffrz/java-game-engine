@@ -6,15 +6,14 @@ import com.farias.rengine.assets.AssetsModule;
 import com.farias.rengine.engine.Engine;
 import com.farias.rengine.engine.EngineContext;
 import com.farias.rengine.engine.Timer;
-import com.farias.rengine.engine.modules.InputModule;
 import com.farias.rengine.renderer.RenderModule;
-import com.farias.rengine.engine.modules.WindowModule;
 import com.farias.rengine.engine3d.Camera;
 import com.farias.rengine.engine3d.Engine3DModule;
 import com.farias.rengine.engine3d.ModelLoader;
 import com.farias.rengine.engine3d.Projections;
 import com.farias.rengine.engine3d.Shaders;
 import com.farias.rengine.engine3d.TexturedModel;
+import com.farias.rengine.platform.glfw.GlfwModule;
 import com.farias.rengine.io.InputSystem;
 import com.farias.rengine.io.Key;
 import com.farias.rengine.io.Window;
@@ -199,8 +198,7 @@ public class ModelViewer {
 
     public static void launch() {
         Engine engine = new Engine()
-                .registerModule(new WindowModule(WINDOW_WIDTH, WINDOW_HEIGHT, "Model Viewer - Isometric"))
-                .registerModule(new InputModule())
+                .registerModule(new GlfwModule(WINDOW_WIDTH, WINDOW_HEIGHT, "Model Viewer - Isometric"))
                 .registerModule(new RenderModule())
                 .registerModule(new AssetsModule(Path.of("resources")))
                 .registerModule(new Engine3DModule())

@@ -13,14 +13,4 @@
 	<artifactId>java-game-engine-core</artifactId>
 	<name>Java Game Engine :: Core</name>
 
-	<dependencies>
-		<dependency>
-			<groupId>org.lwjgl</groupId>
-			<artifactId>lwjgl</artifactId>
-		</dependency>
-		<dependency>
-			<groupId>org.lwjgl</groupId>
-			<artifactId>lwjgl-glfw</artifactId>
-		</dependency>
-	</dependencies>
 </project>

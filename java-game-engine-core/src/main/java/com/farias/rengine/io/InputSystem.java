@@ -1,78 +1,25 @@
 package com.farias.rengine.io;
 
-import static org.lwjgl.glfw.GLFW.*;
+/**
+ * Estado de teclado e mouse, como os servicos o veem. A implementacao
+ * concreta vem de um modulo de plataforma.
+ */
+public interface InputSystem {
 
-import java.nio.DoubleBuffer;
+    boolean isKeyDown(Key key);
 
-import org.lwjgl.BufferUtils;
+    /** true no frame em que a tecla passou de solta para pressionada. */
+    boolean isKeyPressed(Key key);
 
-public class InputSystem {
-	
-	public static final int KEY_FIRST = GLFW_KEY_SPACE;
-	
-	public static final int KEY_LAST = GLFW_KEY_LAST;
+    /** true no frame em que a tecla passou de pressionada para solta. */
+    boolean isKeyReleased(Key key);
 
-	private final Window window;
-	private final long handle;
-	
-	private boolean keys[];
+    boolean isMouseButtonDown(MouseButton button);
 
-	private DoubleBuffer mouseX = BufferUtils.createDoubleBuffer(1);
-	private DoubleBuffer mouseY = BufferUtils.createDoubleBuffer(1);
-	
-	public InputSystem(Window window) {
-		this.window = window;
-		this.handle = window.getHandle();
-		this.keys = new boolean[KEY_LAST];
-	}
-	
-	private boolean isKeyDown(int key) {
-		return glfwGetKey(handle, key) == 1;
-	}
-	
-	private boolean isKeyPressed(int key) {
-		return isKeyDown(key) && !keys[key];
-	}
-	
-	private boolean isKeyReleased(int key) {
-		return !isKeyDown(key) && keys[key];
-	}
-	
-	private boolean isMouseButtonDown(int button) {
-		return glfwGetMouseButton(handle, button) == 1;
-	}
+    double getMouseX();
 
-	public boolean isKeyDown(Key key) {
-		return isKeyDown(key.getGlfwCode());
-	}
+    double getMouseY();
 
-	public boolean isKeyPressed(Key key) {
-		return isKeyPressed(key.getGlfwCode());
-	}
-
-	public boolean isKeyReleased(Key key) {
-		return isKeyReleased(key.getGlfwCode());
-	}
-
-	public boolean isMouseButtonDown(MouseButton button) {
-		return isMouseButtonDown(button.getGlfwCode());
-	}
-
-	public double getMouseX() {
-		return mouseX.get(0);
-	}
-
-	public double getMouseY() {
-		return mouseY.get(0);
-	}
-	
-	public void update() {
-		//update input
-		for (int i = KEY_FIRST; i < GLFW_KEY_LAST; i++)
-			keys[i] = isKeyDown(i);
-		
-		glfwGetCursorPos(handle, mouseX, mouseY);
-		
-		window.pollEvents();
-	}
+    /** Amostra o estado atual e processa os eventos da janela. Uma vez por frame. */
+    void update();
 }
