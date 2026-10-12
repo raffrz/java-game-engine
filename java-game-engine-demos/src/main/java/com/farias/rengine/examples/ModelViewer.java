@@ -101,17 +101,17 @@ public class ModelViewer {
     private void update(float deltaTime) {
 
         // rotação da terra
-        earth.getRotation().y -= 0.7f * deltaTime * ROTATION_SPEED;
+        earth.getRotation().y += 0.7f * deltaTime * ROTATION_SPEED;
 
-        if (earth.getRotation().y < -360f) {
-            earth.getRotation().y += 360f;
+        if (earth.getRotation().y > 360f) {
+            earth.getRotation().y -= 360f;
         }
 
         // rotação das nuvens
-        clouds.getRotation().y -= 1.0f * deltaTime * ROTATION_SPEED;
+        clouds.getRotation().y += 1.0f * deltaTime * ROTATION_SPEED;
 
-        if (clouds.getRotation().y < -360f) {
-            clouds.getRotation().y += 360f;
+        if (clouds.getRotation().y > 360f) {
+            clouds.getRotation().y -= 360f;
         }
 
         // tamanho da atmosfera
