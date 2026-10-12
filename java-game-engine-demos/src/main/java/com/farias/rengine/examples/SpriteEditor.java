@@ -6,20 +6,27 @@ import java.io.IOException;
 
 import javax.imageio.ImageIO;
 
-import org.joml.Matrix4f;
+import java.nio.file.Path;
 
-import com.farias.rengine.engine3d.Game;
+import com.farias.rengine.assets.Assets;
+import com.farias.rengine.assets.AssetsModule;
+import com.farias.rengine.engine.Engine;
+import com.farias.rengine.engine.EngineContext;
+import com.farias.rengine.engine.Timer;
+import com.farias.rengine.engine.modules.InputModule;
+import com.farias.rengine.engine.modules.RenderModule;
+import com.farias.rengine.engine.modules.WindowModule;
+import com.farias.rengine.io.InputSystem;
 import com.farias.rengine.io.Key;
 import com.farias.rengine.io.MouseButton;
-import com.farias.rengine.toolkit2d.legacy.BitmapFont;
-import com.farias.rengine.toolkit2d.legacy.Projections2D;
-import com.farias.rengine.toolkit2d.legacy.Sprite;
-import com.farias.rengine.toolkit2d.legacy.SpriteBatch2D;
-import com.farias.rengine.renderer.RenderPassDescriptor;
-import com.farias.rengine.renderer.RenderPassNode;
-import com.farias.rengine.renderer.RenderView;
+import com.farias.rengine.io.Window;
+import com.farias.rengine.renderer.Renderer;
+import com.farias.rengine.toolkit2d.BitmapFont;
+import com.farias.rengine.toolkit2d.Canvas;
+import com.farias.rengine.toolkit2d.SpriteSheet;
+import com.farias.rengine.toolkit2d.Toolkit2DModule;
 
-public class SpriteEditor extends Game {
+public class SpriteEditor {
 
     private static final int WINDOW_SIZE = 512;
     private static final int VIRTUAL_SIZE = 128;
@@ -42,45 +49,61 @@ public class SpriteEditor extends Game {
             0xffffff, 0x3a8216, 0x73bb4f, 0x744531, 0x592d1b, 0xf1c71a, 0xe6970b, 0x411350
     };
 
-    private SpriteBatch2D batch;
-    private BitmapFont font;
-    private RenderPassDescriptor passDescriptor;
+    private final Window window;
+    private final InputSystem input;
+    private final Renderer renderer;
+    private final Canvas canvas;
+    private final BitmapFont font;
+    // 32x32 tiles: uma cor da paleta por tile
+    private final SpriteSheet palleteTiles;
+    // a paleta inteira como um unico tile (barra de cores)
+    private final SpriteSheet palleteBar;
 
-    Sprite pallete;
-    int hover_x = 0;
-    int hover_y = -32;
-    int selected;
-    int color = 0;
-    String message = "";
+    private int hover_x = 0;
+    private int hover_y = 32;
+    private int selected;
+    private int color = 0;
+    private String message = "";
 
-    public SpriteEditor() {
-        super("Sprite Editor", WINDOW_SIZE, WINDOW_SIZE);
+    public SpriteEditor(EngineContext context) {
+        window = context.require(Window.class);
+        input = context.require(InputSystem.class);
+        renderer = context.require(Renderer.class);
+        canvas = context.require(Canvas.class);
+        Assets assets = context.require(Assets.class);
+
+        font = canvas.defaultFont();
+        var pallete = assets.texture("palletes/default.png");
+        palleteTiles = new SpriteSheet(pallete, 32, 32);
+        palleteBar = new SpriteSheet(pallete, 256, 64);
+
+        canvas.clearColor(0f, 0f, 0f);
     }
 
-    @Override
-    protected void onCreate() {
-        batch = new SpriteBatch2D(renderer, assets);
-        font = new BitmapFont(batch);
-        pallete = batch.createSprite("palletes/default.png", 0, 256, 64);
+    private void run() {
+        Timer timer = new Timer();
+        while (!window.shouldClose() && !input.isKeyPressed(Key.ESCAPE)) {
+            timer.update();
+            input.update();
+            update(timer.deltaTime());
 
-        passDescriptor = new RenderPassDescriptor("sprite-editor")
-                .clearColor(0f, 0f, 0f, 1f)
-                .depthTest(false)
-                .cullFace(true)
-                .blend(true);
+            renderer.beginFrame();
+            canvas.begin();
+            render(canvas);
+            renderer.endFrame();
+        }
     }
 
-    @Override
-    protected void onUpdate(float deltaTime) {
+    private void update(float deltaTime) {
         int mouse_x = (int) input.getMouseX() / 4 / 8;
-        int mouse_y = -(int) input.getMouseY() / 4 / 8;
+        int mouse_y = (int) input.getMouseY() / 4 / 8;
 
         hover_x = mouse_x * 8;
         hover_y = mouse_y * 8;
 
         if (input.isMouseButtonDown(MouseButton.LEFT)) {
             int x = mouse_x - 4;
-            int y = -mouse_y - 2;
+            int y = mouse_y - 2;
             selected = 8 * y + x;
             if (selected >= 0 && selected < 64)
                 draw[selected] = color;
@@ -104,27 +127,22 @@ public class SpriteEditor extends Game {
         }
     }
 
-    @Override
-    protected void onRender(float deltaTime) {
-        RenderView view = new RenderView(window.getFramebufferWidth(), window.getFramebufferHeight(),
-                Projections2D.orthographic2D(VIRTUAL_SIZE, VIRTUAL_SIZE), new Matrix4f());
-        RenderPassNode pass = renderer.createPass(passDescriptor, view);
-
+    private void render(Canvas g) {
         // title
-        font.drawText(pass, "Sprite Editor", 64, -4, 4, 4);
+        g.textCentered(font, "Sprite Editor", 64, 4, 4);
         // draw area
         for (int i = 0; i < draw.length; i++) {
             int cellColor = draw[i];
             int x = 8 * (i % 8) + 32;
-            int y = -8 * (i / 8) - 16;
-            batch.draw(pass, pallete, cellColor, 32, 32, SpriteBatch2D.rectTransform(x, y, 8, 8));
+            int y = 8 * (i / 8) + 16;
+            g.spr(palleteTiles, cellColor, x, y, 8, 8);
         }
         // color bar
-        batch.draw(pass, pallete, 0, 256, 64, SpriteBatch2D.rectTransform(32, -88, 64, 16));
+        g.spr(palleteBar, 0, 32, 88, 64, 16);
         // hover
-        batch.draw(pass, pallete, color, 32, 32, SpriteBatch2D.rectTransform(hover_x, hover_y, 8, 8));
+        g.spr(palleteTiles, color, hover_x, hover_y, 8, 8);
         // info message
-        font.drawText(pass, message, 64, -112, 4, 4);
+        g.textCentered(font, message, 64, 112, 4);
     }
 
     // TODO Refactor
@@ -173,7 +191,19 @@ public class SpriteEditor extends Game {
     }
 
     public static void launch() {
-        new SpriteEditor().run();
+        Engine engine = new Engine()
+                .registerModule(new WindowModule(WINDOW_SIZE, WINDOW_SIZE, "Sprite Editor"))
+                .registerModule(new InputModule())
+                .registerModule(new RenderModule())
+                .registerModule(new AssetsModule(Path.of("resources")))
+                .registerModule(new Toolkit2DModule(VIRTUAL_SIZE, VIRTUAL_SIZE));
+
+        EngineContext context = engine.start();
+        try {
+            new SpriteEditor(context).run();
+        } finally {
+            engine.terminate();
+        }
     }
 
     public static void main(String[] args) {
