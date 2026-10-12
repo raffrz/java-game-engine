@@ -7,8 +7,13 @@ import com.farias.rengine.renderer.Material;
 import com.farias.rengine.renderer.Mesh;
 
 /**
- * Um Mesh + Material (tipicamente lit via {@link Materials#lit}) mais
- * posicao/rotacao/escala no mundo.
+ * Um {@link Mesh} e um {@link Material} (tipicamente lit, via
+ * {@link Materials#lit}) com posição, rotação e escala no mundo.
+ *
+ * <p>
+ * A rotação é em graus, ordem XYZ, no sentido positivo. {@link #getModelMatrix()}
+ * é a fonte única da matriz de modelo: use a mesma para desenhar e para o
+ * {@link Picking}.
  */
 public final class TexturedModel {
     private final Mesh mesh;
@@ -25,9 +30,9 @@ public final class TexturedModel {
     public Matrix4f getModelMatrix() {
         Matrix4f translationMatrix = new Matrix4f().translation(position);
         Matrix4f rotationMatrix = new Matrix4f().rotationXYZ(
-                (float) Math.toRadians(-rotation.x),
-                (float) Math.toRadians(-rotation.y),
-                (float) Math.toRadians(-rotation.z));
+                (float) Math.toRadians(rotation.x),
+                (float) Math.toRadians(rotation.y),
+                (float) Math.toRadians(rotation.z));
         Matrix4f scalingMatrix = new Matrix4f().scale(scale);
 
         return translationMatrix.mul(scalingMatrix.mul(rotationMatrix));
