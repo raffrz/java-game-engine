@@ -9,7 +9,7 @@ import org.joml.Vector3f;
 import com.farias.rengine.engine.Engine;
 import com.farias.rengine.engine.EngineContext;
 import com.farias.rengine.engine.Timer;
-import com.farias.rengine.engine.modules.RenderModule;
+import com.farias.rengine.renderer.RenderModule;
 import com.farias.rengine.engine.modules.WindowModule;
 import com.farias.rengine.io.Window;
 import com.farias.rengine.renderer.DirectionalLight;

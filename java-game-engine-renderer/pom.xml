@@ -15,6 +15,10 @@
 
 	<dependencies>
 		<dependency>
+			<groupId>com.farias.rengine</groupId>
+			<artifactId>java-game-engine-core</artifactId>
+		</dependency>
+		<dependency>
 			<groupId>org.lwjgl</groupId>
 			<artifactId>lwjgl</artifactId>
 		</dependency>

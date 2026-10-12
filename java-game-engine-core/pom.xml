@@ -15,24 +15,12 @@
 
 	<dependencies>
 		<dependency>
-			<groupId>com.farias.rengine</groupId>
-			<artifactId>java-game-engine-renderer</artifactId>
-		</dependency>
-		<dependency>
 			<groupId>org.lwjgl</groupId>
 			<artifactId>lwjgl</artifactId>
 		</dependency>
 		<dependency>
 			<groupId>org.lwjgl</groupId>
 			<artifactId>lwjgl-glfw</artifactId>
-		</dependency>
-		<dependency>
-			<groupId>org.lwjgl</groupId>
-			<artifactId>lwjgl-opengl</artifactId>
-		</dependency>
-		<dependency>
-			<groupId>org.joml</groupId>
-			<artifactId>joml</artifactId>
 		</dependency>
 	</dependencies>
 </project>
