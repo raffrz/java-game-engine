@@ -19,49 +19,67 @@ A lista curta está no [README](README.md#architecture-rules). Aqui, a justifica
    é trocar uma linha do `main`.
 3. **Componentes com dependência vêm do módulo.** Tudo que precisa de serviço (`Renderer`,
    `Assets`, ...) é criado e registrado por um módulo, e o jogo faz `context.require(...)`. O
-   jogo não faz `new` desses componentes. `static` fica para funções **puras** (sem serviço, GPU
-   ou disco): `Projections`, `SpriteRenderer.orthographic`. Um `static` que carrega arquivo ou
+   jogo não faz `new` desses componentes, e o código garante isso: os construtores são
+   package-private. Quando o jogo precisa de várias instâncias com parâmetros próprios, o serviço
+   é uma fábrica (`Toolkit2D.canvas(w, h)`, `Shadows.create(...)`). `static` fica para funções
+   **puras** (sem serviço, GPU ou disco): `Projections`, `ShapeData`, `Picking`. Um `static` que carrega arquivo ou
    cria recurso de GPU esconde a dependência e impede cache.
 4. **Direção de dependência.** `core` não depende de nada (sem gráficos, sem biblioteca de
    janela, sem LWJGL). Módulos da biblioteca nunca dependem de `platform-*`; só o jogo (ou um
-   demo) depende. `toolkit2d` e `engine3d` são irmãos e nunca dependem um do outro: um jogo 3D
+   demo) depende. `toolkit2d` e `toolkit3d` são irmãos e nunca dependem um do outro: um jogo 3D
    que quer HUD registra o `Toolkit2DModule` e usa `Ui`. Nada específico de uma API gráfica entra
    no `core` nem na API pública dos toolkits.
-5. **Plataforma é contrato.** `Window` e `InputSystem` são interfaces no `core`. Um módulo de
+5. **Plataforma é contrato.** `Window` e `Input` são interfaces no `core` (pacote `platform`). Um módulo de
    plataforma (hoje `platform-glfw`) as implementa e registra. `Key` e `MouseButton` são enums
    puros; traduzi-los para códigos GLFW é trabalho do módulo de plataforma.
-6. **Um frame, um ciclo de vida.** `renderer.beginFrame()` → criar/preencher passes →
-   `renderer.endFrame()` (executa os passes e apresenta). Os passes executam na ordem de
+6. **Um frame, um ciclo de vida.** `window.pollEvents()` → `input.update()` →
+   `renderer.beginFrame()` → criar/preencher passes → `renderer.endFrame()` (executa os passes e
+   apresenta). Nada disso é chamado por baixo dos panos: o `Input` não processa eventos. Os passes executam na ordem de
    criação, então um overlay (`Ui`) precisa começar depois do pass da cena. O `Renderer` impõe
    isso: chamar fora de ordem lança exceção.
-7. **Posse de recursos.** O `Renderer` é dono dos recursos de GPU e os libera. `Assets` resolve
-   caminhos (raiz, depois classpath) e cacheia texturas, então o mesmo arquivo é uma textura na
-   GPU. Tipos de valor (`SpriteSheet`, `BitmapFont`) são dados sobre uma `Texture`, sem I/O.
+7. **Posse de recursos.** O `Renderer` é dono dos recursos de GPU: só ele os cria (`Mesh`,
+   `Texture` e `Shader` não têm construtor público) e os libera, no `dispose` ou antes com
+   `destroy(recurso)`. `Assets` resolve caminhos (raiz, depois classpath) e cacheia texturas, e
+   `Models` cacheia meshes, então o mesmo arquivo é um recurso só na GPU. Tipos de valor (`SpriteSheet`, `BitmapFont`) são dados sobre uma `Texture`, sem I/O.
 8. **Convenções não vazam.** Convenções internas (clip space, projeção do motor, winding/UV do
    quad) ficam atrás do toolkit. O jogo vê Y para baixo e positivo, e rotação horária.
 9. **Onde vai o código novo.**
    1. Precisa de API gráfica? → `renderer` (ou um futuro módulo de backend), nunca o `core`.
    2. Precisa de biblioteca de janela/SO? → um módulo `platform-*`, atrás dos contratos do `core`.
-   3. É só 2D ou só 3D? → `toolkit2d` ou `engine3d`; nunca os dois.
+   3. É só 2D ou só 3D? → `toolkit2d` ou `toolkit3d`; nunca os dois.
    4. Precisa de serviço? → exponha por um módulo e use `require`; sem `new` escondido.
    5. É matemática/dado puro? → tipo de valor ou função `static` no módulo dono.
 
 ## Estrutura
 
-Build Maven multi-módulo, com POM raiz (`java-game-engine`) que centraliza versões, plugins e os
-profiles de natives.
+Build Maven multi-módulo, com POM raiz (`rengine`) que centraliza versões, plugins e os profiles de
+natives. Artefato e diretório são `rengine-<módulo>`; o pacote é `com.farias.rengine.<módulo>`.
 
 | Módulo | Papel | Depende de |
 |---|---|---|
-| `java-game-engine-renderer` | Renderer modular (OpenGL): `Renderer`, `RenderModule`, `RenderPassDescriptor`, `RenderView`, `RenderCommand`, `Material`, `Mesh`, `Bounds`, `Shader`, `Texture` | core, LWJGL (OpenGL), JOML |
-| `java-game-engine-core` | `Engine`/`Module`/`EngineContext`, `Timer`, contratos `Window` e `InputSystem` (interfaces), `Key`, `MouseButton` | nada |
-| `java-game-engine-platform-glfw` | `GlfwModule` (janela + input via GLFW; registra `Window`/`InputSystem`) | core |
-| `java-game-engine-assets` | `Assets` (resolução raiz → classpath, cache de texturas), `AssetsModule`, `TextureLoader` (STB, interno) | core, renderer |
-| `java-game-engine-toolkit2d` | `Canvas`, `Ui` (overlay), `SpriteSheet`, `BitmapFont`, `SpriteRenderer`, `Toolkit2DModule` | core, renderer, assets |
-| `java-game-engine-engine3d` | `Camera`, `IsometricCamera`, `TexturedModel`, `Meshes`, `Materials`, `LitMaterial`, `ShadowMap`, `Shadows`, `ModelLoader`, `Shaders`, `Projections`, `Ray`, `Picking`, `Engine3DModule` | core, renderer, assets |
-| `java-game-engine-demos` | 5 exemplos + `Launcher` | platform-glfw, toolkit2d, engine3d (+ natives, em runtime) |
+| `rengine-core` | `core`: `Engine`/`Module`/`EngineContext`, `Timer`. `platform`: contratos `Window` e `Input` (interfaces), `Key`, `MouseButton` | nada |
+| `rengine-renderer` | Renderer modular (OpenGL): `Renderer`, `RendererModule`, `RenderPassDescriptor`, `RenderPass`, `RenderView`, `RenderCommand`, `Material`, `Mesh`, `Bounds`, `Shader`, `Texture` | core, LWJGL (OpenGL), JOML |
+| `rengine-platform-glfw` | `GlfwPlatformModule` (janela + input via GLFW) | core |
+| `rengine-assets` | `Assets` (resolução raiz → classpath, cache de texturas), `AssetsModule`, `TextureLoader` (STB, interno) | core, renderer |
+| `rengine-toolkit2d` | `Toolkit2D` (fábrica de `Canvas` e `Ui`), `SpriteSheet`, `BitmapFont`, `SpriteRenderer`, `Toolkit2DModule` | core, renderer, assets |
+| `rengine-toolkit3d` | `Shapes`, `ShapeData`, `LitMaterials`, `LitMaterial`, `Models`, `TexturedModel`, `Shadows`, `ShadowMap`, `DirectionalLight`, `Camera`, `IsometricCamera`, `Projections`, `Ray`, `Picking`, `Shaders`, `Toolkit3DModule` | core, renderer, assets |
+| `rengine-demos` | 5 exemplos + `Launcher` | todos os anteriores (+ natives, em runtime) |
 
-`toolkit2d` e `engine3d` não dependem um do outro; nenhum módulo da biblioteca depende de `platform-glfw`.
+`toolkit2d` e `toolkit3d` não dependem um do outro; nenhum módulo da biblioteca depende de
+`platform-glfw`. Cada POM declara tudo que o módulo usa direto (conferir com
+`./mvnw dependency:analyze`; os natives do `demos` aparecem como "unused", é esperado).
+
+Serviços registrados (o que `context.require(...)` devolve):
+
+| Módulo | Serviços |
+|---|---|
+| `GlfwPlatformModule` | `Window`, `Input` |
+| `RendererModule` | `Renderer` |
+| `AssetsModule` | `Assets` |
+| `Toolkit2DModule` | `Toolkit2D`, `SpriteRenderer` (baixo nível) |
+| `Toolkit3DModule` | `Shapes`, `LitMaterials`, `Models`, `Shadows` |
+
+Registrar o mesmo tipo duas vezes lança exceção (`EngineContext.registerService`).
 
 ## Arquitetura
 
@@ -69,10 +87,12 @@ profiles de natives.
 
 - `Renderer` é a única porta de entrada: cria recursos (`createMesh/Texture/Shader/Material`) e
   passes. `createPass` cria **e enfileira** o passe no frame corrente; `beginFrame` limpa a fila,
-  então os passes são criados a cada frame, em `onRender`. Não existe `submitPass`.
+  então os passes são criados a cada frame. Não existe `submitPass`. Um passe sem comandos ainda
+  executa (o clear dele faz parte do frame).
 - Um frame é descrito por dados: `RenderPassDescriptor` (clear, depth, cull, blend, depth
   attachment) + `RenderView` (viewport, view, projection) + `RenderCommand`s (mesh, material,
-  model matrix). O `Renderer` agrupa por material e executa.
+  model matrix). O `Renderer` executa na ordem de submissão e só reaplica material/uniforms quando
+  o material muda entre comandos consecutivos.
 - O renderer é **OpenGL-only, sem interface de backend** (decisão consciente, ver
   [Ideia futura](#ideia-futura-backend-de-render-como-módulo)). `OpenGLBackend` é um detalhe
   interno do `Renderer` (package-private) que cuida do estado de pass e do framebuffer de depth.
@@ -80,29 +100,31 @@ profiles de natives.
 - Hot path do draw call sem alocação: `Shader` reutiliza `FloatBuffer`s para matrizes, `Renderer`
   reutiliza a `Matrix3f` normal (`Matrix4f.normal`) e `Material` guarda uniforms já tipados
   (sem `instanceof`).
-- `DirectionalLight`: volume ortográfico + matrizes de light-space para shadow mapping.
 - `Material` tem setters encadeáveis (`setFloat(...).setTexture(...)`).
 
 ### `core`
 
-- `engine.Engine` registra `Module`s, chama `onRegister` na ordem e `onTerminate` na ordem
-  inversa. É biblioteca, não framework: quem tem o loop é o jogo.
-- `engine.EngineContext` é o registro de serviços. `require(Class)` devolve o serviço ou lança
+- `core.Engine` registra `Module`s, chama `onStart` na ordem e `onTerminate` na ordem inversa, só
+  dos módulos que iniciaram. Se um `onStart` falha, `start()` encerra os anteriores antes de
+  propagar a exceção. É biblioteca, não framework: quem tem o loop é o jogo.
+- `core.EngineContext` é o registro de serviços. `require(Class)` devolve o serviço ou lança
   `IllegalStateException` com mensagem clara; módulos que dependem de outros chamam isso na
-  primeira linha de `onRegister`, então registrar na ordem errada falha ali. `resolve(Class)`
+  primeira linha de `onStart`, então registrar na ordem errada falha ali. `resolve(Class)`
   continua existindo e devolve `null` (serviço opcional).
-- `Window` e `InputSystem` são interfaces; quem as implementa e registra é um módulo de
-  plataforma (hoje `platform-glfw`). `Key`/`MouseButton` são enums puros.
-- `GlfwModule` (em `platform-glfw`): cria a janela com o contexto corrente e o input; **deve ser o
-  primeiro**; em `onTerminate` destrói a janela e encerra o GLFW. Ainda pede um contexto OpenGL 3.3
-  core (parametrizar isso só faz sentido com outro backend).
-- `RenderModule` (no módulo `renderer`): `GL.createCapabilities()` e liga
+- `Window` e `Input` são interfaces; quem as implementa e registra é um módulo de plataforma (hoje
+  `platform-glfw`). `Key`/`MouseButton` são enums puros. `Window.getWidth/getHeight` devolvem o
+  tamanho atual (a janela é redimensionável) e `setVSync` liga/desliga o vsync (ligado por padrão).
+- `GlfwPlatformModule` (em `platform-glfw`): cria a janela com o contexto corrente e o input;
+  **deve ser o primeiro**; em `onTerminate` destrói a janela e encerra o GLFW. Ainda pede um
+  contexto OpenGL 3.3 core (parametrizar isso só faz sentido com outro backend).
+- `RendererModule` (no módulo `renderer`): `GL.createCapabilities()` e liga
   `Renderer.setPresent(window::swapBuffers)`.
-- Ordem usual: Glfw → Render → Assets → Engine3D → Toolkit2D.
+- Ordem usual: GlfwPlatform → Renderer → Assets → Toolkit3D → Toolkit2D.
 - `Renderer` tem estado de frame (`inFrame()`, `frameIndex()`): `beginFrame` duplo, `endFrame`
   sem `beginFrame` e `createPass` fora de um frame lançam `IllegalStateException`. `endFrame`
   executa os passes e apresenta (hook `Present`).
-- `InputSystem.update()` amostra teclas/mouse e delega o polling a `Window.pollEvents()`.
+- `Input.update()` só amostra teclas/mouse (guarda o frame atual e o anterior, de onde saem
+  `isKeyPressed`/`isKeyReleased`); o jogo chama `window.pollEvents()` antes.
 - Não existe mais `Game`: cada demo escreve o `main` (módulos) e o loop.
 
 ### `assets`
@@ -115,50 +137,61 @@ profiles de natives.
 
 ### `toolkit2d`
 
-- `Toolkit2DModule(virtualW, virtualH)` registra `Canvas`, `Ui` e o `SpriteRenderer`.
+- `Toolkit2DModule` registra `Toolkit2D` e o `SpriteRenderer`. `Toolkit2D` é uma fábrica:
+  `canvas(w, h)` e `ui(w, h)` criam superfícies com tamanho virtual próprio (um jogo 128×128 pode
+  ter HUD em outra resolução). O jogo as cria uma vez e guarda.
 - Convenção exposta ao jogo: origem no canto superior esquerdo, Y para baixo (positivo), rotação
   em graus no sentido horário. A projeção interna continua "Y negativo para baixo"; a inversão
-  é feita em `SpriteRenderer`, nunca vaza.
+  é feita em `SpriteRenderer`, nunca vaza. `toVirtualX/Y` converte a posição do mouse (pixels
+  lógicos da janela) para unidades virtuais.
 - `Canvas`: um pass que limpa a tela (`begin()`, `spr`, `text`, `textCentered`).
   `Ui`: overlay sem clear, para HUD por cima de uma cena (`begin()` depois do pass da cena).
+  Os dois herdam de `Layer2D` (abstrata, `sealed`, package-private), que tem o pass, o texto e a
+  conversão de coordenadas; cada um só acrescenta o descritor e os nomes da própria API. Por isso
+  o módulo é um pacote só: `sealed` e construtores package-private exigem o mesmo pacote.
 - `SpriteRenderer` cacheia um `Material` por (textura, tile) e reaproveita um pool de
   `Matrix4f` por frame (`RenderCommand` guarda a matriz por referência até o `endFrame`).
 
-### `engine3d`
+### `toolkit3d`
 
-- Componentes com dependência de serviço vêm do módulo: `Engine3DModule` registra `Meshes`,
-  `Materials`, `Shadows` e `ModelLoader`; o jogo faz `context.require(...)`.
+- Componentes com dependência de serviço vêm do módulo: `Toolkit3DModule` registra `Shapes`,
+  `LitMaterials`, `Models` e `Shadows`; o jogo faz `context.require(...)`.
 - **Ferramentas, não camadas:** o que segue são peças que o jogo chama e combina com o `Renderer`
   (o jogo continua dono dos passes e da ordem); nenhuma delas chama o jogo de volta nem esconde o
   nível baixo.
-- `ModelLoader` lê `models/<nome>.obj` e `textures/<nome>.png` pelo `Assets`; erro de leitura
-  ou parse lança exceção (não devolve mais `null`).
+- `Shapes` cria meshes das formas básicas (`plane`, `cube`, `floor`); a geometria em si é
+  `ShapeData`, funções puras, para quem cria o mesh direto no `Renderer` (`ShadowCubeDemo`).
+- `Models` lê Wavefront OBJ pelo `Assets`, com caminhos explícitos (sem convenção de pastas):
+  `load(obj, textura[, flipNormals])` devolve um `TexturedModel` com `LitMaterial` novo, e
+  `mesh(obj[, flipNormals])` só o mesh, para outro tipo de material. O mesh é cacheado por
+  arquivo, então vários modelos compartilham um upload. Faces com mais de 3 vértices são
+  trianguladas em leque. Erro de leitura ou parse lança exceção.
 - **`IsometricCamera`**: câmera ortográfica isométrica (alvo, afastamento, zoom com mínimo).
   `pan(direita, cima)` move o alvo (o jogo não precisa conhecer a diagonal da câmera),
   `view(window)` devolve o `RenderView` do passe 3D e `rayAt(mouseX, mouseY, window)` o raio sob o
   mouse, da mesma matriz, então o que é desenhado e o que é clicado coincidem.
-- **`LitMaterial`** (`materials.lit(texture)`): é um `Material` com métodos tipados no lugar dos
-  nomes de uniform: `light`, `glossy` (brilho especular branco, estilo plástico) e
-  `receiving(ShadowMap)`. Por padrão é fosco e não recebe sombra. Usa o shader padrão
-  (`Shaders.STANDARD_*`), criado sob demanda e pertencente ao `Renderer`. `LIT_*` continua
-  existindo para quem usa o shader direto.
-- **`ShadowMap`** (`shadows.create(light, size)`): o mapa de profundidade, a luz, o descritor e a
-  view do passe da luz, e `caster(model)` para o comando de cada objeto que projeta. O jogo cria o
-  passe de sombra antes do passe da cena e submete os casters; quem recebe sombra usa
-  `LitMaterial.receiving`.
-- `ModelLoader.loadWavefrontOBJ(nome, flipNormals)` carrega com o material padrão e
-  `model.lit()` devolve o `LitMaterial` para refiná-lo; a sobrecarga com
-  `texture -> material` fica para quem quer outro tipo de material.
+- **`LitMaterial`** (`litMaterials.create(texture)`): é um `Material` com métodos tipados no lugar
+  dos nomes de uniform: `light`, `glossy` (brilho especular branco, estilo plástico) e
+  `receiving(ShadowMap)`. Por padrão é fosco, não recebe sombra e a luz vem de (1, 1, 1). Usa o
+  shader padrão (`Shaders.STANDARD_*`), criado sob demanda e pertencente ao `Renderer`. É o único
+  material lit: o par `LIT_*` e as sobrecargas que recebiam um `Shader` foram removidos.
+- **`ShadowMap`** (`shadows.create(light, size[, bias])`): o mapa de profundidade, a luz, o
+  descritor e a view do passe da luz, e `caster(model)` para o comando de cada objeto que projeta.
+  O jogo cria o passe de sombra antes do passe da cena e submete os casters; quem recebe sombra
+  usa `LitMaterial.receiving`. O bias é fixo por mapa, porque `receiving` o copia para o material.
+- `model.lit()` devolve o `LitMaterial` de um modelo carregado por `Models.load`, para refiná-lo.
 - `TexturedModel.command()` é o `RenderCommand` do modelo com a transformação atual (matriz nova a
   cada chamada, então pode ser guardado até o `endFrame`).
-- `DirectionalLight.covering(direção, centro, raio)` (renderer) cria a luz de sombra a partir da
-  esfera que deve ser coberta, derivando distância, extensão e planos near/far.
+- `DirectionalLight` (volume ortográfico + matrizes de light-space): `covering(direção, centro,
+  raio)` cria a luz de sombra a partir da esfera que deve ser coberta, derivando distância,
+  extensão e planos near/far. Aceita luz a pino (troca o vetor "para cima" do `lookAt`).
 - `TexturedModel.getModelMatrix()` é a **única fonte** da matriz de modelo: o que desenha (o
   `RenderCommand`) e o que testa picking usam a mesma. Rotação em graus, ordem XYZ, sentido
-  **positivo** (antes era negativo; o `ModelViewer` foi ajustado, mesmo giro visual).
+  **positivo**. A matriz é T·R·S (escala antes de girar), então escala não uniforme não deforma o
+  modelo girado; o `SpriteRenderer` segue a mesma ordem.
 - **Picking** (`Ray`, `Picking`): funções `static` puras, no estilo de `Projections` (regra 3).
   `Mesh.bounds()` (renderer) guarda a caixa local calculada na criação; `Bounds` é um tipo de valor
-  sem GPU. O `InputSystem` ganhou `isMouseButtonPressed` (borda de subida do botão). Ver
+  sem GPU. O `Input` tem `isMouseButtonPressed` (borda de subida do botão). Ver
   [Picking](#picking).
 
 ### `demos`
@@ -186,18 +219,18 @@ export JAVA_HOME=$(/usr/libexec/java_home -v 17)
 ./mvnw -DskipTests install                                # builda os módulos (a partir da raiz)
 
 # rodar um demo (usa -XstartOnFirstThread automaticamente no macOS)
-./mvnw -pl java-game-engine-demos exec:exec               # Launcher
-./mvnw -pl java-game-engine-demos exec:exec \
+./mvnw -pl rengine-demos exec:exec                        # Launcher
+./mvnw -pl rengine-demos exec:exec \
     -Dexec.mainClass=com.farias.rengine.examples.SnakeGame
 
 # ou distribuição executável: jar fino + lib/ (profile opt-in)
 ./mvnw -Pdist -DskipTests package
-cd java-game-engine-demos
-java -XstartOnFirstThread -jar target/java-game-engine-demos-1.0.2-SNAPSHOT.jar   # tire a flag fora do macOS
+cd rengine-demos
+java -XstartOnFirstThread -jar target/rengine-demos-1.0.2-SNAPSHOT.jar   # tire a flag fora do macOS
 ```
 
 Os demos leem `resources/...` por caminho relativo, então precisam rodar com o diretório de
-trabalho em `java-game-engine-demos/` (o `exec:exec` já faz isso).
+trabalho em `rengine-demos/` (o `exec:exec` já faz isso).
 
 ### Decisões de build
 
@@ -240,14 +273,14 @@ Coisas que custaram caro e valem lembrar ao mexer em renderização:
   em Y; o `SpriteRenderer` inverte isso, então o jogo usa Y positivo para baixo.
 - **Alpha no shader lit:** multiplicar só RGB pela luz. Multiplicar o alpha fazia fragmentos
   escuros parecerem transparentes com blending ligado.
-- **Normal/winding de `Meshes.plane`:** a rotação usada para deitar o quad como piso virava a
+- **Normal/winding de `Shapes.plane`:** a rotação usada para deitar o quad como piso virava a
   normal para baixo; normal e winding precisam ser corrigidos juntos para o culling funcionar.
-- **Luz padrão** (`Materials.lit`) tem que apontar para o lado visível da câmera isométrica, senão
+- **Luz padrão** (`LitMaterial`) tem que apontar para o lado visível da câmera isométrica, senão
   o modelo fica quase preto.
 - **Modelos de xadrez:** os `.obj` das peças têm normais e winding invertidos (≈75% das normais
   apontam para dentro, medido contra o centroide). Não é bug do motor. O contorno atual é
   `cullFace(false)` + `flipNormals=true` (custo: ~2x triângulos nas peças). Detalhes e como
-  reexportar no Blender em `java-game-engine-demos/CHESS_MODELS.md`.
+  reexportar no Blender em `rengine-demos/CHESS_MODELS.md`.
 
 ## Picking
 
@@ -259,13 +292,13 @@ Fluxo: pixel lógico do mouse → `Picking.toNdc` → `Picking.ray(view, ndc)` �
 
 Decisões:
 
-- Matemática pura em `engine3d` (`Picking`, `Ray`), no estilo de `Projections`; sem módulo nem
+- Matemática pura em `toolkit3d` (`Picking`, `Ray`), no estilo de `Projections`; sem módulo nem
   serviço.
 - Os limites (`Bounds`) vivem no `Mesh`, calculados na criação; um mesh sem vértices tem caixa
   vazia e nunca é atingido, em vez de falhar na criação.
 - O raio sai da mesma view que desenha, e o objeto é testado com a mesma matriz de modelo
   (`TexturedModel.getModelMatrix()`), então a caixa acompanha qualquer animação do modelo.
-- "O botão foi pressionado neste frame" faz parte do contrato `InputSystem`
+- "O botão foi pressionado neste frame" faz parte do contrato `Input`
   (`isMouseButtonPressed`).
 - Coordenadas: o mouse chega em pixels lógicos; `toNdc` normaliza pelo tamanho lógico da janela,
   então a escala HiDPI não interfere.
@@ -287,19 +320,21 @@ Decisões:
 - Adiado de propósito (só se surgir outro backend de render): `Mesh`/`Shader`/`Texture` ainda são
   classes OpenGL concretas e o `Renderer` chama `bind`/uniforms/`draw` diretamente (handles
   opacos + SPI `RenderBackend` com `execute(frame)`); hints de contexto OpenGL em `GlfwWindow`;
-  uniforms como dados e shaders portáveis (GLSL 330 em `toolkit2d`/`engine3d`).
+  uniforms como dados e shaders portáveis (GLSL 330 em `toolkit2d`/`toolkit3d`).
 - `Game` foi removido; cada demo monta o `Engine` e tem o próprio loop (concluído).
-- `SnakeGame`: se uma seta for pressionada antes do primeiro movimento, `changeDirection` lê
-  `direction == null` e lança NPE (pré-existente, não corrigido).
-- Componentes com `new` solto: o `ModelViewer` ainda cria o shader `Shaders.LIT_*` e o passa ao
-  `ModelLoader`; migrá-lo para `materials.lit(texture)` (o `Materials` já é dono do shader padrão)
-  encerra isto.
-- Testes: `Engine`, `EngineContext`, `Material` e `RenderPassNode` são testáveis sem contexto GL.
+- **Apresentação por callback:** `Renderer.endFrame()` ainda apresenta via
+  `setPresent(window::swapBuffers)`, ligado pelo `RendererModule`. É o último ponto em que a
+  engine chama algo por conta própria; a alternativa é o jogo chamar `window.swapBuffers()` depois
+  do `endFrame()`, o que também tira o `Window` do `RendererModule`. Em aberto.
+- O teste por pixel dos demos 2D (seção Demos) é anterior à mudança da matriz de sprite para
+  T·R·S e à remoção do `flip()` em `Texture`; as duas não mudam o resultado para os demos atuais
+  (sprites quadrados, buffer já na posição 0), mas a comparação não foi refeita.
+- Testes: `Engine`, `EngineContext`, `Material` e `RenderPass` são testáveis sem contexto GL.
   Ficam para outro momento (exige adicionar JUnit ao build).
 
 **Modelos de xadrez:** se forem reexportados corretamente, reverter para `cullFace(true)` em
-`IsometricChess` (construtor) e tirar o `flipNormals` da chamada de `ModelLoader.loadWavefrontOBJ` em
-`ChessBoard.createAndPlace`.
+`ChessRenderer` e tirar o `flipNormals` da chamada de `models.load` em
+`ChessScene.createPieceView`.
 
 **Ideia futura: backend de render como módulo**
 
