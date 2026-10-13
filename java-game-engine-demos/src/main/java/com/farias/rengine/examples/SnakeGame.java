@@ -112,6 +112,7 @@ public class SnakeGame {
         Timer timer = new Timer();
         while (!window.shouldClose() && !input.isKeyPressed(Key.ESCAPE)) {
             timer.update();
+            window.pollEvents();
             input.update();
             update(timer.deltaTime());
 

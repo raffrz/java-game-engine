@@ -47,6 +47,7 @@ final class GlfwWindow implements Window {
     /** Torna o contexto da janela corrente na thread atual. */
     void bind() {
         glfwMakeContextCurrent(id);
+        setVSync(true);
     }
 
     /** Destroi a janela nativa. Nao encerra o GLFW (quem a criou faz isso). */
@@ -73,9 +74,12 @@ final class GlfwWindow implements Window {
 
     @Override
     public void swapBuffers() {
-        // 0 nao limita o fps (util para medir o impacto de performance)
-        glfwSwapInterval(0);
         glfwSwapBuffers(id);
+    }
+
+    @Override
+    public void setVSync(boolean enabled) {
+        glfwSwapInterval(enabled ? 1 : 0);
     }
 
     // Consultados a cada chamada: a janela pode ser redimensionada.
