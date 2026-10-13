@@ -21,7 +21,7 @@ public class Shader implements Disposable {
     private final FloatBuffer matrix4Buffer = BufferUtils.createFloatBuffer(16);
     private final FloatBuffer matrix3Buffer = BufferUtils.createFloatBuffer(9);
 
-    public Shader(String vertexSource, String fragmentSource) {
+    Shader(String vertexSource, String fragmentSource) {
         // 1. Compile Vertex Shader
         int vertexShader = createShader(vertexSource, GL20.GL_VERTEX_SHADER);
 

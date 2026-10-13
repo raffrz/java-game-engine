@@ -9,20 +9,17 @@ import com.farias.rengine.engine.Timer;
 import com.farias.rengine.renderer.RenderModule;
 import com.farias.rengine.engine3d.Camera;
 import com.farias.rengine.engine3d.Engine3DModule;
-import com.farias.rengine.engine3d.ModelLoader;
+import com.farias.rengine.engine3d.Models;
 import com.farias.rengine.engine3d.Projections;
-import com.farias.rengine.engine3d.Shaders;
 import com.farias.rengine.engine3d.TexturedModel;
 import com.farias.rengine.platform.glfw.GlfwModule;
 import com.farias.rengine.io.InputSystem;
 import com.farias.rengine.io.Key;
 import com.farias.rengine.io.Window;
-import com.farias.rengine.renderer.RenderCommand;
 import com.farias.rengine.renderer.RenderPassDescriptor;
 import com.farias.rengine.renderer.RenderPassNode;
 import com.farias.rengine.renderer.RenderView;
 import com.farias.rengine.renderer.Renderer;
-import com.farias.rengine.renderer.Shader;
 import com.farias.rengine.toolkit2d.Toolkit2D;
 import com.farias.rengine.toolkit2d.Toolkit2DModule;
 import com.farias.rengine.toolkit2d.Ui;
@@ -59,10 +56,9 @@ public class ModelViewer {
         renderer = context.require(Renderer.class);
         ui = context.require(Toolkit2D.class).ui(WINDOW_WIDTH, WINDOW_HEIGHT);
 
-        Shader litShader = renderer.createShader(Shaders.LIT_VERTEX, Shaders.LIT_FRAGMENT);
-        ModelLoader models = context.require(ModelLoader.class);
-        earth = models.loadWavefrontOBJ("earth", litShader);
-        clouds = models.loadWavefrontOBJ("clouds", litShader);
+        Models models = context.require(Models.class);
+        earth = models.load("models/earth.obj", "textures/earth.png");
+        clouds = models.load("models/clouds.obj", "textures/clouds.png");
 
         scene3DDescriptor = new RenderPassDescriptor("model-viewer-3d")
                 .clearColor(0f, 0f, 0f, 1f)
@@ -180,8 +176,8 @@ public class ModelViewer {
                 Projections.perspective(window.getWidth(), Math.max(window.getHeight(), 1)), camera.getViewMatrix());
         RenderPassNode scenePass = renderer.createPass(scene3DDescriptor, view3D);
 
-        scenePass.submit(new RenderCommand(earth.getMesh(), earth.getMaterial(), earth.getModelMatrix()));
-        scenePass.submit(new RenderCommand(clouds.getMesh(), clouds.getMaterial(), clouds.getModelMatrix()));
+        scenePass.submit(earth.command());
+        scenePass.submit(clouds.command());
 
         // UI (depois da cena: os passes executam na ordem de criacao)
         ui.begin();

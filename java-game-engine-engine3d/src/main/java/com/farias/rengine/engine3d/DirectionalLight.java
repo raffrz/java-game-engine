@@ -1,7 +1,10 @@
-package com.farias.rengine.renderer;
+package com.farias.rengine.engine3d;
 
 import org.joml.Matrix4f;
 import org.joml.Vector3f;
+
+import com.farias.rengine.renderer.RenderView;
+import com.farias.rengine.renderer.Texture;
 
 /**
  * Luz direcional com volume ortografico para shadow mapping. Deriva as

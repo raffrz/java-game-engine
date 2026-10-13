@@ -9,7 +9,7 @@ import com.farias.rengine.renderer.RenderCommand;
 
 /**
  * Um {@link Mesh} e um {@link Material} (tipicamente lit, via
- * {@link Materials#lit}) com posição, rotação e escala no mundo.
+ * {@link LitMaterials#create}) com posição, rotação e escala no mundo.
  *
  * <p>
  * A rotação é em graus, ordem XYZ, no sentido positivo. {@link #getModelMatrix()}
@@ -61,7 +61,7 @@ public final class TexturedModel {
     /**
      * O material como {@link LitMaterial}, para refiná-lo (luz, brilho,
      * sombra). Vale para modelos criados com o material padrão da engine, como
-     * os de {@link ModelLoader#loadWavefrontOBJ(String, boolean)}.
+     * os de {@link Models#load(String, String)}.
      *
      * @throws IllegalStateException se o modelo usa outro tipo de material
      */

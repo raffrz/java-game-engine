@@ -9,13 +9,14 @@ import org.joml.Vector3f;
 import com.farias.rengine.engine.Engine;
 import com.farias.rengine.engine.EngineContext;
 import com.farias.rengine.engine.Timer;
+import com.farias.rengine.engine3d.DirectionalLight;
+import com.farias.rengine.engine3d.Projections;
+import com.farias.rengine.engine3d.ShapeData;
 import com.farias.rengine.renderer.RenderModule;
 import com.farias.rengine.platform.glfw.GlfwModule;
 import com.farias.rengine.io.Window;
-import com.farias.rengine.renderer.DirectionalLight;
 import com.farias.rengine.renderer.Material;
 import com.farias.rengine.renderer.Mesh;
-import com.farias.rengine.renderer.MeshData;
 import com.farias.rengine.renderer.RenderCommand;
 import com.farias.rengine.renderer.RenderPassDescriptor;
 import com.farias.rengine.renderer.RenderPassNode;
@@ -27,9 +28,10 @@ import com.farias.rengine.renderer.Texture;
 /**
  * Cubo girando projetando sombra sobre um piso (shadow mapping: pass de
  * profundidade do ponto de vista da luz + pass forward que amostra o shadow
- * map). Ao contrario dos outros exemplos, este usa so o Renderer, sem os
- * toolkits 2D/3D: cria shaders, materiais e passes na mao, para mostrar esse
- * nivel mais baixo de composicao tambem.
+ * map). Ao contrario dos outros exemplos, este usa o Renderer direto, sem os
+ * servicos dos toolkits (do 3D, so funcoes e valores puros): cria shaders,
+ * materiais e passes na mao, para mostrar esse nivel mais baixo de composicao
+ * tambem.
  *
  * Estilo funcional: o estado e um valor imutavel (State), a simulacao e a
  * geracao de comandos sao funcoes puras, e os efeitos colaterais (GPU/janela)
@@ -165,7 +167,7 @@ public final class ShadowCubeDemo {
                 .setTexture("shadowMap", shadowMap, 1);
 
         return new Resources(
-                RenderView.createDefault(width, height),
+                new RenderView(width, height, Projections.perspective(width, height), new Matrix4f()),
                 light.shadowView(shadowMap),
                 new RenderPassDescriptor("shadow")
                         .depthAttachment(shadowMap)
@@ -177,8 +179,8 @@ public final class ShadowCubeDemo {
                         .clearColor(0.1f, 0.2f, 0.3f, 1f)
                         .depthTest(true)
                         .cullFace(true),
-                renderer.createMesh(MeshData.createCube()),
-                renderer.createMesh(MeshData.createPlane()),
+                renderer.createMesh(ShapeData.cube()),
+                renderer.createMesh(ShapeData.floor()),
                 lit.apply(new LitParams(new Vector3f(1.0f, 0.5f, 0.2f), 0.2f, 0.8f, 0.004f)),
                 lit.apply(new LitParams(new Vector3f(0.72f, 0.78f, 0.68f), 0.25f, 0.75f, 0.002f)),
                 renderer.createMaterial(shadowShader));

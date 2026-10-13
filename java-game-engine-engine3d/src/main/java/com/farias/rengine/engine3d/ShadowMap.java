@@ -2,7 +2,6 @@ package com.farias.rengine.engine3d;
 
 import org.joml.Matrix4f;
 
-import com.farias.rengine.renderer.DirectionalLight;
 import com.farias.rengine.renderer.Material;
 import com.farias.rengine.renderer.Mesh;
 import com.farias.rengine.renderer.RenderCommand;

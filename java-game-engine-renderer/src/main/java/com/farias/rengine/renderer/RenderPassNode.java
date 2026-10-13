@@ -9,7 +9,7 @@ public final class RenderPassNode {
     private final RenderView view;
     private final List<RenderCommand> commands = new ArrayList<>();
 
-    public RenderPassNode(RenderPassDescriptor descriptor, RenderView view) {
+    RenderPassNode(RenderPassDescriptor descriptor, RenderView view) {
         this.descriptor = descriptor;
         this.view = view;
     }

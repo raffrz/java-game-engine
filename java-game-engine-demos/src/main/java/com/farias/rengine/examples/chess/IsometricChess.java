@@ -9,19 +9,19 @@ import com.farias.rengine.assets.AssetsModule;
 import com.farias.rengine.engine.Engine;
 import com.farias.rengine.engine.EngineContext;
 import com.farias.rengine.engine.Timer;
+import com.farias.rengine.engine3d.DirectionalLight;
 import com.farias.rengine.engine3d.Engine3DModule;
 import com.farias.rengine.engine3d.IsometricCamera;
-import com.farias.rengine.engine3d.Materials;
-import com.farias.rengine.engine3d.Meshes;
-import com.farias.rengine.engine3d.ModelLoader;
+import com.farias.rengine.engine3d.LitMaterials;
+import com.farias.rengine.engine3d.Models;
 import com.farias.rengine.engine3d.ShadowMap;
+import com.farias.rengine.engine3d.Shapes;
 import com.farias.rengine.engine3d.Shadows;
 import com.farias.rengine.io.InputSystem;
 import com.farias.rengine.io.Key;
 import com.farias.rengine.io.MouseButton;
 import com.farias.rengine.io.Window;
 import com.farias.rengine.platform.glfw.GlfwModule;
-import com.farias.rengine.renderer.DirectionalLight;
 import com.farias.rengine.renderer.RenderModule;
 import com.farias.rengine.renderer.Renderer;
 import com.farias.rengine.toolkit2d.Toolkit2D;
@@ -105,9 +105,9 @@ public class IsometricChess {
         cameraControls = new ChessCameraControls(input, camera);
         scene = new ChessScene(game,
                 context.require(Assets.class),
-                context.require(Meshes.class),
-                context.require(Materials.class),
-                context.require(ModelLoader.class),
+                context.require(Shapes.class),
+                context.require(LitMaterials.class),
+                context.require(Models.class),
                 shadow, camera);
         renderer = new ChessRenderer(context.require(Renderer.class),
                 context.require(Toolkit2D.class).ui(WINDOW_WIDTH, WINDOW_HEIGHT),

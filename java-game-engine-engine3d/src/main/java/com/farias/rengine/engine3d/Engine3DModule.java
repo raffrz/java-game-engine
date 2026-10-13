@@ -6,26 +6,34 @@ import com.farias.rengine.engine.Module;
 import com.farias.rengine.renderer.Renderer;
 
 /**
- * Registra os componentes 3D que dependem de servicos (Meshes, Materials,
- * Shadows, ModelLoader), para o jogo resolver por {@code context.require(...)}
- * em vez de instancia-los. Deve vir depois de RenderModule e AssetsModule.
- * Camera, IsometricCamera, TexturedModel, Picking e Projections nao dependem
- * de servico e seguem como estao.
+ * Registra os componentes 3D que dependem de servicos ({@link Shapes},
+ * {@link LitMaterials}, {@link Shadows}, {@link Models}), para o jogo
+ * resolver por {@code context.require(...)} em vez de instancia-los. Deve vir
+ * depois de RenderModule e AssetsModule. Camera, IsometricCamera,
+ * TexturedModel, DirectionalLight, ShapeData, Picking e Projections nao
+ * dependem de servico e seguem como estao.
  */
 public final class Engine3DModule implements Module {
+    private Models models;
+
     @Override
     public void onRegister(EngineContext context) {
         Renderer renderer = context.require(Renderer.class);
         Assets assets = context.require(Assets.class);
 
-        Meshes meshes = new Meshes(renderer);
-        Materials materials = new Materials(renderer);
-        Shadows shadows = new Shadows(renderer);
-        ModelLoader modelLoader = new ModelLoader(assets, renderer, materials);
+        LitMaterials materials = new LitMaterials(renderer);
+        models = new Models(assets, renderer, materials);
 
-        context.registerService(Meshes.class, meshes);
-        context.registerService(Materials.class, materials);
-        context.registerService(Shadows.class, shadows);
-        context.registerService(ModelLoader.class, modelLoader);
+        context.registerService(Shapes.class, new Shapes(renderer));
+        context.registerService(LitMaterials.class, materials);
+        context.registerService(Shadows.class, new Shadows(renderer));
+        context.registerService(Models.class, models);
+    }
+
+    @Override
+    public void onTerminate(EngineContext context) {
+        if (models != null) {
+            models.clear();
+        }
     }
 }

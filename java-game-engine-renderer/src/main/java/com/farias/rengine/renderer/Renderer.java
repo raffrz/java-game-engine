@@ -21,7 +21,11 @@ public final class Renderer {
     // Scratch reutilizado a cada draw call (evita uma Matrix3f por comando).
     private final Matrix3f normalMatrix = new Matrix3f();
 
-    public void initialize() {
+    /** Criado pelo RenderModule, que e quem tem o contexto GL corrente. */
+    Renderer() {
+    }
+
+    void initialize() {
         if (initialized) {
             return;
         }
