@@ -15,8 +15,10 @@ public interface Window {
     /** Apresenta o frame (troca os buffers). */
     void swapBuffers();
 
+    /** Largura logica atual da janela (acompanha o redimensionamento). */
     int getWidth();
 
+    /** Altura logica atual da janela; 0 enquanto ela esta minimizada. */
     int getHeight();
 
     /**
