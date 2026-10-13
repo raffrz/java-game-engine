@@ -132,7 +132,9 @@ public class SnakeGame {
         int appleX = cols / 3 * 2;
         int appleY = rows / 2 + 1;
         this.apple = new Vector2i(appleX, appleY);
+        this.direction = Direction.RIGHT;
         this.nexDirection = Direction.RIGHT;
+        this.time = 0;
     }
 
     private void update(float deltaTime) {
@@ -245,9 +247,14 @@ public class SnakeGame {
             if (!apple.equals(pos)) {
                 snake.pollLast();
             } else {
+                score++;
+                if (snake.size() == rows * cols) {
+                    // tabuleiro cheio: nao ha onde por a maca, o jogo acabou
+                    this.gameOver = true;
+                    return;
+                }
                 var applePosition = randomPosition();
                 apple = new Vector2i(applePosition.x, applePosition.y);
-                score++;
             }
         });
     }

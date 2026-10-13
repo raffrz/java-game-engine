@@ -27,9 +27,9 @@ import com.farias.rengine.renderer.Texture;
 /**
  * Cubo girando projetando sombra sobre um piso (shadow mapping: pass de
  * profundidade do ponto de vista da luz + pass forward que amostra o shadow
- * map). Ao contrario dos outros exemplos, este nao estende Game - monta
- * Engine/EngineContext/modulos e roda o loop na mao, para mostrar esse nivel
- * mais baixo de composicao tambem.
+ * map). Ao contrario dos outros exemplos, este usa so o Renderer, sem os
+ * toolkits 2D/3D: cria shaders, materiais e passes na mao, para mostrar esse
+ * nivel mais baixo de composicao tambem.
  *
  * Estilo funcional: o estado e um valor imutavel (State), a simulacao e a
  * geracao de comandos sao funcoes puras, e os efeitos colaterais (GPU/janela)
@@ -87,20 +87,23 @@ public final class ShadowCubeDemo {
         engine.registerModule(new RenderModule());
         EngineContext context = engine.start();
 
-        Window window = context.require(Window.class);
-        Renderer renderer = context.require(Renderer.class);
-        Resources resources = createResources(renderer, window.getFramebufferWidth(), window.getFramebufferHeight());
-        Timer timer = new Timer();
+        try {
+            Window window = context.require(Window.class);
+            Renderer renderer = context.require(Renderer.class);
+            Resources resources = createResources(renderer, window.getFramebufferWidth(),
+                    window.getFramebufferHeight());
+            Timer timer = new Timer();
 
-        State state = State.INITIAL;
-        while (!window.shouldClose()) {
-            window.pollEvents();
-            timer.update();
-            state = update(state, timer.deltaTime());
-            render(renderer, resources, state);
+            State state = State.INITIAL;
+            while (!window.shouldClose()) {
+                window.pollEvents();
+                timer.update();
+                state = update(state, timer.deltaTime());
+                render(renderer, resources, state);
+            }
+        } finally {
+            engine.terminate();
         }
-
-        engine.terminate();
     }
 
     // ---- Simulacao (pura) ----

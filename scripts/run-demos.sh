@@ -5,7 +5,7 @@
 # Uso: scripts/run-demos.sh [-t segundos] [demo ...]
 #   -t N   segundos por demo (padrao 5)
 #   demo   nomes das classes em com.farias.rengine.examples
-#          (padrao: SnakeGame SpriteEditor ModelViewer IsometricChess ShadowCubeDemo)
+#          (padrao: SnakeGame SpriteEditor ModelViewer chess.IsometricChess ShadowCubeDemo)
 set -u
 
 SECONDS_PER_DEMO=5
@@ -19,7 +19,7 @@ shift $((OPTIND - 1))
 
 DEMOS=("$@")
 if [ ${#DEMOS[@]} -eq 0 ]; then
-    DEMOS=(SnakeGame SpriteEditor ModelViewer IsometricChess ShadowCubeDemo)
+    DEMOS=(SnakeGame SpriteEditor ModelViewer chess.IsometricChess ShadowCubeDemo)
 fi
 
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
