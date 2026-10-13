@@ -26,15 +26,15 @@ from your OS/architecture automatically.
 ./mvnw -DskipTests install                      # build and install all modules
 
 # run the demo launcher (uses -XstartOnFirstThread on macOS automatically)
-./mvnw -pl rengine-demos exec:exec
+./mvnw -pl java-game-engine-demos exec:exec
 
 # or a specific demo
-./mvnw -pl rengine-demos exec:exec \
-    -Dexec.mainClass=com.farias.rengine.examples.SnakeGame
+./mvnw -pl java-game-engine-demos exec:exec \
+    -Dexec.mainClass=com.farias.jengine.examples.SnakeGame
 ```
 
 Demos read `resources/...` relative to the working directory, so they must run from
-`rengine-demos/` (`exec:exec` already does that).
+`java-game-engine-demos/` (`exec:exec` already does that).
 
 To smoke-run every demo for a few seconds each (it only checks that they open and stay up):
 
@@ -104,8 +104,8 @@ VSync is on by default; `window.setVSync(false)` uncaps the frame rate.
 | `toolkit3d` | `Shapes`, `LitMaterials`, `Models`, `Shadows`, cameras, picking, `Toolkit3DModule` | core, renderer, assets |
 | `demos` | Example games | all of the above |
 
-Maven artifacts and directories are `rengine-<module>` (group `com.farias.rengine`); each module's
-code lives in the package `com.farias.rengine.<module>` (`platform-glfw` in `platform.glfw`, and the
+Maven artifacts and directories are `java-game-engine-<module>` (group `com.farias.jengine`); each module's
+code lives in the package `com.farias.jengine.<module>` (`platform-glfw` in `platform.glfw`, and the
 `Window`/`Input` contracts of `core` in `platform`).
 
 Services each module registers (what `context.require(...)` can return):
@@ -171,4 +171,4 @@ decision, not an accident. The reasoning behind each rule is in
 ## Project notes
 
 - `DEVELOPMENT.md`: module details, build decisions, lessons from past bugs and open items (pt-BR).
-- `rengine-demos/CHESS_MODELS.md`: why the chess models need `flipNormals`.
+- `java-game-engine-demos/CHESS_MODELS.md`: why the chess models need `flipNormals`.
