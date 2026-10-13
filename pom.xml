@@ -4,19 +4,19 @@
 	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
 	<modelVersion>4.0.0</modelVersion>
 
-	<groupId>com.farias.rengine</groupId>
+	<groupId>com.farias.jengine</groupId>
 	<artifactId>java-game-engine</artifactId>
 	<version>1.0.2-SNAPSHOT</version>
 	<packaging>pom</packaging>
 	<name>Java Game Engine</name>
 
 	<modules>
-		<module>java-game-engine-renderer</module>
 		<module>java-game-engine-core</module>
+		<module>java-game-engine-renderer</module>
 		<module>java-game-engine-platform-glfw</module>
 		<module>java-game-engine-assets</module>
 		<module>java-game-engine-toolkit2d</module>
-		<module>java-game-engine-engine3d</module>
+		<module>java-game-engine-toolkit3d</module>
 		<module>java-game-engine-demos</module>
 	</modules>
 
@@ -49,33 +49,33 @@
 				<version>${joml.version}</version>
 			</dependency>
 			<dependency>
-				<groupId>com.farias.rengine</groupId>
+				<groupId>com.farias.jengine</groupId>
 				<artifactId>java-game-engine-renderer</artifactId>
 				<version>${project.version}</version>
 			</dependency>
 			<dependency>
-				<groupId>com.farias.rengine</groupId>
+				<groupId>com.farias.jengine</groupId>
 				<artifactId>java-game-engine-core</artifactId>
 				<version>${project.version}</version>
 			</dependency>
 			<dependency>
-				<groupId>com.farias.rengine</groupId>
+				<groupId>com.farias.jengine</groupId>
 				<artifactId>java-game-engine-platform-glfw</artifactId>
 				<version>${project.version}</version>
 			</dependency>
 			<dependency>
-				<groupId>com.farias.rengine</groupId>
+				<groupId>com.farias.jengine</groupId>
 				<artifactId>java-game-engine-assets</artifactId>
 				<version>${project.version}</version>
 			</dependency>
 			<dependency>
-				<groupId>com.farias.rengine</groupId>
+				<groupId>com.farias.jengine</groupId>
 				<artifactId>java-game-engine-toolkit2d</artifactId>
 				<version>${project.version}</version>
 			</dependency>
 			<dependency>
-				<groupId>com.farias.rengine</groupId>
-				<artifactId>java-game-engine-engine3d</artifactId>
+				<groupId>com.farias.jengine</groupId>
+				<artifactId>java-game-engine-toolkit3d</artifactId>
 				<version>${project.version}</version>
 			</dependency>
 		</dependencies>
@@ -181,8 +181,8 @@
 
 	<!--
 		Natives do LWJGL escolhidos pelo SO/arquitetura de quem esta buildando.
-		Apenas o modulo executavel (demos) os declara; renderer e core dependem
-		so das APIs, entao continuam portaveis.
+		Apenas o modulo executavel (demos) os declara; os modulos da biblioteca
+		dependem so das APIs, entao continuam portaveis.
 	-->
 	<profiles>
 		<profile>

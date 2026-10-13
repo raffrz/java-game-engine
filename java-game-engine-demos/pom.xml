@@ -5,7 +5,7 @@
 	<modelVersion>4.0.0</modelVersion>
 
 	<parent>
-		<groupId>com.farias.rengine</groupId>
+		<groupId>com.farias.jengine</groupId>
 		<artifactId>java-game-engine</artifactId>
 		<version>1.0.2-SNAPSHOT</version>
 	</parent>
@@ -14,26 +14,39 @@
 	<name>Java Game Engine :: Demos</name>
 
 	<properties>
-		<!-- Troque com -Dexec.mainClass=com.farias.rengine.examples.SnakeGame -->
-		<exec.mainClass>com.farias.rengine.examples.Launcher</exec.mainClass>
+		<!-- Troque com -Dexec.mainClass=com.farias.jengine.examples.SnakeGame -->
+		<exec.mainClass>com.farias.jengine.examples.Launcher</exec.mainClass>
 	</properties>
 
 	<dependencies>
 		<dependency>
-			<groupId>com.farias.rengine</groupId>
+			<groupId>com.farias.jengine</groupId>
 			<artifactId>java-game-engine-core</artifactId>
 		</dependency>
 		<dependency>
-			<groupId>com.farias.rengine</groupId>
+			<groupId>com.farias.jengine</groupId>
 			<artifactId>java-game-engine-platform-glfw</artifactId>
 		</dependency>
 		<dependency>
-			<groupId>com.farias.rengine</groupId>
+			<groupId>com.farias.jengine</groupId>
+			<artifactId>java-game-engine-renderer</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>com.farias.jengine</groupId>
+			<artifactId>java-game-engine-assets</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>com.farias.jengine</groupId>
 			<artifactId>java-game-engine-toolkit2d</artifactId>
 		</dependency>
 		<dependency>
-			<groupId>com.farias.rengine</groupId>
-			<artifactId>java-game-engine-engine3d</artifactId>
+			<groupId>com.farias.jengine</groupId>
+			<artifactId>java-game-engine-toolkit3d</artifactId>
+		</dependency>
+
+		<dependency>
+			<groupId>org.joml</groupId>
+			<artifactId>joml</artifactId>
 		</dependency>
 
 		<!-- Natives da plataforma de quem builda (ver profiles no pom raiz). -->

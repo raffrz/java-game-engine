@@ -4,8 +4,8 @@
 #
 # Uso: scripts/run-demos.sh [-t segundos] [demo ...]
 #   -t N   segundos por demo (padrao 5)
-#   demo   nomes das classes em com.farias.rengine.examples
-#          (padrao: SnakeGame SpriteEditor ModelViewer IsometricChess ShadowCubeDemo)
+#   demo   nomes das classes em com.farias.jengine.examples
+#          (padrao: SnakeGame SpriteEditor ModelViewer chess.IsometricChess ShadowCubeDemo)
 set -u
 
 SECONDS_PER_DEMO=5
@@ -19,12 +19,12 @@ shift $((OPTIND - 1))
 
 DEMOS=("$@")
 if [ ${#DEMOS[@]} -eq 0 ]; then
-    DEMOS=(SnakeGame SpriteEditor ModelViewer IsometricChess ShadowCubeDemo)
+    DEMOS=(SnakeGame SpriteEditor ModelViewer chess.IsometricChess ShadowCubeDemo)
 fi
 
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
 DEMOS_DIR="$ROOT/java-game-engine-demos"
-PKG=com.farias.rengine.examples
+PKG=com.farias.jengine.examples
 
 # JDK 17+ (o enforcer do projeto exige); no macOS procura via java_home.
 if [ -z "${JAVA_HOME:-}" ] || ! "$JAVA_HOME/bin/java" -version 2>&1 | grep -qE 'version "(1[7-9]|[2-9][0-9])'; then

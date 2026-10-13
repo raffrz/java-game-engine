@@ -36,7 +36,7 @@ Veja como a estrutura fica profissional e elegante:
 O Material passa a guardar um mapa de valores genéricos.
 
 ```java
-package com.farias.rengine.renderer;
+package com.farias.jengine.renderer;
 
 import java.util.HashMap;
 import java.util.Map;

@@ -5,7 +5,7 @@
 	<modelVersion>4.0.0</modelVersion>
 
 	<parent>
-		<groupId>com.farias.rengine</groupId>
+		<groupId>com.farias.jengine</groupId>
 		<artifactId>java-game-engine</artifactId>
 		<version>1.0.2-SNAPSHOT</version>
 	</parent>
@@ -15,11 +15,11 @@
 
 	<dependencies>
 		<dependency>
-			<groupId>com.farias.rengine</groupId>
+			<groupId>com.farias.jengine</groupId>
 			<artifactId>java-game-engine-core</artifactId>
 		</dependency>
 		<dependency>
-			<groupId>com.farias.rengine</groupId>
+			<groupId>com.farias.jengine</groupId>
 			<artifactId>java-game-engine-renderer</artifactId>
 		</dependency>
 		<dependency>
@@ -29,10 +29,6 @@
 		<dependency>
 			<groupId>org.lwjgl</groupId>
 			<artifactId>lwjgl-stb</artifactId>
-		</dependency>
-		<dependency>
-			<groupId>org.joml</groupId>
-			<artifactId>joml</artifactId>
 		</dependency>
 	</dependencies>
 </project>
