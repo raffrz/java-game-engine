@@ -3,6 +3,6 @@ target/
 .classpath
 .project
 .settings
-core
+/core
 .DS_Store
 .vscode*

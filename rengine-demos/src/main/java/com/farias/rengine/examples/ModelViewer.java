@@ -1,0 +1,207 @@
+package com.farias.rengine.examples;
+
+import java.nio.file.Path;
+
+import com.farias.rengine.assets.AssetsModule;
+import com.farias.rengine.core.Engine;
+import com.farias.rengine.core.EngineContext;
+import com.farias.rengine.core.Timer;
+import com.farias.rengine.renderer.RendererModule;
+import com.farias.rengine.toolkit3d.Camera;
+import com.farias.rengine.toolkit3d.Toolkit3DModule;
+import com.farias.rengine.toolkit3d.Models;
+import com.farias.rengine.toolkit3d.Projections;
+import com.farias.rengine.toolkit3d.TexturedModel;
+import com.farias.rengine.platform.glfw.GlfwPlatformModule;
+import com.farias.rengine.platform.Input;
+import com.farias.rengine.platform.Key;
+import com.farias.rengine.platform.Window;
+import com.farias.rengine.renderer.RenderPassDescriptor;
+import com.farias.rengine.renderer.RenderPass;
+import com.farias.rengine.renderer.RenderView;
+import com.farias.rengine.renderer.Renderer;
+import com.farias.rengine.toolkit2d.Toolkit2D;
+import com.farias.rengine.toolkit2d.Toolkit2DModule;
+import com.farias.rengine.toolkit2d.Ui;
+
+public class ModelViewer {
+
+    private static final int WINDOW_WIDTH = 960;
+    private static final int WINDOW_HEIGHT = 960;
+    private static final int FONT_SIZE = 20;
+    private static final float CAMERA_SPEED = 5.0f;
+    private static final float ROTATION_SPEED = 16f;
+
+    private final Camera camera = new Camera();
+    private final TexturedModel earth;
+    private final TexturedModel clouds;
+
+    private final Window window;
+    private final Input input;
+    private final Renderer renderer;
+    private final Ui ui;
+    private final RenderPassDescriptor scene3DDescriptor;
+
+    // ponto observado pela câmera
+    private float targetX = 0;
+    private float targetY = 0;
+    private float targetZ = 0;
+
+    // distância da câmera (terra tem raio ~1, entao perto o bastante pra preencher a tela)
+    private float cameraDistance = 3f;
+
+    public ModelViewer(EngineContext context) {
+        window = context.require(Window.class);
+        input = context.require(Input.class);
+        renderer = context.require(Renderer.class);
+        ui = context.require(Toolkit2D.class).ui(WINDOW_WIDTH, WINDOW_HEIGHT);
+
+        Models models = context.require(Models.class);
+        earth = models.load("models/earth.obj", "textures/earth.png");
+        clouds = models.load("models/clouds.obj", "textures/clouds.png");
+
+        scene3DDescriptor = new RenderPassDescriptor("model-viewer-3d")
+                .clearColor(0f, 0f, 0f, 1f)
+                .depthTest(true)
+                .cullFace(true)
+                .blend(true);
+
+        updateIsometricCamera();
+    }
+
+    private void run() {
+        Timer timer = new Timer();
+        while (!window.shouldClose() && !input.isKeyPressed(Key.ESCAPE)) {
+            timer.update();
+            window.pollEvents();
+            input.update();
+            update(timer.deltaTime());
+
+            renderer.beginFrame();
+            render();
+            renderer.endFrame();
+        }
+    }
+
+    private void updateIsometricCamera() {
+        camera.lookAt(
+                targetX + cameraDistance,
+                targetY + cameraDistance,
+                targetZ + cameraDistance,
+
+                targetX,
+                targetY,
+                targetZ,
+
+                0, 1, 0);
+    }
+
+    private void update(float deltaTime) {
+
+        // rotação da terra
+        earth.getRotation().y += 0.7f * deltaTime * ROTATION_SPEED;
+
+        if (earth.getRotation().y > 360f) {
+            earth.getRotation().y -= 360f;
+        }
+
+        // rotação das nuvens
+        clouds.getRotation().y += 1.0f * deltaTime * ROTATION_SPEED;
+
+        if (clouds.getRotation().y > 360f) {
+            clouds.getRotation().y -= 360f;
+        }
+
+        // tamanho da atmosfera
+        if (input.isKeyDown(Key.A)) {
+
+            if (input.isKeyDown(Key.LEFT_SHIFT)) {
+                clouds.getScale().sub(0.1f, 0.1f, 0.1f);
+            } else {
+                clouds.getScale().add(0.1f, 0.1f, 0.1f);
+            }
+        }
+
+        float move = CAMERA_SPEED * deltaTime;
+
+        /*
+         * Movimento isométrico
+         *
+         * ↑ = nordeste
+         * ↓ = sudoeste
+         * ← = noroeste
+         * → = sudeste
+         */
+
+        if (input.isKeyDown(Key.UP)) {
+            targetX += move;
+            targetZ += move;
+        }
+
+        if (input.isKeyDown(Key.DOWN)) {
+            targetX -= move;
+            targetZ -= move;
+        }
+
+        if (input.isKeyDown(Key.LEFT)) {
+            targetX -= move;
+            targetZ += move;
+        }
+
+        if (input.isKeyDown(Key.RIGHT)) {
+            targetX += move;
+            targetZ -= move;
+        }
+
+        // zoom (aproxima/afasta a câmera do alvo)
+        if (input.isKeyDown(Key.Z)) {
+
+            if (input.isKeyDown(Key.LEFT_SHIFT)) {
+                cameraDistance += 2f * deltaTime * CAMERA_SPEED;
+            } else {
+                cameraDistance -= 2f * deltaTime * CAMERA_SPEED;
+            }
+
+            if (cameraDistance < 2f) {
+                cameraDistance = 2f;
+            }
+        }
+
+        updateIsometricCamera();
+    }
+
+    private void render() {
+        // Renderização 3D em perspectiva (era ortográfica/isométrica)
+        RenderView view3D = new RenderView(window.getFramebufferWidth(), window.getFramebufferHeight(),
+                Projections.perspective(window.getWidth(), Math.max(window.getHeight(), 1)), camera.getViewMatrix());
+        RenderPass scenePass = renderer.createPass(scene3DDescriptor, view3D);
+
+        scenePass.submit(earth.command());
+        scenePass.submit(clouds.command());
+
+        // UI (depois da cena: os passes executam na ordem de criacao)
+        ui.begin();
+        ui.textCentered(ui.defaultFont(), "ISOMETRIC VIEW", WINDOW_WIDTH / 2, 20, FONT_SIZE);
+        ui.textCentered(ui.defaultFont(), "ARROWS = MOVE | Z = ZOOM | SHIFT+Z = ZOOM OUT", WINDOW_WIDTH / 2, 50, 14);
+    }
+
+    public static void launch() {
+        Engine engine = new Engine()
+                .registerModule(new GlfwPlatformModule(WINDOW_WIDTH, WINDOW_HEIGHT, "Model Viewer - Isometric"))
+                .registerModule(new RendererModule())
+                .registerModule(new AssetsModule(Path.of("resources")))
+                .registerModule(new Toolkit3DModule())
+                .registerModule(new Toolkit2DModule());
+
+        EngineContext context = engine.start();
+        try {
+            new ModelViewer(context).run();
+        } finally {
+            engine.terminate();
+        }
+    }
+
+    public static void main(String[] args) {
+        launch();
+    }
+}

@@ -5,19 +5,19 @@
 	<modelVersion>4.0.0</modelVersion>
 
 	<groupId>com.farias.rengine</groupId>
-	<artifactId>java-game-engine</artifactId>
+	<artifactId>rengine</artifactId>
 	<version>1.0.2-SNAPSHOT</version>
 	<packaging>pom</packaging>
-	<name>Java Game Engine</name>
+	<name>Rengine</name>
 
 	<modules>
-		<module>java-game-engine-core</module>
-		<module>java-game-engine-renderer</module>
-		<module>java-game-engine-platform-glfw</module>
-		<module>java-game-engine-assets</module>
-		<module>java-game-engine-toolkit2d</module>
-		<module>java-game-engine-engine3d</module>
-		<module>java-game-engine-demos</module>
+		<module>rengine-core</module>
+		<module>rengine-renderer</module>
+		<module>rengine-platform-glfw</module>
+		<module>rengine-assets</module>
+		<module>rengine-toolkit2d</module>
+		<module>rengine-toolkit3d</module>
+		<module>rengine-demos</module>
 	</modules>
 
 	<properties>
@@ -50,32 +50,32 @@
 			</dependency>
 			<dependency>
 				<groupId>com.farias.rengine</groupId>
-				<artifactId>java-game-engine-renderer</artifactId>
+				<artifactId>rengine-renderer</artifactId>
 				<version>${project.version}</version>
 			</dependency>
 			<dependency>
 				<groupId>com.farias.rengine</groupId>
-				<artifactId>java-game-engine-core</artifactId>
+				<artifactId>rengine-core</artifactId>
 				<version>${project.version}</version>
 			</dependency>
 			<dependency>
 				<groupId>com.farias.rengine</groupId>
-				<artifactId>java-game-engine-platform-glfw</artifactId>
+				<artifactId>rengine-platform-glfw</artifactId>
 				<version>${project.version}</version>
 			</dependency>
 			<dependency>
 				<groupId>com.farias.rengine</groupId>
-				<artifactId>java-game-engine-assets</artifactId>
+				<artifactId>rengine-assets</artifactId>
 				<version>${project.version}</version>
 			</dependency>
 			<dependency>
 				<groupId>com.farias.rengine</groupId>
-				<artifactId>java-game-engine-toolkit2d</artifactId>
+				<artifactId>rengine-toolkit2d</artifactId>
 				<version>${project.version}</version>
 			</dependency>
 			<dependency>
 				<groupId>com.farias.rengine</groupId>
-				<artifactId>java-game-engine-engine3d</artifactId>
+				<artifactId>rengine-toolkit3d</artifactId>
 				<version>${project.version}</version>
 			</dependency>
 		</dependencies>
