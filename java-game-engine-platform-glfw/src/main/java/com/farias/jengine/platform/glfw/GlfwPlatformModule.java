@@ -5,11 +5,13 @@ import static org.lwjgl.glfw.GLFW.glfwTerminate;
 import com.farias.jengine.core.EngineContext;
 import com.farias.jengine.core.Module;
 import com.farias.jengine.platform.Input;
+import com.farias.jengine.platform.Presenter;
 import com.farias.jengine.platform.Window;
 
 /**
  * Cria a janela GLFW (com seu contexto corrente) e o input, e os registra
- * como {@link Window} e {@link Input}. Deve ser o primeiro modulo
+ * como {@link Window} e {@link Input}, mais o {@link Presenter} que troca os
+ * buffers da janela. Deve ser o primeiro modulo
  * registrado: os demais dependem da janela ja resolvida.
  */
 public final class GlfwPlatformModule implements Module {
@@ -32,6 +34,7 @@ public final class GlfwPlatformModule implements Module {
         window.bind();
 
         context.registerService(Window.class, window);
+        context.registerService(Presenter.class, window::swapBuffers);
         context.registerService(Input.class, new GlfwInput(window));
     }
 

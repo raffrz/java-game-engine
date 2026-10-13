@@ -29,7 +29,9 @@ A lista curta está no [README](README.md#architecture-rules). Aqui, a justifica
    demo) depende. `toolkit2d` e `toolkit3d` são irmãos e nunca dependem um do outro: um jogo 3D
    que quer HUD registra o `Toolkit2DModule` e usa `Ui`. Nada específico de uma API gráfica entra
    no `core` nem na API pública dos toolkits.
-5. **Plataforma é contrato.** `Window` e `Input` são interfaces no `core` (pacote `platform`). Um módulo de
+5. **Plataforma é contrato.** `Window`, `Input` e `Presenter` são interfaces no `core` (pacote
+   `platform`). O `renderer` apresenta o frame pelo `Presenter` que o módulo de plataforma
+   registra, então nenhum dos dois conhece o outro. Um módulo de
    plataforma (hoje `platform-glfw`) as implementa e registra. `Key` e `MouseButton` são enums
    puros; traduzi-los para códigos GLFW é trabalho do módulo de plataforma.
 6. **Um frame, um ciclo de vida.** `window.pollEvents()` → `input.update()` →
@@ -57,7 +59,7 @@ natives. Artefato e diretório são `java-game-engine-<módulo>`; o pacote é `c
 
 | Módulo | Papel | Depende de |
 |---|---|---|
-| `java-game-engine-core` | `core`: `Engine`/`Module`/`EngineContext`, `Timer`. `platform`: contratos `Window` e `Input` (interfaces), `Key`, `MouseButton` | nada |
+| `java-game-engine-core` | `core`: `Engine`/`Module`/`EngineContext`, `Timer`. `platform`: contratos `Window`, `Input` e `Presenter` (interfaces), `Key`, `MouseButton` | nada |
 | `java-game-engine-renderer` | Renderer modular (OpenGL): `Renderer`, `RendererModule`, `RenderPassDescriptor`, `RenderPass`, `RenderView`, `RenderCommand`, `Material`, `Mesh`, `Bounds`, `Shader`, `Texture` | core, LWJGL (OpenGL), JOML |
 | `java-game-engine-platform-glfw` | `GlfwPlatformModule` (janela + input via GLFW) | core |
 | `java-game-engine-assets` | `Assets` (resolução raiz → classpath, cache de texturas), `AssetsModule`, `TextureLoader` (STB, interno) | core, renderer |
@@ -73,7 +75,7 @@ Serviços registrados (o que `context.require(...)` devolve):
 
 | Módulo | Serviços |
 |---|---|
-| `GlfwPlatformModule` | `Window`, `Input` |
+| `GlfwPlatformModule` | `Window`, `Input`, `Presenter` |
 | `RendererModule` | `Renderer` |
 | `AssetsModule` | `Assets` |
 | `Toolkit2DModule` | `Toolkit2D`, `SpriteRenderer` (baixo nível) |
@@ -117,12 +119,14 @@ Registrar o mesmo tipo duas vezes lança exceção (`EngineContext.registerServi
 - `GlfwPlatformModule` (em `platform-glfw`): cria a janela com o contexto corrente e o input;
   **deve ser o primeiro**; em `onTerminate` destrói a janela e encerra o GLFW. Ainda pede um
   contexto OpenGL 3.3 core (parametrizar isso só faz sentido com outro backend).
-- `RendererModule` (no módulo `renderer`): `GL.createCapabilities()` e liga
-  `Renderer.setPresent(window::swapBuffers)`.
+- `RendererModule` (no módulo `renderer`): `GL.createCapabilities()` e cria o `Renderer` com o
+  `Presenter` resolvido do contexto (`require`, então a ordem errada falha com mensagem clara).
+  Não importa `Window`.
 - Ordem usual: GlfwPlatform → Renderer → Assets → Toolkit3D → Toolkit2D.
 - `Renderer` tem estado de frame (`inFrame()`, `frameIndex()`): `beginFrame` duplo, `endFrame`
   sem `beginFrame` e `createPass` fora de um frame lançam `IllegalStateException`. `endFrame`
-  executa os passes e apresenta (hook `Present`).
+  executa os passes e apresenta (`Presenter.present()`). `Window` não tem mais `swapBuffers`:
+  apresentar tem um caminho só.
 - `Input.update()` só amostra teclas/mouse (guarda o frame atual e o anterior, de onde saem
   `isKeyPressed`/`isKeyReleased`); o jogo chama `window.pollEvents()` antes.
 - Não existe mais `Game`: cada demo escreve o `main` (módulos) e o loop.
@@ -322,10 +326,6 @@ Decisões:
   opacos + SPI `RenderBackend` com `execute(frame)`); hints de contexto OpenGL em `GlfwWindow`;
   uniforms como dados e shaders portáveis (GLSL 330 em `toolkit2d`/`toolkit3d`).
 - `Game` foi removido; cada demo monta o `Engine` e tem o próprio loop (concluído).
-- **Apresentação por callback:** `Renderer.endFrame()` ainda apresenta via
-  `setPresent(window::swapBuffers)`, ligado pelo `RendererModule`. É o último ponto em que a
-  engine chama algo por conta própria; a alternativa é o jogo chamar `window.swapBuffers()` depois
-  do `endFrame()`, o que também tira o `Window` do `RendererModule`. Em aberto.
 - O teste por pixel dos demos 2D (seção Demos) é anterior à mudança da matriz de sprite para
   T·R·S e à remoção do `flip()` em `Texture`; as duas não mudam o resultado para os demos atuais
   (sprites quadrados, buffer já na posição 0), mas a comparação não foi refeita.

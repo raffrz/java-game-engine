@@ -72,8 +72,8 @@ final class GlfwWindow implements Window {
         return glfwWindowShouldClose(id);
     }
 
-    @Override
-    public void swapBuffers() {
+    /** Apresenta o frame; exposto ao renderer como {@code Presenter}. */
+    void swapBuffers() {
         glfwSwapBuffers(id);
     }
 

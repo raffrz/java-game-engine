@@ -7,14 +7,15 @@ import java.util.Objects;
 import org.joml.Matrix3f;
 import org.joml.Matrix4f;
 
+import com.farias.jengine.platform.Presenter;
+
 public final class Renderer {
 
     private final OpenGLBackend backend = new OpenGLBackend();
     private boolean initialized;
     private boolean inFrame;
     private long frameIndex;
-    private Runnable present = () -> {
-    };
+    private final Presenter presenter;
     private final List<RenderPass> renderPasses = new ArrayList<>();
     private final List<Disposable> resources = new ArrayList<>();
 
@@ -22,7 +23,8 @@ public final class Renderer {
     private final Matrix3f normalMatrix = new Matrix3f();
 
     /** Criado pelo RendererModule, que e quem tem o contexto GL corrente. */
-    Renderer() {
+    Renderer(Presenter presenter) {
+        this.presenter = Objects.requireNonNull(presenter, "presenter");
     }
 
     void initialize() {
@@ -113,6 +115,10 @@ public final class Renderer {
         frameIndex++;
     }
 
+    /**
+     * Executa os passes do frame, na ordem em que foram criados, e o apresenta
+     * pelo {@link Presenter} registrado pelo modulo de plataforma.
+     */
     public void endFrame() {
         ensureInitialized();
         if (!inFrame) {
@@ -125,16 +131,7 @@ public final class Renderer {
         }
 
         inFrame = false;
-        present.run();
-    }
-
-    /**
-     * Define o que apresenta o frame ao fim de {@link #endFrame()} (ex.: trocar
-     * os buffers da janela). O renderer nao conhece a janela: quem o monta
-     * liga isso. Por padrao nao faz nada.
-     */
-    public void setPresent(Runnable present) {
-        this.present = Objects.requireNonNull(present, "present");
+        presenter.present();
     }
 
     /** true entre beginFrame() e endFrame(). */

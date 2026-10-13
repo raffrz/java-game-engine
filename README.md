@@ -96,7 +96,7 @@ VSync is on by default; `window.setVSync(false)` uncaps the frame rate.
 
 | Module | Responsibility | Depends on |
 |---|---|---|
-| `core` | Kernel: `Engine`, `Module`, `EngineContext`, `Timer`; contracts `Window`, `Input`, `Key`, `MouseButton` | nothing |
+| `core` | Kernel: `Engine`, `Module`, `EngineContext`, `Timer`; contracts `Window`, `Input`, `Presenter`, `Key`, `MouseButton` | nothing |
 | `platform-glfw` | `GlfwPlatformModule`: window + input through GLFW | core |
 | `renderer` | `Renderer`, `RendererModule`, passes, materials, meshes, shaders, textures (OpenGL) | core |
 | `assets` | `Assets`, `AssetsModule`: path resolution and texture cache | core, renderer |
@@ -112,7 +112,7 @@ Services each module registers (what `context.require(...)` can return):
 
 | Module class | Services |
 |---|---|
-| `GlfwPlatformModule` | `Window`, `Input` |
+| `GlfwPlatformModule` | `Window`, `Input`, `Presenter` |
 | `RendererModule` | `Renderer` |
 | `AssetsModule` | `Assets` |
 | `Toolkit2DModule` | `Toolkit2D`, `SpriteRenderer` (low level) |
@@ -149,8 +149,9 @@ decision, not an accident. The reasoning behind each rule is in
    constructors are not public); `static` is for pure functions only.
 4. **Dependency direction:** `core` depends on nothing; library modules never depend on
    `platform-*`; `toolkit2d` and `toolkit3d` never depend on each other.
-5. **Platform is a contract:** `Window` and `Input` are interfaces in `core`, implemented by
-   `platform-*` modules.
+5. **Platform is a contract:** `Window`, `Input` and `Presenter` are interfaces in `core`,
+   implemented by `platform-*` modules. The renderer presents through `Presenter`, so it never
+   sees the window.
 6. **One frame lifecycle:** `pollEvents` → `input.update` → `beginFrame` → passes → `endFrame`;
    overlays are begun after the scene.
 7. **Resource ownership:** the `Renderer` owns GPU resources (only it can create them, and

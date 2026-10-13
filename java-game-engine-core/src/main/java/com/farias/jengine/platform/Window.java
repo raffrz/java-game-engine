@@ -12,12 +12,10 @@ public interface Window {
     /** Processa os eventos pendentes da janela. */
     void pollEvents();
 
-    /** Apresenta o frame (troca os buffers). */
-    void swapBuffers();
-
     /**
-     * Liga ou desliga a sincronizacao vertical. Ligada (o padrao), swapBuffers
-     * espera o refresh do monitor; desligada, o loop roda sem limite de fps.
+     * Liga ou desliga a sincronizacao vertical. Ligada (o padrao), apresentar
+     * o frame ({@link Presenter}) espera o refresh do monitor; desligada, o
+     * loop roda sem limite de fps.
      */
     void setVSync(boolean enabled);
 
