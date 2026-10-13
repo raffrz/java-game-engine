@@ -23,6 +23,7 @@ import com.farias.rengine.renderer.Renderer;
 import com.farias.rengine.toolkit2d.BitmapFont;
 import com.farias.rengine.toolkit2d.Canvas;
 import com.farias.rengine.toolkit2d.SpriteSheet;
+import com.farias.rengine.toolkit2d.Toolkit2D;
 import com.farias.rengine.toolkit2d.Toolkit2DModule;
 
 public class SpriteEditor {
@@ -68,7 +69,7 @@ public class SpriteEditor {
         window = context.require(Window.class);
         input = context.require(InputSystem.class);
         renderer = context.require(Renderer.class);
-        canvas = context.require(Canvas.class);
+        canvas = context.require(Toolkit2D.class).canvas(VIRTUAL_SIZE, VIRTUAL_SIZE);
         Assets assets = context.require(Assets.class);
 
         font = canvas.defaultFont();
@@ -95,8 +96,8 @@ public class SpriteEditor {
     }
 
     private void update(float deltaTime) {
-        int mouse_x = (int) input.getMouseX() / 4 / 8;
-        int mouse_y = (int) input.getMouseY() / 4 / 8;
+        int mouse_x = (int) canvas.toVirtualX(input.getMouseX()) / 8;
+        int mouse_y = (int) canvas.toVirtualY(input.getMouseY()) / 8;
 
         hover_x = mouse_x * 8;
         hover_y = mouse_y * 8;
@@ -199,7 +200,7 @@ public class SpriteEditor {
                 .registerModule(new GlfwModule(WINDOW_SIZE, WINDOW_SIZE, "Sprite Editor"))
                 .registerModule(new RenderModule())
                 .registerModule(new AssetsModule(Path.of("resources")))
-                .registerModule(new Toolkit2DModule(VIRTUAL_SIZE, VIRTUAL_SIZE));
+                .registerModule(new Toolkit2DModule());
 
         EngineContext context = engine.start();
         try {

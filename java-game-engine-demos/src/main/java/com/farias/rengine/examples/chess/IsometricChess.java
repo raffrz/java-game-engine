@@ -24,8 +24,8 @@ import com.farias.rengine.platform.glfw.GlfwModule;
 import com.farias.rengine.renderer.DirectionalLight;
 import com.farias.rengine.renderer.RenderModule;
 import com.farias.rengine.renderer.Renderer;
+import com.farias.rengine.toolkit2d.Toolkit2D;
 import com.farias.rengine.toolkit2d.Toolkit2DModule;
-import com.farias.rengine.toolkit2d.ui.Ui;
 
 /**
  * Xadrez isométrico: liga o {@link ChessGame} (regras e estado, sem engine) à
@@ -86,7 +86,7 @@ public class IsometricChess {
                 .registerModule(new RenderModule())
                 .registerModule(new AssetsModule(Path.of("resources")))
                 .registerModule(new Engine3DModule())
-                .registerModule(new Toolkit2DModule(WINDOW_WIDTH, WINDOW_HEIGHT));
+                .registerModule(new Toolkit2DModule());
 
         EngineContext context = engine.start();
         try {
@@ -109,7 +109,8 @@ public class IsometricChess {
                 context.require(Materials.class),
                 context.require(ModelLoader.class),
                 shadow, camera);
-        renderer = new ChessRenderer(context.require(Renderer.class), context.require(Ui.class),
+        renderer = new ChessRenderer(context.require(Renderer.class),
+                context.require(Toolkit2D.class).ui(WINDOW_WIDTH, WINDOW_HEIGHT),
                 window, WINDOW_WIDTH, camera, shadow);
     }
 

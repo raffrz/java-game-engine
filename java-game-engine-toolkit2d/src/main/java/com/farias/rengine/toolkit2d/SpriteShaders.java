@@ -1,4 +1,4 @@
-package com.farias.rengine.toolkit2d.draw;
+package com.farias.rengine.toolkit2d;
 
 /**
  * GLSL source embutido do shader de sprite 2D. O

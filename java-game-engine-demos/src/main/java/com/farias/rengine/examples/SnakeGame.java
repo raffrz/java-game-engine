@@ -25,6 +25,7 @@ import com.farias.rengine.renderer.Renderer;
 import com.farias.rengine.toolkit2d.BitmapFont;
 import com.farias.rengine.toolkit2d.Canvas;
 import com.farias.rengine.toolkit2d.SpriteSheet;
+import com.farias.rengine.toolkit2d.Toolkit2D;
 import com.farias.rengine.toolkit2d.Toolkit2DModule;
 
 public class SnakeGame {
@@ -73,7 +74,7 @@ public class SnakeGame {
                 .registerModule(new GlfwModule(WIDTH, HEIGHT, "New Snake Game"))
                 .registerModule(new RenderModule())
                 .registerModule(new AssetsModule(Path.of("resources")))
-                .registerModule(new Toolkit2DModule(WIDTH, HEIGHT));
+                .registerModule(new Toolkit2DModule());
 
         EngineContext context = engine.start();
         try {
@@ -94,7 +95,7 @@ public class SnakeGame {
         window = context.require(Window.class);
         input = context.require(InputSystem.class);
         renderer = context.require(Renderer.class);
-        canvas = context.require(Canvas.class);
+        canvas = context.require(Toolkit2D.class).canvas(WIDTH, HEIGHT);
         Assets assets = context.require(Assets.class);
 
         palette = new SpriteSheet(assets.texture("palletes/default.png"), PALLETE_TILE_SIZE, PALLETE_TILE_SIZE);

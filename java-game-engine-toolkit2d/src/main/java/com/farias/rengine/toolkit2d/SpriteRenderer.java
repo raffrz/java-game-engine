@@ -1,4 +1,4 @@
-package com.farias.rengine.toolkit2d.draw;
+package com.farias.rengine.toolkit2d;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -16,12 +16,10 @@ import com.farias.rengine.renderer.RenderPassNode;
 import com.farias.rengine.renderer.Renderer;
 import com.farias.rengine.renderer.Shader;
 import com.farias.rengine.renderer.Texture;
-import com.farias.rengine.toolkit2d.BitmapFont;
-import com.farias.rengine.toolkit2d.SpriteSheet;
 
 /**
  * Primitiva 2D de baixo nivel: transforma "tile de uma folha em (x, y, w, h)"
- * em um RenderCommand. Compartilhada por Canvas e Ui.
+ * em um RenderCommand. Compartilhada por todos os Canvas e Ui.
  *
  * <p>Convencao exposta: origem no canto superior esquerdo, X para a direita,
  * Y para baixo (valores positivos), rotacao em graus no sentido horario. A
@@ -47,7 +45,7 @@ public final class SpriteRenderer {
     private final Vector2f uvOffset = new Vector2f();
     private final Vector2f uvScale = new Vector2f();
 
-    public SpriteRenderer(Renderer renderer) {
+    SpriteRenderer(Renderer renderer) {
         this.renderer = renderer;
         this.shader = renderer.createShader(SpriteShaders.SPRITE_VERTEX, SpriteShaders.SPRITE_FRAGMENT);
         this.quad = renderer.createMesh(quadData());
@@ -96,7 +94,7 @@ public final class SpriteRenderer {
     }
 
     /** Esvazia o cache de materiais (nao libera GPU: pertence ao Renderer). */
-    public void clear() {
+    void clear() {
         materials.clear();
     }
 
