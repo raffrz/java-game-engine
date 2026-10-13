@@ -74,7 +74,8 @@ public final class IsometricCamera {
 
     /** A view do passe 3D: viewport no tamanho do framebuffer, aspecto da janela lógica. */
     public RenderView view(Window window) {
-        float aspect = (float) window.getWidth() / window.getHeight();
+        // janela minimizada tem altura 0
+        float aspect = (float) window.getWidth() / Math.max(window.getHeight(), 1);
         return new RenderView(window.getFramebufferWidth(), window.getFramebufferHeight(),
                 Projections.orthographic3D(size, aspect), viewMatrix());
     }

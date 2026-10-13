@@ -78,14 +78,21 @@ final class GlfwWindow implements Window {
         glfwSwapBuffers(id);
     }
 
+    // Consultados a cada chamada: a janela pode ser redimensionada.
     @Override
     public int getWidth() {
-        return width;
+        int[] w = new int[1];
+        int[] h = new int[1];
+        glfwGetWindowSize(id, w, h);
+        return w[0];
     }
 
     @Override
     public int getHeight() {
-        return height;
+        int[] w = new int[1];
+        int[] h = new int[1];
+        glfwGetWindowSize(id, w, h);
+        return h[0];
     }
 
     @Override

@@ -175,7 +175,7 @@ public class ModelViewer {
     private void render() {
         // Renderização 3D em perspectiva (era ortográfica/isométrica)
         RenderView view3D = new RenderView(window.getFramebufferWidth(), window.getFramebufferHeight(),
-                Projections.perspective(WINDOW_WIDTH, WINDOW_HEIGHT), camera.getViewMatrix());
+                Projections.perspective(window.getWidth(), Math.max(window.getHeight(), 1)), camera.getViewMatrix());
         RenderPassNode scenePass = renderer.createPass(scene3DDescriptor, view3D);
 
         scenePass.submit(new RenderCommand(earth.getMesh(), earth.getMaterial(), earth.getModelMatrix()));
