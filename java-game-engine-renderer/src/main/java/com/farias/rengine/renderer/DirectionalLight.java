@@ -16,10 +16,13 @@ public final class DirectionalLight {
 
     public DirectionalLight(Vector3f direction, Vector3f focus, float distance, float extent, float near, float far) {
         this.direction = new Vector3f(direction).normalize();
+        // Luz a pino: o "para cima" padrao (Y) fica paralelo a direcao e o
+        // lookAt degenera, entao usa Z nesse caso.
+        boolean vertical = Math.abs(this.direction.y) > 0.999f;
         this.view = new Matrix4f().lookAt(
                 new Vector3f(this.direction).mul(distance).add(focus),
                 new Vector3f(focus),
-                new Vector3f(0.0f, 1.0f, 0.0f));
+                vertical ? new Vector3f(0.0f, 0.0f, 1.0f) : new Vector3f(0.0f, 1.0f, 0.0f));
         this.projection = new Matrix4f().ortho(-extent, extent, -extent, extent, near, far);
         this.lightSpaceMatrix = new Matrix4f(projection).mul(view);
     }

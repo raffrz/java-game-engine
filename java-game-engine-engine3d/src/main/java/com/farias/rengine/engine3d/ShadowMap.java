@@ -26,19 +26,18 @@ import com.farias.rengine.renderer.Texture;
  */
 public final class ShadowMap {
 
-    private static final float DEFAULT_BIAS = 0.004f;
-
     private final Texture texture;
     private final DirectionalLight light;
     private final RenderView view;
     private final RenderPassDescriptor descriptor;
     private final Material casterMaterial;
-    private float bias = DEFAULT_BIAS;
+    private final float bias;
 
-    ShadowMap(Texture texture, DirectionalLight light, Material casterMaterial) {
+    ShadowMap(Texture texture, DirectionalLight light, Material casterMaterial, float bias) {
         this.texture = texture;
         this.light = light;
         this.casterMaterial = casterMaterial;
+        this.bias = bias;
         this.view = light.shadowView(texture);
         this.descriptor = new RenderPassDescriptor("shadow")
                 .depthAttachment(texture)
@@ -60,11 +59,6 @@ public final class ShadowMap {
     /** Tolerância de profundidade contra o serrilhado da sombra (acne). */
     public float bias() {
         return bias;
-    }
-
-    public ShadowMap bias(float bias) {
-        this.bias = bias;
-        return this;
     }
 
     public RenderPassDescriptor descriptor() {

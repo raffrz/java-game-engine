@@ -70,8 +70,8 @@ public final class SpriteRenderer {
             float height, float rotationDegrees) {
         Matrix4f model = nextMatrix()
                 .translation(x + width / 2f, -y - height / 2f, 0)
-                .scale(width / 2f, height / 2f, 1f)
-                .rotateZ((float) Math.toRadians(-rotationDegrees));
+                .rotateZ((float) Math.toRadians(-rotationDegrees))
+                .scale(width / 2f, height / 2f, 1f);
         pass.submit(new RenderCommand(quad, material(sheet, tile), model));
     }
 

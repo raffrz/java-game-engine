@@ -94,16 +94,14 @@ public final class ModelLoader {
                     normals.add(new Vector3f(parseFloat(parts[1]), parseFloat(parts[2]), parseFloat(parts[3])));
                 } else if (line.startsWith("f ")) {
                     String[] parts = line.split("\\s+");
-                    String[] vertex1 = parts[1].split("/");
-                    String[] vertex2 = parts[2].split("/");
-                    String[] vertex3 = parts[3].split("/");
-
-                    processVertex(vertex1, vertices, textures, normals, outVertices, outTextures, outNormals, indices,
-                            vertexCache);
-                    processVertex(vertex2, vertices, textures, normals, outVertices, outTextures, outNormals, indices,
-                            vertexCache);
-                    processVertex(vertex3, vertices, textures, normals, outVertices, outTextures, outNormals, indices,
-                            vertexCache);
+                    // Faces com mais de 3 vertices (quads, n-gons) viram um
+                    // leque de triangulos a partir do primeiro vertice.
+                    for (int i = 2; i < parts.length - 1; i++) {
+                        for (String corner : new String[] { parts[1], parts[i], parts[i + 1] }) {
+                            processVertex(corner.split("/"), vertices, textures, normals, outVertices, outTextures,
+                                    outNormals, indices, vertexCache);
+                        }
+                    }
                 }
             }
         } catch (IOException e) {

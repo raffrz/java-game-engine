@@ -70,6 +70,21 @@ public final class Renderer {
     }
 
     /**
+     * Libera agora um recurso criado por este Renderer (mesh, textura ou
+     * shader), em vez de esperar o {@link #dispose()}. O recurso nao pode mais
+     * ser usado depois disso.
+     */
+    public void destroy(Disposable resource) {
+        if (!resources.remove(resource)) {
+            return;
+        }
+        if (resource instanceof Texture texture) {
+            backend.release(texture);
+        }
+        resource.dispose();
+    }
+
+    /**
      * Cria um passe e o enfileira no frame corrente. A fila e limpa em
      * {@link #beginFrame()}, entao passes devem ser criados a cada frame.
      */
@@ -135,8 +150,9 @@ public final class Renderer {
         RenderView renderView = pass.view();
         List<RenderCommand> commands = pass.commands();
 
-        // Se o passe não tem câmera ou comandos, pula
-        if (renderView == null || commands.isEmpty()) {
+        // Sem câmera não há o que executar. Um passe sem comandos ainda roda:
+        // o clear dele faz parte do frame (tela vazia, shadow map sem casters).
+        if (renderView == null) {
             return;
         }
 

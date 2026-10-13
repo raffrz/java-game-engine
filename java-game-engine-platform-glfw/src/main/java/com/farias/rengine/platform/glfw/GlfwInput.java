@@ -18,7 +18,7 @@ final class GlfwInput implements InputSystem {
     private final GlfwWindow window;
     private final long handle;
 
-    private final boolean[] keys = new boolean[KEY_LAST];
+    private final boolean[] keys = new boolean[KEY_LAST + 1];
     private final boolean[] mouseButtons = new boolean[MouseButton.values().length];
 
     private final DoubleBuffer mouseX = BufferUtils.createDoubleBuffer(1);
@@ -68,7 +68,7 @@ final class GlfwInput implements InputSystem {
 
     @Override
     public void update() {
-        for (int i = KEY_FIRST; i < KEY_LAST; i++) {
+        for (int i = KEY_FIRST; i <= KEY_LAST; i++) {
             keys[i] = isDown(i);
         }
 

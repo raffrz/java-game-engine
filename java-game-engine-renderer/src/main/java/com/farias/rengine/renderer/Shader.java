@@ -13,7 +13,7 @@ import org.lwjgl.opengl.GL20;
 
 public class Shader implements Disposable {
 
-    private final int program;
+    private int program;
     private final Map<String, Integer> uniforms = new HashMap<>();
 
     // Reutilizados a cada uniform de matriz: alocar um direct buffer por draw
@@ -130,6 +130,9 @@ public class Shader implements Disposable {
 
     @Override
     public void dispose() {
-        GL20.glDeleteProgram(program);
+        if (program != 0) {
+            GL20.glDeleteProgram(program);
+            program = 0;
+        }
     }
 }

@@ -5,7 +5,6 @@ import org.joml.Vector3f;
 
 public class Camera {
     public Vector3f position = new Vector3f(0, 0, 0);
-    public Vector3f scale = new Vector3f(1, 1, 1);
     public Vector3f rotation = new Vector3f(0, 0, 0);
 
     private boolean useLookAt = false;
@@ -49,17 +48,16 @@ public class Camera {
         this.rotation.y = y;
     }
 
-    public void setZoom(float zoom) {
-        this.scale.x = zoom;
-        this.scale.y = zoom;
-    }
-
     public void pitch(float angle) {
         this.rotation.x = angle;
     }
 
-    public void roll(float angle) {
+    public void yaw(float angle) {
         this.rotation.y = angle;
+    }
+
+    public void roll(float angle) {
+        this.rotation.z = angle;
     }
 
     public void lookAt(float eyeX, float eyeY, float eyeZ,
