@@ -1,6 +1,5 @@
 package com.farias.rengine.engine3d;
 
-import com.farias.rengine.renderer.DirectionalLight;
 import com.farias.rengine.renderer.Material;
 import com.farias.rengine.renderer.Renderer;
 
@@ -14,7 +13,7 @@ public final class Shadows {
     private final Renderer renderer;
     private Material casterMaterial;
 
-    public Shadows(Renderer renderer) {
+    Shadows(Renderer renderer) {
         this.renderer = renderer;
     }
 

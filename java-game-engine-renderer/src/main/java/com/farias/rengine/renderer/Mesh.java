@@ -36,7 +36,7 @@ public final class Mesh implements Disposable {
     private final Bounds bounds;
     private boolean disposed;
 
-    public Mesh(MeshData data) {
+    Mesh(MeshData data) {
         // 1. Gerar e vincular o VAO global
         this.vao = glGenVertexArrays();
         glBindVertexArray(vao);

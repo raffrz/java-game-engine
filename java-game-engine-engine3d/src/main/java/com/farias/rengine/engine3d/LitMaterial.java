@@ -11,13 +11,14 @@ import com.farias.rengine.renderer.Texture;
  * difusa por uma luz direcional e, opcionalmente, brilho especular e
  * recepção de sombra. É um {@code Material} comum (serve em
  * {@link TexturedModel} e {@code RenderCommand}) com métodos tipados no lugar
- * dos nomes de uniform. Criado por {@link Materials#lit(Texture)}.
+ * dos nomes de uniform. Criado por {@link LitMaterials#create(Texture)}.
  *
  * <p>
- * Por padrão é fosco e não recebe sombra.
+ * Por padrão é fosco, não recebe sombra e a luz vem de (1, 1, 1): de cima e
+ * de frente para quem olha a cena dos eixos positivos.
  *
  * <pre>{@code
- * Material plastic = materials.lit(texture)
+ * Material plastic = litMaterials.create(texture)
  *         .receiving(shadow)
  *         .glossy(0.5f, 48f, camera.directionToEye());
  * }</pre>

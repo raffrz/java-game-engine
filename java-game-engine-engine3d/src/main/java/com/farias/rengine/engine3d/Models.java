@@ -11,60 +11,70 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.function.Function;
 
 import org.joml.Vector2f;
 import org.joml.Vector3f;
 
 import com.farias.rengine.assets.Assets;
-import com.farias.rengine.renderer.Material;
 import com.farias.rengine.renderer.Mesh;
 import com.farias.rengine.renderer.MeshData;
 import com.farias.rengine.renderer.Renderer;
-import com.farias.rengine.renderer.Shader;
-import com.farias.rengine.renderer.Texture;
 
 /**
- * Carrega modelos Wavefront OBJ (e a textura de mesmo nome) via {@link Assets}:
- * {@code models/<nome>.obj} e {@code textures/<nome>.png}, relativos a raiz
- * de assets. Falhas de leitura/parse viram excecao, nunca um modelo nulo.
+ * Carrega modelos Wavefront OBJ via {@link Assets}; os caminhos sao relativos
+ * a raiz de assets, como em {@code Assets.texture}. Falhas de leitura/parse
+ * viram excecao, nunca um modelo nulo.
+ *
+ * <p>Cada arquivo e lido e enviado a GPU uma vez: pedir o mesmo .obj de novo
+ * devolve o mesmo {@link Mesh}, entao varios modelos podem compartilha-lo.
  */
-public final class ModelLoader {
+public final class Models {
     private final Assets assets;
     private final Renderer renderer;
-    private final Materials materials;
+    private final LitMaterials materials;
+    private final Map<MeshKey, Mesh> meshes = new HashMap<>();
 
-    public ModelLoader(Assets assets, Renderer renderer, Materials materials) {
+    Models(Assets assets, Renderer renderer, LitMaterials materials) {
         this.assets = assets;
         this.renderer = renderer;
         this.materials = materials;
     }
 
-    public TexturedModel loadWavefrontOBJ(String fileName, Shader litShader) {
-        return loadWavefrontOBJ(fileName, litShader, false);
+    /**
+     * O modelo do .obj com um {@link LitMaterial} novo para a textura dada;
+     * refine-o com {@link TexturedModel#lit()}. Para outro tipo de material,
+     * use {@link #mesh(String)} e monte o {@link TexturedModel} voce mesmo.
+     */
+    public TexturedModel load(String objPath, String texturePath) {
+        return load(objPath, texturePath, false);
     }
 
-    public TexturedModel loadWavefrontOBJ(String fileName, Shader litShader, boolean flipNormals) {
-        return loadWavefrontOBJ(fileName, flipNormals, texture -> materials.lit(litShader, texture));
+    /** Idem; ver {@link #mesh(String, boolean)} sobre {@code flipNormals}. */
+    public TexturedModel load(String objPath, String texturePath, boolean flipNormals) {
+        return new TexturedModel(mesh(objPath, flipNormals), materials.create(assets.texture(texturePath)));
     }
 
-    /** Carrega com o material padrão da engine ({@link Materials#lit(Texture)}). */
-    public TexturedModel loadWavefrontOBJ(String fileName, boolean flipNormals) {
-        return loadWavefrontOBJ(fileName, flipNormals, materials::lit);
+    public Mesh mesh(String objPath) {
+        return mesh(objPath, false);
     }
 
     /**
-     * @param flipNormals     inverte as normais lidas do arquivo - alguns .obj
-     *                        sao exportados com as normais apontando "pra
-     *                        dentro" (ao contrario de earth/clouds, que ja
-     *                        vem corretas); nesses casos a iluminacao fica
-     *                        invertida a menos que as normais sejam
-     *                        invertidas aqui.
-     * @param materialFactory cria o material a partir da textura do modelo,
-     *                        por exemplo {@code t -> materials.lit(t).receiving(shadow)}
+     * @param flipNormals inverte as normais lidas do arquivo - alguns .obj sao
+     *                    exportados com as normais apontando "pra dentro";
+     *                    nesses casos a iluminacao fica invertida a menos que
+     *                    as normais sejam invertidas aqui.
      */
-    public TexturedModel loadWavefrontOBJ(String fileName, boolean flipNormals,
-            Function<Texture, ? extends Material> materialFactory) {
+    public Mesh mesh(String objPath, boolean flipNormals) {
+        return meshes.computeIfAbsent(new MeshKey(objPath, flipNormals),
+                key -> renderer.createMesh(read(key.objPath(), key.flipNormals())));
+    }
+
+    /** Esvazia o cache. Nao libera GPU: os meshes pertencem ao Renderer. */
+    void clear() {
+        meshes.clear();
+    }
+
+    private MeshData read(String objPath, boolean flipNormals) {
         String line;
         List<Vector3f> vertices = new ArrayList<>();
         List<Vector2f> textures = new ArrayList<>();
@@ -76,7 +86,7 @@ public final class ModelLoader {
         Map<String, Integer> vertexCache = new HashMap<>();
 
         try (BufferedReader reader = new BufferedReader(
-                new InputStreamReader(assets.open("models/" + fileName + ".obj"), StandardCharsets.UTF_8))) {
+                new InputStreamReader(assets.open(objPath), StandardCharsets.UTF_8))) {
             while ((line = reader.readLine()) != null) {
                 line = line.trim();
                 if (line.isEmpty() || line.startsWith("#")) {
@@ -105,7 +115,7 @@ public final class ModelLoader {
                 }
             }
         } catch (IOException e) {
-            throw new UncheckedIOException("Failed to read model '" + fileName + "'", e);
+            throw new UncheckedIOException("Failed to read model '" + objPath + "'", e);
         }
 
         float[] verticesArray = new float[outVertices.size() * 3];
@@ -138,11 +148,7 @@ public final class ModelLoader {
             indicesArray[i] = indices.get(i);
         }
 
-        Mesh mesh = renderer.createMesh(new MeshData(verticesArray, textureArray, normalsArray, indicesArray));
-        Texture texture = assets.texture("textures/" + fileName + ".png");
-        Material material = materialFactory.apply(texture);
-
-        return new TexturedModel(mesh, material);
+        return new MeshData(verticesArray, textureArray, normalsArray, indicesArray);
     }
 
     private static void processVertex(String[] vertexData, List<Vector3f> vertices, List<Vector2f> textures,
@@ -177,4 +183,6 @@ public final class ModelLoader {
         indices.add(newIndex);
     }
 
+    private record MeshKey(String objPath, boolean flipNormals) {
+    }
 }

@@ -8,12 +8,12 @@ import org.joml.Vector3f;
 
 import com.farias.rengine.assets.Assets;
 import com.farias.rengine.engine3d.IsometricCamera;
-import com.farias.rengine.engine3d.Materials;
-import com.farias.rengine.engine3d.Meshes;
-import com.farias.rengine.engine3d.ModelLoader;
+import com.farias.rengine.engine3d.LitMaterials;
+import com.farias.rengine.engine3d.Models;
 import com.farias.rengine.engine3d.Picking;
 import com.farias.rengine.engine3d.Ray;
 import com.farias.rengine.engine3d.ShadowMap;
+import com.farias.rengine.engine3d.Shapes;
 import com.farias.rengine.engine3d.TexturedModel;
 import com.farias.rengine.renderer.Material;
 import com.farias.rengine.renderer.Mesh;
@@ -36,11 +36,11 @@ final class ChessScene {
     private final List<TexturedModel> tiles = new ArrayList<>();
     private final List<PieceView> pieceViews = new ArrayList<>();
 
-    ChessScene(ChessGame game, Assets assets, Meshes meshes, Materials materials, ModelLoader modelLoader,
+    ChessScene(ChessGame game, Assets assets, Shapes shapes, LitMaterials materials, Models models,
             ShadowMap shadow, IsometricCamera camera) {
-        createTiles(assets, meshes, materials, shadow);
+        createTiles(assets, shapes, materials, shadow);
         for (ChessPiece piece : game.pieces()) {
-            pieceViews.add(createPieceView(piece, modelLoader, shadow, camera));
+            pieceViews.add(createPieceView(piece, models, shadow, camera));
         }
     }
 
@@ -88,10 +88,10 @@ final class ChessScene {
         return ChessBoard.contains(x, z) ? Optional.of(new Square(x, z)) : Optional.empty();
     }
 
-    private void createTiles(Assets assets, Meshes meshes, Materials materials, ShadowMap shadow) {
-        Mesh plane = meshes.plane(1f, 1f);
-        Material white = materials.lit(assets.texture("textures/yellow_sprite.png")).receiving(shadow);
-        Material black = materials.lit(assets.texture("textures/brown_sprite.png")).receiving(shadow);
+    private void createTiles(Assets assets, Shapes shapes, LitMaterials materials, ShadowMap shadow) {
+        Mesh plane = shapes.plane(1f, 1f);
+        Material white = materials.create(assets.texture("textures/yellow_sprite.png")).receiving(shadow);
+        Material black = materials.create(assets.texture("textures/brown_sprite.png")).receiving(shadow);
 
         for (int x = 0; x < ChessBoard.SIZE; x++) {
             for (int z = 0; z < ChessBoard.SIZE; z++) {
@@ -103,10 +103,11 @@ final class ChessScene {
         }
     }
 
-    private PieceView createPieceView(ChessPiece piece, ModelLoader modelLoader, ShadowMap shadow,
+    private PieceView createPieceView(ChessPiece piece, Models models, ShadowMap shadow,
             IsometricCamera camera) {
         String name = piece.type().name().toLowerCase() + "_" + piece.side().name().toLowerCase();
-        TexturedModel model = modelLoader.loadWavefrontOBJ(name, true);
+        // o mesh de cada tipo de peca e compartilhado; o material e por peca
+        TexturedModel model = models.load("models/" + name + ".obj", "textures/" + name + ".png", true);
         model.lit().receiving(shadow).glossy(SPECULAR_STRENGTH, SHININESS, camera.directionToEye());
         return new PieceView(piece, model);
     }

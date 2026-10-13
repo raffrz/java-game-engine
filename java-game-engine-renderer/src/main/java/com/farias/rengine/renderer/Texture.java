@@ -13,7 +13,7 @@ public class Texture implements Disposable {
 
     private final boolean depthTexture;
 
-    public Texture(TextureData data) {
+    Texture(TextureData data) {
         id = glGenTextures();
         width = data.width();
         height = data.height();
@@ -62,7 +62,7 @@ public class Texture implements Disposable {
         glBindTexture(GL_TEXTURE_2D, 0);
     }
 
-    public static Texture createDepthTexture(int width, int height) {
+    static Texture createDepthTexture(int width, int height) {
         return new Texture(width, height, true);
     }
     
