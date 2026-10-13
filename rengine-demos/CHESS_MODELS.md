@@ -48,11 +48,10 @@ teriam dado o mesmo tipo de problema, e não deram.
 Para as peças renderizarem certo sem re-exportar nada, o `IsometricChess` hoje:
 
 - desliga face culling só na pass 3D dele (`cullFace(false)` em
-  `java-game-engine-demos/.../IsometricChess.java`) — renderiza os dois lados de cada triângulo e
+  `rengine-demos/.../chess/ChessRenderer.java`) — renderiza os dois lados de cada triângulo e
   deixa o depth test escolher a superfície visível certa;
-- chama `ModelLoader.loadWavefrontOBJ(nome, renderer, litShader, true)` — o último parâmetro
-  `flipNormals` inverte as normais lidas do arquivo só para esses modelos
-  (`java-game-engine-core/.../util/ModelLoader.java`).
+- chama `models.load(obj, textura, true)` — o último parâmetro `flipNormals` inverte as normais
+  lidas do arquivo só para esses modelos (`rengine-toolkit3d/.../toolkit3d/Models.java`).
 
 Isso funciona, mas tem dois custos:
 
@@ -79,15 +78,14 @@ Se você tiver os arquivos fonte (`.blend` ou equivalente) dos modelos de xadrez
    Blender costuma anotar a versão/config do exportador ali) para ver se saíram de exportações
    diferentes.
 5. Depois de reexportar, reverta as duas gambiarras no código:
-   - `IsometricChess.java`: volte `cullFace(false)` para `cullFace(true)` na `scene3DDescriptor`.
-   - `IsometricChess.java` (`ChessBoard.createAndPlace`): troque
-     `ModelLoader.loadWavefrontOBJ(pieceName, renderer, litShader, true)` de volta para a versão de
-     3 argumentos (sem `flipNormals`).
+   - `ChessRenderer.java`: volte `cullFace(false)` para `cullFace(true)` na `scene3DDescriptor`.
+   - `ChessScene.java` (`createPieceView`): troque `models.load(obj, textura, true)` pela versão de
+     2 argumentos (sem `flipNormals`).
 6. Rode `IsometricChess` de novo e confirme visualmente que continua certo com culling ligado.
 
 ## Se não for possível reexportar
 
 Pode manter como está — o `flipNormals` + `cullFace(false)` continuam funcionando indefinidamente,
 só carregam o custo de performance/dívida técnica acima. Nesse caso, considere documentar no
-próprio `ModelLoader` (já tem um comentário no `IsometricChess.java` explicando) para quem mexer no
+próprio `Models` (já tem um comentário no `ChessRenderer.java` explicando) para quem mexer no
 código no futuro não precisar redescobrir isso.
