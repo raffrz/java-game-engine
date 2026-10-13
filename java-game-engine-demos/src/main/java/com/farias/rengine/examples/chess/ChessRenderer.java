@@ -6,7 +6,7 @@ import com.farias.rengine.io.Window;
 import com.farias.rengine.renderer.RenderPassDescriptor;
 import com.farias.rengine.renderer.RenderPassNode;
 import com.farias.rengine.renderer.Renderer;
-import com.farias.rengine.toolkit2d.ui.Ui;
+import com.farias.rengine.toolkit2d.Ui;
 
 /**
  * Monta os passes de um frame: sombra, cena 3D e UI. Os passes executam na

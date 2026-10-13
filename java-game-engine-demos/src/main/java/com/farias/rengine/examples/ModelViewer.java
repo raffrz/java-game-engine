@@ -23,8 +23,9 @@ import com.farias.rengine.renderer.RenderPassNode;
 import com.farias.rengine.renderer.RenderView;
 import com.farias.rengine.renderer.Renderer;
 import com.farias.rengine.renderer.Shader;
+import com.farias.rengine.toolkit2d.Toolkit2D;
 import com.farias.rengine.toolkit2d.Toolkit2DModule;
-import com.farias.rengine.toolkit2d.ui.Ui;
+import com.farias.rengine.toolkit2d.Ui;
 
 public class ModelViewer {
 
@@ -56,7 +57,7 @@ public class ModelViewer {
         window = context.require(Window.class);
         input = context.require(InputSystem.class);
         renderer = context.require(Renderer.class);
-        ui = context.require(Ui.class);
+        ui = context.require(Toolkit2D.class).ui(WINDOW_WIDTH, WINDOW_HEIGHT);
 
         Shader litShader = renderer.createShader(Shaders.LIT_VERTEX, Shaders.LIT_FRAGMENT);
         ModelLoader models = context.require(ModelLoader.class);
@@ -194,7 +195,7 @@ public class ModelViewer {
                 .registerModule(new RenderModule())
                 .registerModule(new AssetsModule(Path.of("resources")))
                 .registerModule(new Engine3DModule())
-                .registerModule(new Toolkit2DModule(WINDOW_WIDTH, WINDOW_HEIGHT));
+                .registerModule(new Toolkit2DModule());
 
         EngineContext context = engine.start();
         try {
