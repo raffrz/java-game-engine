@@ -14,9 +14,23 @@ import com.farias.rengine.renderer.Texture;
  */
 public final class Materials {
     private final Renderer renderer;
+    private Shader standardShader;
 
     public Materials(Renderer renderer) {
         this.renderer = renderer;
+    }
+
+    /**
+     * Material padrão da engine para {@code texture}: fosco, sem sombra e com
+     * a luz padrão. O shader é criado na primeira chamada e fica com o
+     * {@link Renderer}. Refine com {@link LitMaterial#light},
+     * {@link LitMaterial#glossy} e {@link LitMaterial#receiving}.
+     */
+    public LitMaterial lit(Texture texture) {
+        if (standardShader == null) {
+            standardShader = renderer.createShader(Shaders.STANDARD_VERTEX, Shaders.STANDARD_FRAGMENT);
+        }
+        return new LitMaterial(standardShader, texture);
     }
 
     public Material lit(Shader litShader, Texture texture, Vector3f lightDirection,

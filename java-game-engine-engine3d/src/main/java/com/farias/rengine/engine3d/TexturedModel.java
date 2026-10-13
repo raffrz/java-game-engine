@@ -5,6 +5,7 @@ import org.joml.Vector3f;
 
 import com.farias.rengine.renderer.Material;
 import com.farias.rengine.renderer.Mesh;
+import com.farias.rengine.renderer.RenderCommand;
 
 /**
  * Um {@link Mesh} e um {@link Material} (tipicamente lit, via
@@ -38,12 +39,35 @@ public final class TexturedModel {
         return translationMatrix.mul(scalingMatrix.mul(rotationMatrix));
     }
 
+    /**
+     * O comando que desenha este modelo com a transformação atual. A matriz é
+     * nova a cada chamada, então o comando pode ser guardado até o
+     * {@code endFrame}.
+     */
+    public RenderCommand command() {
+        return new RenderCommand(mesh, material, getModelMatrix());
+    }
+
     public Mesh getMesh() {
         return mesh;
     }
 
     public Material getMaterial() {
         return material;
+    }
+
+    /**
+     * O material como {@link LitMaterial}, para refiná-lo (luz, brilho,
+     * sombra). Vale para modelos criados com o material padrão da engine, como
+     * os de {@link ModelLoader#loadWavefrontOBJ(String, boolean)}.
+     *
+     * @throws IllegalStateException se o modelo usa outro tipo de material
+     */
+    public LitMaterial lit() {
+        if (material instanceof LitMaterial lit) {
+            return lit;
+        }
+        throw new IllegalStateException("O material do modelo não é um LitMaterial: " + material.getClass().getName());
     }
 
     public Vector3f getPosition() {

@@ -58,7 +58,7 @@ profiles de natives.
 | `java-game-engine-platform-glfw` | `GlfwModule` (janela + input via GLFW; registra `Window`/`InputSystem`) | core |
 | `java-game-engine-assets` | `Assets` (resolução raiz → classpath, cache de texturas), `AssetsModule`, `TextureLoader` (STB, interno) | core, renderer |
 | `java-game-engine-toolkit2d` | `Canvas`, `Ui` (overlay), `SpriteSheet`, `BitmapFont`, `SpriteRenderer`, `Toolkit2DModule` | core, renderer, assets |
-| `java-game-engine-engine3d` | `Camera`, `TexturedModel`, `Meshes`, `Materials`, `ModelLoader`, `Shaders` (lit), `Projections`, `Ray`, `Picking`, `Engine3DModule` | core, renderer, assets |
+| `java-game-engine-engine3d` | `Camera`, `IsometricCamera`, `TexturedModel`, `Meshes`, `Materials`, `LitMaterial`, `ShadowMap`, `Shadows`, `ModelLoader`, `Shaders`, `Projections`, `Ray`, `Picking`, `Engine3DModule` | core, renderer, assets |
 | `java-game-engine-demos` | 5 exemplos + `Launcher` | platform-glfw, toolkit2d, engine3d (+ natives, em runtime) |
 
 `toolkit2d` e `engine3d` não dependem um do outro; nenhum módulo da biblioteca depende de `platform-glfw`.
@@ -127,9 +127,32 @@ profiles de natives.
 ### `engine3d`
 
 - Componentes com dependência de serviço vêm do módulo: `Engine3DModule` registra `Meshes`,
-  `Materials` e `ModelLoader`; o jogo faz `context.require(...)`.
+  `Materials`, `Shadows` e `ModelLoader`; o jogo faz `context.require(...)`.
+- **Ferramentas, não camadas:** o que segue são peças que o jogo chama e combina com o `Renderer`
+  (o jogo continua dono dos passes e da ordem); nenhuma delas chama o jogo de volta nem esconde o
+  nível baixo.
 - `ModelLoader` lê `models/<nome>.obj` e `textures/<nome>.png` pelo `Assets`; erro de leitura
   ou parse lança exceção (não devolve mais `null`).
+- **`IsometricCamera`**: câmera ortográfica isométrica (alvo, afastamento, zoom com mínimo).
+  `pan(direita, cima)` move o alvo (o jogo não precisa conhecer a diagonal da câmera),
+  `view(window)` devolve o `RenderView` do passe 3D e `rayAt(mouseX, mouseY, window)` o raio sob o
+  mouse, da mesma matriz, então o que é desenhado e o que é clicado coincidem.
+- **`LitMaterial`** (`materials.lit(texture)`): é um `Material` com métodos tipados no lugar dos
+  nomes de uniform: `light`, `glossy` (brilho especular branco, estilo plástico) e
+  `receiving(ShadowMap)`. Por padrão é fosco e não recebe sombra. Usa o shader padrão
+  (`Shaders.STANDARD_*`), criado sob demanda e pertencente ao `Renderer`. `LIT_*` continua
+  existindo para quem usa o shader direto.
+- **`ShadowMap`** (`shadows.create(light, size)`): o mapa de profundidade, a luz, o descritor e a
+  view do passe da luz, e `caster(model)` para o comando de cada objeto que projeta. O jogo cria o
+  passe de sombra antes do passe da cena e submete os casters; quem recebe sombra usa
+  `LitMaterial.receiving`.
+- `ModelLoader.loadWavefrontOBJ(nome, flipNormals)` carrega com o material padrão e
+  `model.lit()` devolve o `LitMaterial` para refiná-lo; a sobrecarga com
+  `texture -> material` fica para quem quer outro tipo de material.
+- `TexturedModel.command()` é o `RenderCommand` do modelo com a transformação atual (matriz nova a
+  cada chamada, então pode ser guardado até o `endFrame`).
+- `DirectionalLight.covering(direção, centro, raio)` (renderer) cria a luz de sombra a partir da
+  esfera que deve ser coberta, derivando distância, extensão e planos near/far.
 - `TexturedModel.getModelMatrix()` é a **única fonte** da matriz de modelo: o que desenha (o
   `RenderCommand`) e o que testa picking usam a mesma. Rotação em graus, ordem XYZ, sentido
   **positivo** (antes era negativo; o `ModelViewer` foi ajustado, mesmo giro visual).
@@ -143,7 +166,7 @@ profiles de natives.
 | Demo | O que mostra | Verificado visualmente |
 |---|---|---|
 | `ModelViewer` | 3D em perspectiva + `Ui` | sim |
-| `IsometricChess` | 3D isométrico + `Ui`, seleção de peças por picking | sim |
+| `IsometricChess` | 3D isométrico + `Ui`, seleção de peças por picking, sombras (shadow mapping); pacote `examples.chess`: estado do jogo (`ChessGame`, `ChessBoard`, `ChessPiece`) separado da apresentação (`ChessScene`, `ChessRenderer`) | sim |
 | `SnakeGame` | 2D com `Canvas` | comparado por pixel com o desenho anterior |
 | `SpriteEditor` | 2D com `Canvas` (editor de pixel art) | comparado por pixel com o desenho anterior |
 | `ShadowCubeDemo` | `Engine` + `Renderer` direto, shadow mapping em 2 passes, estilo funcional | não |
@@ -268,8 +291,9 @@ Decisões:
 - `Game` foi removido; cada demo monta o `Engine` e tem o próprio loop (concluído).
 - `SnakeGame`: se uma seta for pressionada antes do primeiro movimento, `changeDirection` lê
   `direction == null` e lança NPE (pré-existente, não corrigido).
-- Componentes com `new` solto: `Shaders.LIT_*` (shader lit) ainda é criado pelos demos; a ideia é
-  `Materials` ser dono dele (muda assinaturas de `ModelLoader`/`Materials.lit`).
+- Componentes com `new` solto: o `ModelViewer` ainda cria o shader `Shaders.LIT_*` e o passa ao
+  `ModelLoader`; migrá-lo para `materials.lit(texture)` (o `Materials` já é dono do shader padrão)
+  encerra isto.
 - Testes: `Engine`, `EngineContext`, `Material` e `RenderPassNode` são testáveis sem contexto GL.
   Ficam para outro momento (exige adicionar JUnit ao build).
 
