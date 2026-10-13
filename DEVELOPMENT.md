@@ -52,18 +52,18 @@ A lista curta está no [README](README.md#architecture-rules). Aqui, a justifica
 
 ## Estrutura
 
-Build Maven multi-módulo, com POM raiz (`rengine`) que centraliza versões, plugins e os profiles de
-natives. Artefato e diretório são `rengine-<módulo>`; o pacote é `com.farias.rengine.<módulo>`.
+Build Maven multi-módulo, com POM raiz (`java-game-engine`) que centraliza versões, plugins e os profiles de
+natives. Artefato e diretório são `java-game-engine-<módulo>`; o pacote é `com.farias.jengine.<módulo>`.
 
 | Módulo | Papel | Depende de |
 |---|---|---|
-| `rengine-core` | `core`: `Engine`/`Module`/`EngineContext`, `Timer`. `platform`: contratos `Window` e `Input` (interfaces), `Key`, `MouseButton` | nada |
-| `rengine-renderer` | Renderer modular (OpenGL): `Renderer`, `RendererModule`, `RenderPassDescriptor`, `RenderPass`, `RenderView`, `RenderCommand`, `Material`, `Mesh`, `Bounds`, `Shader`, `Texture` | core, LWJGL (OpenGL), JOML |
-| `rengine-platform-glfw` | `GlfwPlatformModule` (janela + input via GLFW) | core |
-| `rengine-assets` | `Assets` (resolução raiz → classpath, cache de texturas), `AssetsModule`, `TextureLoader` (STB, interno) | core, renderer |
-| `rengine-toolkit2d` | `Toolkit2D` (fábrica de `Canvas` e `Ui`), `SpriteSheet`, `BitmapFont`, `SpriteRenderer`, `Toolkit2DModule` | core, renderer, assets |
-| `rengine-toolkit3d` | `Shapes`, `ShapeData`, `LitMaterials`, `LitMaterial`, `Models`, `TexturedModel`, `Shadows`, `ShadowMap`, `DirectionalLight`, `Camera`, `IsometricCamera`, `Projections`, `Ray`, `Picking`, `Shaders`, `Toolkit3DModule` | core, renderer, assets |
-| `rengine-demos` | 5 exemplos + `Launcher` | todos os anteriores (+ natives, em runtime) |
+| `java-game-engine-core` | `core`: `Engine`/`Module`/`EngineContext`, `Timer`. `platform`: contratos `Window` e `Input` (interfaces), `Key`, `MouseButton` | nada |
+| `java-game-engine-renderer` | Renderer modular (OpenGL): `Renderer`, `RendererModule`, `RenderPassDescriptor`, `RenderPass`, `RenderView`, `RenderCommand`, `Material`, `Mesh`, `Bounds`, `Shader`, `Texture` | core, LWJGL (OpenGL), JOML |
+| `java-game-engine-platform-glfw` | `GlfwPlatformModule` (janela + input via GLFW) | core |
+| `java-game-engine-assets` | `Assets` (resolução raiz → classpath, cache de texturas), `AssetsModule`, `TextureLoader` (STB, interno) | core, renderer |
+| `java-game-engine-toolkit2d` | `Toolkit2D` (fábrica de `Canvas` e `Ui`), `SpriteSheet`, `BitmapFont`, `SpriteRenderer`, `Toolkit2DModule` | core, renderer, assets |
+| `java-game-engine-toolkit3d` | `Shapes`, `ShapeData`, `LitMaterials`, `LitMaterial`, `Models`, `TexturedModel`, `Shadows`, `ShadowMap`, `DirectionalLight`, `Camera`, `IsometricCamera`, `Projections`, `Ray`, `Picking`, `Shaders`, `Toolkit3DModule` | core, renderer, assets |
+| `java-game-engine-demos` | 5 exemplos + `Launcher` | todos os anteriores (+ natives, em runtime) |
 
 `toolkit2d` e `toolkit3d` não dependem um do outro; nenhum módulo da biblioteca depende de
 `platform-glfw`. Cada POM declara tudo que o módulo usa direto (conferir com
@@ -219,18 +219,18 @@ export JAVA_HOME=$(/usr/libexec/java_home -v 17)
 ./mvnw -DskipTests install                                # builda os módulos (a partir da raiz)
 
 # rodar um demo (usa -XstartOnFirstThread automaticamente no macOS)
-./mvnw -pl rengine-demos exec:exec                        # Launcher
-./mvnw -pl rengine-demos exec:exec \
-    -Dexec.mainClass=com.farias.rengine.examples.SnakeGame
+./mvnw -pl java-game-engine-demos exec:exec                        # Launcher
+./mvnw -pl java-game-engine-demos exec:exec \
+    -Dexec.mainClass=com.farias.jengine.examples.SnakeGame
 
 # ou distribuição executável: jar fino + lib/ (profile opt-in)
 ./mvnw -Pdist -DskipTests package
-cd rengine-demos
-java -XstartOnFirstThread -jar target/rengine-demos-1.0.2-SNAPSHOT.jar   # tire a flag fora do macOS
+cd java-game-engine-demos
+java -XstartOnFirstThread -jar target/java-game-engine-demos-1.0.2-SNAPSHOT.jar   # tire a flag fora do macOS
 ```
 
 Os demos leem `resources/...` por caminho relativo, então precisam rodar com o diretório de
-trabalho em `rengine-demos/` (o `exec:exec` já faz isso).
+trabalho em `java-game-engine-demos/` (o `exec:exec` já faz isso).
 
 ### Decisões de build
 
@@ -280,7 +280,7 @@ Coisas que custaram caro e valem lembrar ao mexer em renderização:
 - **Modelos de xadrez:** os `.obj` das peças têm normais e winding invertidos (≈75% das normais
   apontam para dentro, medido contra o centroide). Não é bug do motor. O contorno atual é
   `cullFace(false)` + `flipNormals=true` (custo: ~2x triângulos nas peças). Detalhes e como
-  reexportar no Blender em `rengine-demos/CHESS_MODELS.md`.
+  reexportar no Blender em `java-game-engine-demos/CHESS_MODELS.md`.
 
 ## Picking
 
