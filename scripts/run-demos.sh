@@ -23,7 +23,7 @@ if [ ${#DEMOS[@]} -eq 0 ]; then
 fi
 
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
-DEMOS_DIR="$ROOT/java-game-engine-demos"
+DEMOS_DIR="$ROOT/rengine-demos"
 PKG=com.farias.rengine.examples
 
 # JDK 17+ (o enforcer do projeto exige); no macOS procura via java_home.
@@ -46,7 +46,7 @@ CP_FILE=$(mktemp)
 LOG_DIR=$(mktemp -d)
 trap 'rm -rf "$CP_FILE" "$LOG_DIR"' EXIT
 echo ">> build"
-(cd "$ROOT" && ./mvnw -q -pl java-game-engine-demos -am package dependency:build-classpath \
+(cd "$ROOT" && ./mvnw -q -pl rengine-demos -am package dependency:build-classpath \
     -DskipTests -Dmdep.outputFile="$CP_FILE") || { echo "build falhou" >&2; exit 1; }
 CP="$DEMOS_DIR/target/classes:$(cat "$CP_FILE")"
 
