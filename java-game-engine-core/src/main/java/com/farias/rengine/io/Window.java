@@ -15,6 +15,12 @@ public interface Window {
     /** Apresenta o frame (troca os buffers). */
     void swapBuffers();
 
+    /**
+     * Liga ou desliga a sincronizacao vertical. Ligada (o padrao), swapBuffers
+     * espera o refresh do monitor; desligada, o loop roda sem limite de fps.
+     */
+    void setVSync(boolean enabled);
+
     /** Largura logica atual da janela (acompanha o redimensionamento). */
     int getWidth();
 

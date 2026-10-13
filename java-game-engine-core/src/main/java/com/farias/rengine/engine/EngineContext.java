@@ -11,8 +11,18 @@ import java.util.Map;
 public final class EngineContext {
     private final Map<Class<?>, Object> services = new HashMap<>();
 
-    public void registerService(Class<?> clazz, Object service) {
-        services.put(clazz, service);
+    /**
+     * Registra o servico para o tipo. Cada tipo so pode ser registrado uma
+     * vez: dois modulos fornecendo o mesmo servico e erro de montagem, e
+     * falha aqui em vez de um sobrescrever o outro em silencio.
+     */
+    public <T> void registerService(Class<T> clazz, T service) {
+        if (service == null) {
+            throw new IllegalArgumentException("Service for " + clazz.getSimpleName() + " is null");
+        }
+        if (services.putIfAbsent(clazz, service) != null) {
+            throw new IllegalStateException("Service already registered: " + clazz.getSimpleName());
+        }
     }
 
     /**

@@ -3,6 +3,10 @@ package com.farias.rengine.io;
 /**
  * Estado de teclado e mouse, como os servicos o veem. A implementacao
  * concreta vem de um modulo de plataforma.
+ *
+ * <p>As consultas respondem sobre a amostra feita em {@link #update()}, entao
+ * o estado nao muda no meio de um frame. Por frame:
+ * {@code window.pollEvents(); input.update();}.
  */
 public interface InputSystem {
 
@@ -23,6 +27,9 @@ public interface InputSystem {
 
     double getMouseY();
 
-    /** Amostra o estado atual e processa os eventos da janela. Uma vez por frame. */
+    /**
+     * Amostra o estado atual de teclas, botoes e cursor. Uma vez por frame,
+     * depois de {@code Window.pollEvents()} (este metodo nao processa eventos).
+     */
     void update();
 }

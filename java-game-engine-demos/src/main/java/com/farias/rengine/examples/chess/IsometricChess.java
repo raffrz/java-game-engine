@@ -117,6 +117,7 @@ public class IsometricChess {
         Timer timer = new Timer();
         while (!shouldQuit()) {
             timer.update();
+            window.pollEvents();
             input.update();
             float deltaTime = timer.deltaTime();
 
