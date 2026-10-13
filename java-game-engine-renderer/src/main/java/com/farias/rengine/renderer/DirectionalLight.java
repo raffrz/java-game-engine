@@ -24,6 +24,17 @@ public final class DirectionalLight {
         this.lightSpaceMatrix = new Matrix4f(projection).mul(view);
     }
 
+    /**
+     * Uma luz cujo mapa de sombra cobre a esfera de raio {@code radius}
+     * centrada em {@code center}: tudo que está dentro dela projeta e recebe
+     * sombra. Deriva a distância, a extensão e os planos near/far.
+     *
+     * @param direction direção do alvo para a luz
+     */
+    public static DirectionalLight covering(Vector3f direction, Vector3f center, float radius) {
+        return new DirectionalLight(direction, center, 2f * radius, radius, 0.5f * radius, 3.5f * radius);
+    }
+
     public Vector3f direction() {
         return new Vector3f(direction);
     }

@@ -11,6 +11,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Function;
 
 import org.joml.Vector2f;
 import org.joml.Vector3f;
@@ -43,14 +44,27 @@ public final class ModelLoader {
         return loadWavefrontOBJ(fileName, litShader, false);
     }
 
-    /**
-     * @param flipNormals inverte as normais lidas do arquivo - alguns .obj
-     *                     sao exportados com as normais apontando "pra
-     *                     dentro" (ao contrario de earth/clouds, que ja vem
-     *                     corretas); nesses casos a iluminacao fica invertida
-     *                     a menos que as normais sejam invertidas aqui.
-     */
     public TexturedModel loadWavefrontOBJ(String fileName, Shader litShader, boolean flipNormals) {
+        return loadWavefrontOBJ(fileName, flipNormals, texture -> materials.lit(litShader, texture));
+    }
+
+    /** Carrega com o material padrão da engine ({@link Materials#lit(Texture)}). */
+    public TexturedModel loadWavefrontOBJ(String fileName, boolean flipNormals) {
+        return loadWavefrontOBJ(fileName, flipNormals, materials::lit);
+    }
+
+    /**
+     * @param flipNormals     inverte as normais lidas do arquivo - alguns .obj
+     *                        sao exportados com as normais apontando "pra
+     *                        dentro" (ao contrario de earth/clouds, que ja
+     *                        vem corretas); nesses casos a iluminacao fica
+     *                        invertida a menos que as normais sejam
+     *                        invertidas aqui.
+     * @param materialFactory cria o material a partir da textura do modelo,
+     *                        por exemplo {@code t -> materials.lit(t).receiving(shadow)}
+     */
+    public TexturedModel loadWavefrontOBJ(String fileName, boolean flipNormals,
+            Function<Texture, ? extends Material> materialFactory) {
         String line;
         List<Vector3f> vertices = new ArrayList<>();
         List<Vector2f> textures = new ArrayList<>();
@@ -128,7 +142,7 @@ public final class ModelLoader {
 
         Mesh mesh = renderer.createMesh(new MeshData(verticesArray, textureArray, normalsArray, indicesArray));
         Texture texture = assets.texture("textures/" + fileName + ".png");
-        Material material = materials.lit(litShader, texture);
+        Material material = materialFactory.apply(texture);
 
         return new TexturedModel(mesh, material);
     }

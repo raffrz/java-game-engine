@@ -7,9 +7,10 @@ import com.farias.rengine.renderer.Renderer;
 
 /**
  * Registra os componentes 3D que dependem de servicos (Meshes, Materials,
- * ModelLoader), para o jogo resolver por {@code context.require(...)} em vez
- * de instancia-los. Deve vir depois de RenderModule e AssetsModule. Camera,
- * TexturedModel e Projections nao dependem de servico e seguem como estao.
+ * Shadows, ModelLoader), para o jogo resolver por {@code context.require(...)}
+ * em vez de instancia-los. Deve vir depois de RenderModule e AssetsModule.
+ * Camera, IsometricCamera, TexturedModel, Picking e Projections nao dependem
+ * de servico e seguem como estao.
  */
 public final class Engine3DModule implements Module {
     @Override
@@ -19,10 +20,12 @@ public final class Engine3DModule implements Module {
 
         Meshes meshes = new Meshes(renderer);
         Materials materials = new Materials(renderer);
+        Shadows shadows = new Shadows(renderer);
         ModelLoader modelLoader = new ModelLoader(assets, renderer, materials);
 
         context.registerService(Meshes.class, meshes);
         context.registerService(Materials.class, materials);
+        context.registerService(Shadows.class, shadows);
         context.registerService(ModelLoader.class, modelLoader);
     }
 }

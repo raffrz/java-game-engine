@@ -5,6 +5,8 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Scanner;
 
+import com.farias.rengine.examples.chess.IsometricChess;
+
 public class Launcher {
     public static void main(String[] args) {
 
