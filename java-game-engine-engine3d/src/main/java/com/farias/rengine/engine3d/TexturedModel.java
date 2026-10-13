@@ -36,7 +36,9 @@ public final class TexturedModel {
                 (float) Math.toRadians(rotation.z));
         Matrix4f scalingMatrix = new Matrix4f().scale(scale);
 
-        return translationMatrix.mul(scalingMatrix.mul(rotationMatrix));
+        // T * R * S: escala no espaço do modelo, antes de girar. Na ordem
+        // contrária, uma escala não uniforme deformaria o modelo girado.
+        return translationMatrix.mul(rotationMatrix.mul(scalingMatrix));
     }
 
     /**

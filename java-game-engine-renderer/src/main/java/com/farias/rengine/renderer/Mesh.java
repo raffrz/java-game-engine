@@ -34,6 +34,7 @@ public final class Mesh implements Disposable {
 
     private final int indexCount;
     private final Bounds bounds;
+    private boolean disposed;
 
     public Mesh(MeshData data) {
         // 1. Gerar e vincular o VAO global
@@ -94,6 +95,10 @@ public final class Mesh implements Disposable {
 
     @Override
     public void dispose() {
+        if (disposed) {
+            return;
+        }
+        disposed = true;
         // Deleta todos os buffers criados na memória da GPU
         glDeleteBuffers(vbo);
         glDeleteBuffers(textureVbo);

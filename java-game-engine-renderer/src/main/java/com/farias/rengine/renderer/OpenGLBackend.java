@@ -65,6 +65,14 @@ final class OpenGLBackend {
         glReadBuffer(GL_BACK);
     }
 
+    /** Apaga o framebuffer criado para a textura, se houver. */
+    void release(Texture depthTexture) {
+        Integer framebuffer = framebuffers.remove(depthTexture);
+        if (framebuffer != null) {
+            glDeleteFramebuffers(framebuffer);
+        }
+    }
+
     void dispose() {
         for (int framebuffer : framebuffers.values()) {
             glDeleteFramebuffers(framebuffer);

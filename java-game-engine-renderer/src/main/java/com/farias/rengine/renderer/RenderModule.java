@@ -27,6 +27,8 @@ public final class RenderModule implements Module {
 
     @Override
     public void onTerminate(EngineContext context) {
-        renderer.dispose();
+        if (renderer != null) {
+            renderer.dispose();
+        }
     }
 }
