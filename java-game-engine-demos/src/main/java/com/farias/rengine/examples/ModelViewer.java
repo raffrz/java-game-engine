@@ -155,15 +155,6 @@ public class ModelViewer {
             targetZ -= move;
         }
 
-        // sobe/desce a câmera
-        if (input.isKeyDown(Key.UP)) {
-            targetY += move;
-        }
-
-        if (input.isKeyDown(Key.DOWN)) {
-            targetY -= move;
-        }
-
         // zoom (aproxima/afasta a câmera do alvo)
         if (input.isKeyDown(Key.Z)) {
 

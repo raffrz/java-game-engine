@@ -1,6 +1,6 @@
 package com.farias.rengine.examples;
 
-import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Scanner;
@@ -10,7 +10,7 @@ import com.farias.rengine.examples.chess.IsometricChess;
 public class Launcher {
     public static void main(String[] args) {
 
-        Map<String, Runnable> demos = new HashMap<>();
+        Map<String, Runnable> demos = new LinkedHashMap<>();
 
         demos.put("1 - Snake", SnakeGame::launch);
         demos.put("2 - SpriteEditor", SpriteEditor::launch);

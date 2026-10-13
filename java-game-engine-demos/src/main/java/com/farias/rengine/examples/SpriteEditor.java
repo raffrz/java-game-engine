@@ -104,10 +104,14 @@ public class SpriteEditor {
             int x = mouse_x - 4;
             int y = mouse_y - 2;
             selected = 8 * y + x;
-            if (selected >= 0 && selected < 64)
-                draw[selected] = color;
-            if (selected >= 72 && selected < 88)
-                color = selected - 72;
+            // so as 8 colunas da area de desenho/paleta contam: fora delas o
+            // indice 8 * y + x cairia em outra linha.
+            if (x >= 0 && x < 8) {
+                if (selected >= 0 && selected < 64)
+                    draw[selected] = color;
+                if (selected >= 72 && selected < 88)
+                    color = selected - 72;
+            }
         }
 
         if (input.isKeyPressed(Key.F1)) {
