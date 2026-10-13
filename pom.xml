@@ -11,8 +11,8 @@
 	<name>Java Game Engine</name>
 
 	<modules>
-		<module>java-game-engine-renderer</module>
 		<module>java-game-engine-core</module>
+		<module>java-game-engine-renderer</module>
 		<module>java-game-engine-platform-glfw</module>
 		<module>java-game-engine-assets</module>
 		<module>java-game-engine-toolkit2d</module>
@@ -181,8 +181,8 @@
 
 	<!--
 		Natives do LWJGL escolhidos pelo SO/arquitetura de quem esta buildando.
-		Apenas o modulo executavel (demos) os declara; renderer e core dependem
-		so das APIs, entao continuam portaveis.
+		Apenas o modulo executavel (demos) os declara; os modulos da biblioteca
+		dependem so das APIs, entao continuam portaveis.
 	-->
 	<profiles>
 		<profile>

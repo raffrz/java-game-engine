@@ -29,11 +29,24 @@
 		</dependency>
 		<dependency>
 			<groupId>com.farias.rengine</groupId>
+			<artifactId>java-game-engine-renderer</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>com.farias.rengine</groupId>
+			<artifactId>java-game-engine-assets</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>com.farias.rengine</groupId>
 			<artifactId>java-game-engine-toolkit2d</artifactId>
 		</dependency>
 		<dependency>
 			<groupId>com.farias.rengine</groupId>
 			<artifactId>java-game-engine-engine3d</artifactId>
+		</dependency>
+
+		<dependency>
+			<groupId>org.joml</groupId>
+			<artifactId>joml</artifactId>
 		</dependency>
 
 		<!-- Natives da plataforma de quem builda (ver profiles no pom raiz). -->
