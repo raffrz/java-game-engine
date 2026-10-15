@@ -2,6 +2,7 @@ package com.farias.jengine.platform.glfw;
 
 import static org.lwjgl.glfw.GLFW.*;
 
+import org.lwjgl.glfw.Callbacks;
 import org.lwjgl.glfw.GLFWVidMode;
 
 import com.farias.jengine.platform.Window;
@@ -50,9 +51,13 @@ final class GlfwWindow implements Window {
         setVSync(true);
     }
 
-    /** Destroi a janela nativa. Nao encerra o GLFW (quem a criou faz isso). */
+    /**
+     * Destroi a janela nativa e libera os callbacks registrados nela (ex.: o
+     * de rolagem do GlfwInput). Nao encerra o GLFW (quem a criou faz isso).
+     */
     void destroy() {
         if (id != 0) {
+            Callbacks.glfwFreeCallbacks(id);
             glfwDestroyWindow(id);
             id = 0;
         }

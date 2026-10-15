@@ -28,6 +28,12 @@ public interface Input {
     double getMouseY();
 
     /**
+     * Quanto a roda do mouse rolou na vertical desde a amostra anterior, em
+     * "cliques" (positivo = rolar para cima). 0 se nao rolou.
+     */
+    double getScrollY();
+
+    /**
      * Amostra o estado atual de teclas, botoes e cursor. Uma vez por frame,
      * depois de {@code Window.pollEvents()} (este metodo nao processa eventos).
      */

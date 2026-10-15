@@ -70,6 +70,8 @@ public final class Shaders {
             uniform vec3 viewDirection;
             uniform float specularStrength;
             uniform float shininess;
+            uniform vec3 tintColor;
+            uniform float tintStrength;
 
             in vec2 tex_coords;
             in vec3 fragNormal;
@@ -113,7 +115,8 @@ public final class Shaders {
                 float highlight = pow(max(dot(normal, halfway), 0.0), max(shininess, 1.0));
                 float specular = specularStrength * highlight * (diffuse > 0.0 ? 1.0 : 0.0) * (1.0 - shadow);
 
-                fragColor = vec4(texColor.rgb * light + vec3(specular), texColor.a);
+                vec3 albedo = mix(texColor.rgb, tintColor, tintStrength);
+                fragColor = vec4(albedo * light + vec3(specular), texColor.a);
             }
             """;
 
