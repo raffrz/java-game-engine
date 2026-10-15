@@ -203,7 +203,7 @@ Registrar o mesmo tipo duas vezes lança exceção (`EngineContext.registerServi
 | Demo | O que mostra | Verificado visualmente |
 |---|---|---|
 | `ModelViewer` | 3D em perspectiva + `Ui` | sim |
-| `IsometricChess` | 3D isométrico + `Ui`, seleção de peças por picking, sombras (shadow mapping); pacote `examples.chess`: estado do jogo (`ChessGame`, `ChessBoard`, `ChessPiece`) separado da apresentação (`ChessScene`, `ChessRenderer`) | sim |
+| `IsometricChess` | 3D isométrico + `Ui`, seleção de peças por picking, contorno da peça sob o cursor, caminho do movimento destacado com tint, câmera com zoom e rotação pelo mouse, sombras (shadow mapping); pacote `examples.chess`: estado do jogo (`ChessGame`, `ChessBoard`, peças em `examples.chess.pieces`, uma subclasse de `ChessPiece` por tipo) separado da apresentação (`ChessScene`, `ChessRenderer`) | sim |
 | `SnakeGame` | 2D com `Canvas` | comparado por pixel com o desenho anterior |
 | `SpriteEditor` | 2D com `Canvas` (editor de pixel art) | comparado por pixel com o desenho anterior |
 | `ShadowCubeDemo` | `Engine` + `Renderer` direto, shadow mapping em 2 passes, estilo funcional | não |

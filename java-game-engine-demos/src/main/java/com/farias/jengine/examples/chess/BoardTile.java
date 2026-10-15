@@ -1,5 +1,5 @@
 package com.farias.jengine.examples.chess;
 
 /** Uma casa do tabuleiro. */
-public record Square(int x, int z) {
+public record BoardTile(int x, int z) {
 }

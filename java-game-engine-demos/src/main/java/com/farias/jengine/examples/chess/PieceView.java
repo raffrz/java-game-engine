@@ -1,5 +1,10 @@
 package com.farias.jengine.examples.chess;
 
+import org.joml.Vector3f;
+
+import com.farias.jengine.examples.chess.pieces.ChessPiece;
+import com.farias.jengine.examples.chess.pieces.PieceType;
+import com.farias.jengine.examples.chess.pieces.Side;
 import com.farias.jengine.toolkit3d.Picking;
 import com.farias.jengine.toolkit3d.Ray;
 import com.farias.jengine.toolkit3d.TexturedModel;
@@ -26,7 +31,7 @@ final class PieceView {
         this.model = model;
         this.baseRotationY = initialRotationY(piece);
 
-        model.getPosition().set(piece.x(), 0f, piece.z());
+        model.getPosition().set(piece.tile().x(), 0f, piece.tile().z());
         model.getScale().set(PIECE_SCALE);
         model.getRotation().set(0f, baseRotationY, 0f);
     }
@@ -47,6 +52,14 @@ final class PieceView {
 
         model.getPosition().y = lift;
         model.getRotation().y = baseRotationY + spin;
+    }
+
+    /**
+     * Atualiza o brilho especular para a câmera atual. Sem isso o reflexo
+     * continua calculado para a direção de quando a peça foi criada.
+     */
+    void viewFrom(Vector3f directionToEye) {
+        model.lit().viewDirection(directionToEye);
     }
 
     /** Distância ao longo do raio até esta peça, ou NaN se não acertou. */

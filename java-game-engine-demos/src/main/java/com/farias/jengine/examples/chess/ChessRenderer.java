@@ -9,8 +9,9 @@ import com.farias.jengine.renderer.Renderer;
 import com.farias.jengine.toolkit2d.Ui;
 
 /**
- * Monta os passes de um frame: sombra, cena 3D e UI. Os passes executam na
- * ordem de criação, então a UI vem depois da cena.
+ * Monta os passes de um frame: sombra, cena 3D, contorno da peça sob o cursor
+ * (ver {@link ModelOutline}) e UI. Os passes executam na ordem de criação,
+ * então o contorno e a UI vêm depois da cena.
  *
  * <p>
  * O passe 3D não usa culling: os .obj das peças têm winding e normais
@@ -29,6 +30,7 @@ final class ChessRenderer {
     private final int uiWidth;
     private final IsometricCamera camera;
     private final ShadowMap shadow;
+    private final ModelOutline outline;
     private final RenderPassDescriptor scene3DDescriptor = new RenderPassDescriptor("isometric-chess-3d")
             .clearColor(0f, 0f, 0f, 1f)
             .depthTest(true)
@@ -43,12 +45,14 @@ final class ChessRenderer {
         this.uiWidth = uiWidth;
         this.camera = camera;
         this.shadow = shadow;
+        this.outline = new ModelOutline(renderer, window, camera);
     }
 
     void render(ChessScene scene) {
         renderer.beginFrame();
         drawShadows(scene);
         drawScene(scene);
+        outline.draw(scene.hoveredPieceModels());
         drawUi();
         renderer.endFrame();
     }
@@ -60,7 +64,7 @@ final class ChessRenderer {
 
     private void drawScene(ChessScene scene) {
         RenderPass pass = renderer.createPass(scene3DDescriptor, camera.view(window));
-        scene.tiles().forEach(tile -> pass.submit(tile.command()));
+        scene.tileModels().forEach(tile -> pass.submit(tile.command()));
         scene.pieceModels().forEach(model -> pass.submit(model.command()));
     }
 
@@ -69,7 +73,7 @@ final class ChessRenderer {
         ui.begin();
         ui.textCentered(ui.defaultFont(), "ISOMETRIC CHESS - LWJGL RENDER ENGINE", centerX, 20,
                 TITLE_FONT_SIZE);
-        ui.textCentered(ui.defaultFont(), "ARROWS = MOVE | Z = ZOOM | SHIFT+Z = ZOOM OUT | CLICK = SELECT",
+        ui.textCentered(ui.defaultFont(), "ARROWS = MOVE | WHEEL = ZOOM | MIDDLE DRAG = ROTATE | CLICK = SELECT",
                 centerX, 50, HINT_FONT_SIZE);
     }
 }
