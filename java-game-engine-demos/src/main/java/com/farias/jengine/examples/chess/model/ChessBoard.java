@@ -39,7 +39,7 @@ public final class ChessBoard {
      * Põe {@code piece} em {@code target}, capturando a peça que estiver lá.
      * Não confere se o movimento é válido (ver {@link ChessPiece#getValidMoves});
      * só garante que duas peças nunca dividem uma casa. Package-private: de
-     * fora do pacote, o movimento passa por {@link ChessGame#move}, que valida.
+     * fora do pacote, o movimento passa pelo {@link ChessLogic}, que valida.
      *
      * @return a peça capturada, ou vazio se a casa estava livre
      */

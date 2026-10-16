@@ -203,7 +203,7 @@ Registrar o mesmo tipo duas vezes lança exceção (`EngineContext.registerServi
 | Demo | O que mostra | Verificado visualmente |
 |---|---|---|
 | `ModelViewer` | 3D em perspectiva + `Ui` | sim |
-| `IsometricChess` | 3D isométrico + `Ui`, seleção de peças por picking, contorno da peça sob o cursor, caminho do movimento destacado com tint, câmera com zoom e rotação pelo mouse, sombras (shadow mapping); pacote `examples.chess`: regras no pacote `examples.chess.model` (`ChessGame`, `ChessBoard`, `Move`, `Side`; peças em `model.pieces`, uma subclasse de `ChessPiece` por tipo; só o tabuleiro move peças) e interação (`ChessInteraction`: seleção, hover, clique) separadas da apresentação (`ChessScene`, `ChessRenderer`) | sim |
+| `IsometricChess` | 3D isométrico + `Ui`, seleção de peças por picking, contorno da peça sob o cursor, caminho do movimento destacado com tint, câmera com zoom e rotação pelo mouse, sombras (shadow mapping); pacote `examples.chess`: loop em três passos, input (`ChessControls` → `PlayerInput`), lógica (`ChessLogic.update` aplica as regras e avança as animações no `ChessState`) e render (`ChessRenderer` posiciona os modelos da `ChessScene`, só dados, conforme o estado); o pacote `model` (`ChessState`, `ChessLogic`, `ChessBoard`, `PiecePose`, `Move`, `Side`; peças em `model.pieces`) não depende da engine | sim |
 | `SnakeGame` | 2D com `Canvas` | comparado por pixel com o desenho anterior |
 | `SpriteEditor` | 2D com `Canvas` (editor de pixel art) | comparado por pixel com o desenho anterior |
 | `ShadowCubeDemo` | `Engine` + `Renderer` direto, shadow mapping em 2 passes, estilo funcional | não |
@@ -334,7 +334,7 @@ Decisões:
 
 **Modelos de xadrez:** se forem reexportados corretamente, reverter para `cullFace(true)` em
 `ChessRenderer` e tirar o `flipNormals` da chamada de `models.load` em
-`ChessScene.createPieceView`.
+`ChessSceneFactory.createPieces`.
 
 **Ideia futura: backend de render como módulo**
 

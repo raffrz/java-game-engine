@@ -16,8 +16,9 @@
   do meio; peças em `examples.chess.model.pieces` (uma subclasse por tipo) com os movimentos válidos de
   cada uma, e o caminho até o destino sob o cursor destacado com tint.
 - `IsometricChess`: clicar num destino válido move a peça; a peça capturada é levada para fora do
-  tabuleiro, do lado de quem capturou, com animação (sobe, atravessa, desce). Regras
-  (`ChessGame`, `ChessBoard.move`) separadas da interação (`ChessInteraction`).
+  tabuleiro, do lado de quem capturou, com animação (sobe, atravessa, desce). Loop em três
+  passos: input (`ChessControls`), lógica (`ChessLogic`, que também anima as peças no
+  `ChessState`) e render (`ChessRenderer`, a partir da `ChessScene`, que só guarda os modelos).
 
 ### Corrigido
 - `GlfwWindow.destroy()` libera os callbacks registrados na janela antes de destruí-la.
