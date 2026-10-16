@@ -40,8 +40,8 @@ import com.farias.jengine.toolkit3d.TexturedModel;
  */
 final class ChessRenderer {
 
-    private static final int TITLE_FONT_SIZE = 20;
-    private static final int HINT_FONT_SIZE = 14;
+    private static final int TURN_FONT_SIZE = 14;
+    private static final int HINT_FONT_SIZE = 10;
 
     /** Orientação dos modelos para ficarem de frente para o adversário. */
     private static final float PIECE_ROTATION_Y = 90f;
@@ -66,13 +66,13 @@ final class ChessRenderer {
      * Resolve em {@code context} o renderer, a janela e o toolkit 2D; a UI usa
      * o tamanho lógico da janela.
      */
-    ChessRenderer(EngineContext context, IsometricCamera camera, ShadowMap shadow, ChessScene scene) {
+    ChessRenderer(EngineContext context, ChessScene scene, IsometricCamera camera) {
         this.renderer = context.resolve(Renderer.class);
         this.window = context.resolve(Window.class);
         this.uiWidth = window.getWidth();
         this.ui = context.resolve(Toolkit2D.class).ui(window.getWidth(), window.getHeight());
         this.camera = camera;
-        this.shadow = shadow;
+        this.shadow = scene.shadow();
         this.outline = new ModelOutline(renderer, window, camera);
         this.scene = scene;
     }
@@ -85,7 +85,7 @@ final class ChessRenderer {
         drawShadows();
         drawScene();
         outline.draw(state.pointedPiece().map(scene.pieces()::get).stream().toList());
-        drawUi();
+        drawUi(state);
         renderer.endFrame();
     }
 
@@ -167,12 +167,13 @@ final class ChessRenderer {
         scene.pieces().values().forEach(model -> pass.submit(model.command()));
     }
 
-    private void drawUi() {
+    /** De quem é a vez e, abaixo, os controles. */
+    private void drawUi(ChessState state) {
         int centerX = uiWidth / 2;
         ui.begin();
-        ui.textCentered(ui.defaultFont(), "ISOMETRIC CHESS - LWJGL RENDER ENGINE", centerX, 20,
-                TITLE_FONT_SIZE);
-        ui.textCentered(ui.defaultFont(), "ARROWS = MOVE | WHEEL = ZOOM | MIDDLE DRAG = ROTATE | CLICK = SELECT",
-                centerX, 50, HINT_FONT_SIZE);
+        String turn = state.turn() == Side.WHITE ? "VEZ DAS BRANCAS" : "VEZ DAS PRETAS";
+        ui.textCentered(ui.defaultFont(), turn, centerX, 20, TURN_FONT_SIZE);
+        ui.textCentered(ui.defaultFont(), "SETAS = MOVER | RODA = ZOOM | BOTAO DO MEIO = GIRAR | CLIQUE = JOGAR",
+                centerX, 44, HINT_FONT_SIZE);
     }
 }

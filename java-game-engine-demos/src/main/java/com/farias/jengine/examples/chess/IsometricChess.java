@@ -3,8 +3,6 @@ package com.farias.jengine.examples.chess;
 import java.nio.file.Path;
 import java.util.stream.Stream;
 
-import org.joml.Vector3f;
-
 import com.farias.jengine.examples.chess.model.ChessBoard;
 import com.farias.jengine.examples.chess.model.ChessLogic;
 import com.farias.jengine.examples.chess.model.ChessPiece;
@@ -15,14 +13,12 @@ import com.farias.jengine.assets.AssetsModule;
 import com.farias.jengine.core.Engine;
 import com.farias.jengine.core.EngineContext;
 import com.farias.jengine.core.Timer;
-import com.farias.jengine.toolkit3d.DirectionalLight;
 import com.farias.jengine.toolkit3d.Toolkit3DModule;
 import com.farias.jengine.toolkit3d.IsometricCamera;
 import com.farias.jengine.toolkit3d.LitMaterials;
 import com.farias.jengine.toolkit3d.Models;
-import com.farias.jengine.toolkit3d.ShadowMap;
-import com.farias.jengine.toolkit3d.Shapes;
 import com.farias.jengine.toolkit3d.Shadows;
+import com.farias.jengine.toolkit3d.Shapes;
 import com.farias.jengine.platform.Input;
 import com.farias.jengine.platform.Key;
 import com.farias.jengine.platform.Window;
@@ -50,8 +46,8 @@ import com.farias.jengine.toolkit2d.Toolkit2DModule;
  * {@link ChessBoard}, {@link ChessPiece} e as peças em {@code model.pieces}
  * (o padrão de movimento de cada uma). Não depende da engine.</li>
  * <li>{@link ChessControls} e {@link ChessCameraControls}: teclado e mouse.</li>
- * <li>{@link ChessScene}: os modelos 3D, só dados, criados por
- * {@link ChessSceneFactory}.</li>
+ * <li>{@link ChessScene}: mapa de sombras e modelos 3D, só dados, criados
+ * por {@link ChessSceneFactory}, que também configura a câmera.</li>
  * <li>{@link ChessRenderer} e {@link ModelOutline}: posicionam os modelos
  * conforme o estado, picking e passes de render.</li>
  * </ul>
@@ -85,19 +81,11 @@ public class IsometricChess {
     private static final int WINDOW_WIDTH = 960;
     private static final int WINDOW_HEIGHT = 960;
 
-    private static final float CAMERA_OFFSET = 10f;
-    private static final float CAMERA_SIZE = 5f;
-
-    private static final int SHADOW_MAP_SIZE = 2048;
-    private static final Vector3f LIGHT_DIRECTION = new Vector3f(0.25f, 1f, 0.75f);
-    private static final float LIGHT_RADIUS = 7f;
-
     private final Window window;
     private final Input input;
 
     private final ChessState state = new ChessState();
     private final ChessLogic logic = new ChessLogic();
-    private final IsometricCamera camera = new IsometricCamera(CAMERA_OFFSET, CAMERA_SIZE);
     private final ChessControls controls;
     private final ChessRenderer renderer;
 
@@ -126,13 +114,9 @@ public class IsometricChess {
         window = context.require(Window.class);
         input = context.require(Input.class);
 
-        ShadowMap shadow = context.require(Shadows.class).create(boardLight(), SHADOW_MAP_SIZE);
-
-        // a câmera olha (e gira em volta) do centro do tabuleiro
-        camera.target().set(boardCenter());
-
-        ChessScene scene = ChessSceneFactory.create(context, state, shadow, camera);
-        renderer = new ChessRenderer(context, camera, shadow, scene);
+        IsometricCamera camera = ChessSceneFactory.camera();
+        ChessScene scene = ChessSceneFactory.create(context, state, camera);
+        renderer = new ChessRenderer(context, scene, camera);
         controls = new ChessControls(context, camera, renderer);
     }
 
@@ -142,7 +126,7 @@ public class IsometricChess {
      * serviços com resolve e não fazem essa checagem.
      */
     private static void requireServices(EngineContext context) {
-        Stream.of(Assets.class, Shapes.class, LitMaterials.class, Models.class,
+        Stream.of(Assets.class, Shapes.class, LitMaterials.class, Models.class, Shadows.class,
                 Renderer.class, Toolkit2D.class).forEach(context::require);
     }
 
@@ -166,15 +150,5 @@ public class IsometricChess {
 
     private boolean shouldQuit() {
         return window.shouldClose() || input.isKeyPressed(Key.ESCAPE);
-    }
-
-    private static DirectionalLight boardLight() {
-        return DirectionalLight.covering(LIGHT_DIRECTION, boardCenter(), LIGHT_RADIUS);
-    }
-
-    /** Centro do tabuleiro: a casa (x, z) tem centro em (x, 0, z), de 0 a SIZE - 1. */
-    private static Vector3f boardCenter() {
-        float center = (ChessBoard.SIZE - 1) / 2f;
-        return new Vector3f(center, 0f, center);
     }
 }

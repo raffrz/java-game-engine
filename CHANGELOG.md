@@ -19,6 +19,9 @@
   tabuleiro, do lado de quem capturou, com animação (sobe, atravessa, desce). Loop em três
   passos: input (`ChessControls`), lógica (`ChessLogic`, que também anima as peças no
   `ChessState`) e render (`ChessRenderer`, a partir da `ChessScene`, que só guarda os modelos).
+- `IsometricChess`: turnos (brancas começam, só a peça da vez é selecionável); HUD mostra de quem
+  é a vez e os controles, em fonte menor. A peça desliza até a casa nova. Shadow map e câmera
+  configurados na `ChessSceneFactory`.
 
 ### Corrigido
 - `GlfwWindow.destroy()` libera os callbacks registrados na janela antes de destruí-la.

@@ -9,7 +9,7 @@ import java.util.Optional;
  * As regras da partida: recebe o que o jogador fez ({@link PlayerInput}) e o
  * tempo passado, e atualiza o {@link ChessState}. O padrão de movimento de cada
  * peça fica nela mesma ({@link ChessPiece#getValidMoves}); aqui fica o que
- * depende do jogo inteiro: o que um clique faz, validar e aplicar o lance, o
+ * depende do jogo inteiro: de quem é a vez, o que um clique faz, validar e aplicar o lance, o
  * que destacar e as animações das peças. Não sabe de renderização, janela nem
  * engine.
  *
@@ -24,6 +24,8 @@ public final class ChessLogic {
     private static final float LIFT_SPEED = 3f;
     /** Giro da peça selecionada, em graus por segundo. */
     private static final float SPIN_SPEED = 90f;
+    /** Velocidade da peça indo para a casa nova depois de um lance, em unidades por segundo. */
+    private static final float MOVE_SPEED = 5f;
 
     /** Altura em que a peça capturada atravessa o tabuleiro. */
     private static final float CAPTURE_HEIGHT = 1.5f;
@@ -48,16 +50,19 @@ public final class ChessLogic {
 
     /**
      * Com uma peça selecionada, primeiro tenta movê-la para a casa apontada
-     * (andar ou capturar). Se não é um movimento válido, seleciona a peça
-     * apontada: troca a seleção, ou a desfaz quando é a mesma peça ou nenhuma.
+     * (andar ou capturar); se moveu, passa a vez. Se não é um movimento
+     * válido, seleciona a peça apontada quando ela é de quem tem a vez: troca
+     * a seleção, ou a desfaz quando é a mesma peça, do adversário ou nenhuma.
      */
     private void click(ChessState state) {
         if (state.selectedPiece != null && move(state, state.selectedPiece, state.pointedTile)) {
             state.selectedPiece = null;
+            state.turn = state.turn.opponent();
             return;
         }
         ChessPiece pointed = state.pointedPiece().orElse(null);
-        state.selectedPiece = pointed != null && pointed != state.selectedPiece ? pointed : null;
+        boolean selectable = pointed != null && pointed.side() == state.turn && pointed != state.selectedPiece;
+        state.selectedPiece = selectable ? pointed : null;
     }
 
     /**
@@ -128,12 +133,12 @@ public final class ChessLogic {
     }
 
     /**
-     * Peça em jogo: fica na sua casa (um lance a teleporta para a nova) e,
-     * selecionada, sobe e gira; sem seleção, desce e volta ao giro zero.
+     * Peça em jogo: desliza em linha reta até a sua casa (depois de um lance,
+     * a casa muda na hora e a pose vai atrás) e, selecionada, sobe e gira; sem
+     * seleção, desce e volta ao giro zero.
      */
     private static void animateInPlay(PiecePose pose, ChessPiece piece, boolean selected, float deltaTime) {
-        pose.x = piece.tile().x();
-        pose.z = piece.tile().z();
+        moveTowardXZ(pose, piece.tile().x(), piece.tile().z(), MOVE_SPEED * deltaTime);
         pose.y = moveToward(pose.y, selected ? LIFT_HEIGHT : 0f, LIFT_SPEED * deltaTime);
         pose.spin = selected ? (pose.spin + SPIN_SPEED * deltaTime) % 360f : 0f;
     }
@@ -153,16 +158,8 @@ public final class ChessLogic {
                 }
             }
             case TRAVELING -> {
-                float dx = pose.restX - pose.x;
-                float dz = pose.restZ - pose.z;
-                float distance = (float) Math.sqrt(dx * dx + dz * dz);
-                if (distance <= step) {
-                    pose.x = pose.restX;
-                    pose.z = pose.restZ;
+                if (moveTowardXZ(pose, pose.restX, pose.restZ, step)) {
                     pose.capturePhase = PiecePose.CapturePhase.LANDING;
-                } else {
-                    pose.x += dx / distance * step;
-                    pose.z += dz / distance * step;
                 }
             }
             case LANDING -> {
@@ -174,6 +171,26 @@ public final class ChessLogic {
             case RESTING -> {
             }
         }
+    }
+
+    /**
+     * Anda a pose no plano XZ, em linha reta, até ({@code x}, {@code z}),
+     * no máximo {@code maxStep}.
+     *
+     * @return se chegou
+     */
+    private static boolean moveTowardXZ(PiecePose pose, float x, float z, float maxStep) {
+        float dx = x - pose.x;
+        float dz = z - pose.z;
+        float distance = (float) Math.sqrt(dx * dx + dz * dz);
+        if (distance <= maxStep) {
+            pose.x = x;
+            pose.z = z;
+            return true;
+        }
+        pose.x += dx / distance * maxStep;
+        pose.z += dz / distance * maxStep;
+        return false;
     }
 
     /** {@code current} andando até {@code target}, no máximo {@code maxStep}. */

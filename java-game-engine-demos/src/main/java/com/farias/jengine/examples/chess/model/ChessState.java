@@ -9,7 +9,7 @@ import java.util.Optional;
 
 /**
  * Tudo o que o jogo é num instante: o tabuleiro, a peça selecionada, a casa
- * apontada, as casas a destacar, a pose de cada peça (o resultado das
+ * apontada, de quem é a vez, as casas a destacar, a pose de cada peça (o resultado das
  * animações) e os lances já feitos. Só o {@link ChessLogic} altera (os campos
  * são package-private); quem desenha lê pelos métodos públicos.
  */
@@ -18,6 +18,8 @@ public final class ChessState {
     final ChessBoard board = ChessBoard.initialPosition();
     final Map<ChessPiece, PiecePose> poses = new HashMap<>();
     final List<Move> history = new ArrayList<>();
+    /** Quem joga agora; as brancas começam. */
+    Side turn = Side.WHITE;
     ChessPiece selectedPiece;
     BoardTile pointedTile;
     List<BoardTile> highlightedTiles = List.of();
@@ -46,6 +48,11 @@ public final class ChessState {
     /** Onde {@code piece} está desenhada agora (ver {@link PiecePose}). */
     public PiecePose pose(ChessPiece piece) {
         return poses.get(piece);
+    }
+
+    /** O lado que faz o próximo lance. */
+    public Side turn() {
+        return turn;
     }
 
     public Optional<ChessPiece> selectedPiece() {

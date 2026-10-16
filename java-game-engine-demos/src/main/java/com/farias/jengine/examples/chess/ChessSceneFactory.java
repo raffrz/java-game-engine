@@ -3,6 +3,8 @@ package com.farias.jengine.examples.chess;
 import java.util.HashMap;
 import java.util.Map;
 
+import org.joml.Vector3f;
+
 import com.farias.jengine.examples.chess.model.ChessBoard;
 import com.farias.jengine.examples.chess.model.ChessPiece;
 import com.farias.jengine.examples.chess.model.ChessState;
@@ -10,15 +12,23 @@ import com.farias.jengine.assets.Assets;
 import com.farias.jengine.core.EngineContext;
 import com.farias.jengine.renderer.Mesh;
 import com.farias.jengine.renderer.Texture;
+import com.farias.jengine.toolkit3d.DirectionalLight;
 import com.farias.jengine.toolkit3d.IsometricCamera;
 import com.farias.jengine.toolkit3d.LitMaterials;
 import com.farias.jengine.toolkit3d.Models;
 import com.farias.jengine.toolkit3d.ShadowMap;
+import com.farias.jengine.toolkit3d.Shadows;
 import com.farias.jengine.toolkit3d.Shapes;
 import com.farias.jengine.toolkit3d.TexturedModel;
 
 /**
- * Carrega os modelos da {@link ChessScene}: as 64 casas e um modelo por peça.
+ * Monta a {@link ChessScene} (o mapa de sombras, as 64 casas e um modelo por
+ * peça) e configura a câmera do jogo.
+ *
+ * <p>
+ * A câmera olha (e gira em volta) do centro do tabuleiro, e a luz que gera o
+ * mapa de sombras cobre o tabuleiro inteiro; é a mesma do sombreamento
+ * difuso.
  *
  * <p>
  * A casa (x, z) tem o centro em (x, 0, z) e lado 1. O quad do piso nasce
@@ -28,6 +38,13 @@ import com.farias.jengine.toolkit3d.TexturedModel;
  */
 final class ChessSceneFactory {
 
+    private static final float CAMERA_OFFSET = 10f;
+    private static final float CAMERA_SIZE = 5f;
+
+    private static final int SHADOW_MAP_SIZE = 2048;
+    private static final Vector3f LIGHT_DIRECTION = new Vector3f(0.25f, 1f, 0.75f);
+    private static final float LIGHT_RADIUS = 7f;
+
     private static final float TILE_ROTATION_X = 90f;
     private static final float PIECE_SCALE = 1.2f;
     private static final float SPECULAR_STRENGTH = 0.5f;
@@ -36,16 +53,35 @@ final class ChessSceneFactory {
     private ChessSceneFactory() {
     }
 
+    /** A câmera do jogo, olhando para o centro do tabuleiro. */
+    static IsometricCamera camera() {
+        IsometricCamera camera = new IsometricCamera(CAMERA_OFFSET, CAMERA_SIZE);
+        camera.target().set(boardCenter());
+        return camera;
+    }
+
     /**
-     * Cria os modelos das casas e de cada peça de {@code state}, com os
-     * serviços de assets e 3D resolvidos em {@code context}.
+     * Cria o mapa de sombras e os modelos das casas e de cada peça de
+     * {@code state}, com os serviços de assets e 3D resolvidos em
+     * {@code context}. O brilho das peças é calculado para {@code camera}.
      */
-    static ChessScene create(EngineContext context, ChessState state, ShadowMap shadow,
-            IsometricCamera camera) {
+    static ChessScene create(EngineContext context, ChessState state, IsometricCamera camera) {
+        ShadowMap shadow = context.resolve(Shadows.class).create(boardLight(), SHADOW_MAP_SIZE);
+
         TexturedModel[][] tiles = createTiles(context.resolve(Assets.class), context.resolve(Shapes.class),
                 context.resolve(LitMaterials.class), shadow);
         Map<ChessPiece, TexturedModel> pieces = createPieces(state, context.resolve(Models.class), shadow, camera);
-        return new ChessScene(tiles, pieces);
+        return new ChessScene(shadow, tiles, pieces);
+    }
+
+    private static DirectionalLight boardLight() {
+        return DirectionalLight.covering(LIGHT_DIRECTION, boardCenter(), LIGHT_RADIUS);
+    }
+
+    /** Centro do tabuleiro: a casa (x, z) tem centro em (x, 0, z), de 0 a SIZE - 1. */
+    private static Vector3f boardCenter() {
+        float center = (ChessBoard.SIZE - 1) / 2f;
+        return new Vector3f(center, 0f, center);
     }
 
     private static TexturedModel[][] createTiles(Assets assets, Shapes shapes, LitMaterials materials,
