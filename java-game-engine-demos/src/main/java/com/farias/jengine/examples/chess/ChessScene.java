@@ -74,9 +74,11 @@ final class ChessScene {
         Optional<ChessPiece> selectedPiece = interaction.selectedPiece();
         Optional<ChessPiece> hoveredPiece = interaction.hoveredPiece();
         hoveredPieceModels.clear();
-        for (ChessPiece captured : game.takeRecentCaptures()) {
-            int slot = game.captured(captured.side()).indexOf(captured);
-            viewOf(captured).capture(restingPlace(captured.side(), slot));
+        for (Move move : game.takeMoves()) {
+            move.captured().ifPresent(captured -> {
+                int slot = game.captured(captured.side()).indexOf(captured);
+                viewOf(captured).capture(restingPlace(captured.side(), slot));
+            });
         }
         // a câmera pode ter girado desde o último frame; o brilho acompanha
         Vector3f directionToEye = camera.directionToEye();

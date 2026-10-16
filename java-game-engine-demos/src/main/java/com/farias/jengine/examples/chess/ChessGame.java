@@ -2,6 +2,7 @@ package com.farias.jengine.examples.chess;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
 import com.farias.jengine.examples.chess.pieces.ChessPiece;
 import com.farias.jengine.examples.chess.pieces.Side;
@@ -14,7 +15,7 @@ import com.farias.jengine.examples.chess.pieces.Side;
 public final class ChessGame {
 
     private final ChessBoard board = ChessBoard.initialPosition();
-    private final List<ChessPiece> recentCaptures = new ArrayList<>();
+    private final List<Move> recentMoves = new ArrayList<>();
 
     /** As peças em jogo. */
     public List<ChessPiece> pieces() {
@@ -41,26 +42,29 @@ public final class ChessGame {
 
     /**
      * Move {@code piece} para {@code target}, capturando a peça que estiver
-     * lá. Não faz nada se não é um movimento válido.
+     * lá, e registra o lance (ver {@link #takeMoves}). Não faz nada se não é
+     * um movimento válido.
      *
      * @return se a peça foi movida
      */
     public boolean move(ChessPiece piece, BoardTile target) {
-        if (!validMoves(piece).contains(target)) {
+        List<BoardTile> path = pathTo(piece, target);
+        if (path.isEmpty()) {
             return false;
         }
-        board.move(piece, target).ifPresent(recentCaptures::add);
+        BoardTile from = piece.tile();
+        Optional<ChessPiece> captured = board.move(piece, target);
+        recentMoves.add(new Move(piece, from, target, path, captured));
         return true;
     }
 
     /**
-     * As peças capturadas desde a última chamada, na ordem em que foram
-     * capturadas. Esvazia a lista: é para um consumidor só (a cena, uma vez por
-     * frame).
+     * Os lances feitos desde a última chamada, em ordem. Esvazia a lista: é
+     * para um consumidor só (a cena, uma vez por frame).
      */
-    public List<ChessPiece> takeRecentCaptures() {
-        List<ChessPiece> captures = List.copyOf(recentCaptures);
-        recentCaptures.clear();
-        return captures;
+    public List<Move> takeMoves() {
+        List<Move> moves = List.copyOf(recentMoves);
+        recentMoves.clear();
+        return moves;
     }
 }
