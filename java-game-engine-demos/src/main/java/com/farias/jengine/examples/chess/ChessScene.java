@@ -115,13 +115,13 @@ final class ChessScene {
     /**
      * Onde fica a {@code slot}-ésima peça capturada de {@code capturedSide}
      * (ver {@link ChessGame#captured}): fora do tabuleiro, atrás da última
-     * fileira de quem capturou (brancas em z = 7, pretas em z = 0), em
-     * fileiras de {@code SIZE} peças ao longo de x.
+     * fileira de quem capturou, em fileiras de {@code SIZE} peças ao longo de x.
      */
     private static Vector3f restingPlace(Side capturedSide, int slot) {
-        boolean byWhite = capturedSide == Side.BLACK;
+        Side capturer = capturedSide.opponent();
         float distance = CAPTURED_ROW_DISTANCE + (slot / ChessBoard.SIZE) * CAPTURED_ROW_SPACING;
-        float z = byWhite ? ChessBoard.SIZE - 1 + distance : -distance;
+        // "atrás" da última fileira é o sentido contrário ao da frente
+        float z = capturer.homeRow() - capturer.forward() * distance;
         return new Vector3f(slot % ChessBoard.SIZE, 0f, z);
     }
 

@@ -17,16 +17,15 @@ public final class Pawn extends ChessPiece {
         List<BoardTile> positions = new ArrayList<>();
         var tileX = tile().x();
         var tileZ = tile().z();
-        var signal = side() == Side.WHITE ? -1 : 1;
+        var signal = side().forward();
         int forwardZ = tileZ + signal;
 
         // passo simples e duplo: só em casa vazia
         if (ChessBoard.contains(tileX, forwardZ) && board.pieceAt(tileX, forwardZ).isEmpty()) {
             positions.add(new BoardTile(tileX, forwardZ));
 
-            int startZ = side() == Side.WHITE ? 6 : 1;
             int doubleZ = tileZ + 2 * signal;
-            if (tileZ == startZ && board.pieceAt(tileX, doubleZ).isEmpty()) {
+            if (tileZ == side().pawnRow() && board.pieceAt(tileX, doubleZ).isEmpty()) {
                 positions.add(new BoardTile(tileX, doubleZ));
             }
         }

@@ -11,14 +11,14 @@ import com.farias.jengine.examples.chess.pieces.Side;
 
 /**
  * O tabuleiro 8x8, as peças sobre ele e as já capturadas, com x e z de 0 a 7.
- * As pretas começam em z = 0 e z = 1, as brancas em z = 6 e z = 7. Todo
+ * Onde cada lado começa e para onde avança está em {@link Side}. Todo
  * movimento passa por {@link #move}.
  */
 public final class ChessBoard {
 
     public static final int SIZE = 8;
 
-    private static final PieceType[] BACK_RANK = {
+    private static final PieceType[] HOME_ROW = {
             PieceType.ROOK, PieceType.KNIGHT, PieceType.BISHOP, PieceType.QUEEN,
             PieceType.KING, PieceType.BISHOP, PieceType.KNIGHT, PieceType.ROOK
     };
@@ -30,11 +30,11 @@ public final class ChessBoard {
     /** Um tabuleiro na posição inicial. */
     public static ChessBoard initialPosition() {
         ChessBoard board = new ChessBoard();
-        for (int x = 0; x < SIZE; x++) {
-            board.pieces.add(ChessPiece.of(BACK_RANK[x], Side.BLACK, new BoardTile(x, 0)));
-            board.pieces.add(ChessPiece.of(PieceType.PAWN, Side.BLACK, new BoardTile(x, 1)));
-            board.pieces.add(ChessPiece.of(PieceType.PAWN, Side.WHITE, new BoardTile(x, SIZE - 2)));
-            board.pieces.add(ChessPiece.of(BACK_RANK[x], Side.WHITE, new BoardTile(x, SIZE - 1)));
+        for (Side side : Side.values()) {
+            for (int x = 0; x < SIZE; x++) {
+                board.pieces.add(ChessPiece.of(HOME_ROW[x], side, new BoardTile(x, side.homeRow())));
+                board.pieces.add(ChessPiece.of(PieceType.PAWN, side, new BoardTile(x, side.pawnRow())));
+            }
         }
         return board;
     }
