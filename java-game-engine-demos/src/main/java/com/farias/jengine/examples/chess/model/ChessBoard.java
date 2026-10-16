@@ -1,13 +1,9 @@
-package com.farias.jengine.examples.chess;
+package com.farias.jengine.examples.chess.model;
 
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
-
-import com.farias.jengine.examples.chess.pieces.ChessPiece;
-import com.farias.jengine.examples.chess.pieces.PieceType;
-import com.farias.jengine.examples.chess.pieces.Side;
 
 /**
  * O tabuleiro 8x8, as peças sobre ele e as já capturadas, com x e z de 0 a 7.
@@ -42,11 +38,12 @@ public final class ChessBoard {
     /**
      * Põe {@code piece} em {@code target}, capturando a peça que estiver lá.
      * Não confere se o movimento é válido (ver {@link ChessPiece#getValidMoves});
-     * só garante que duas peças nunca dividem uma casa.
+     * só garante que duas peças nunca dividem uma casa. Package-private: de
+     * fora do pacote, o movimento passa por {@link ChessGame#move}, que valida.
      *
      * @return a peça capturada, ou vazio se a casa estava livre
      */
-    public Optional<ChessPiece> move(ChessPiece piece, BoardTile target) {
+    Optional<ChessPiece> move(ChessPiece piece, BoardTile target) {
         Optional<ChessPiece> captured = pieceAt(target);
         captured.ifPresent(this::capturePiece);
         piece.moveTo(target);

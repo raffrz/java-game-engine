@@ -7,9 +7,13 @@ import java.util.Optional;
 
 import org.joml.Vector3f;
 
+import com.farias.jengine.examples.chess.model.BoardTile;
+import com.farias.jengine.examples.chess.model.ChessBoard;
+import com.farias.jengine.examples.chess.model.ChessGame;
+import com.farias.jengine.examples.chess.model.ChessPiece;
+import com.farias.jengine.examples.chess.model.Move;
+import com.farias.jengine.examples.chess.model.Side;
 import com.farias.jengine.assets.Assets;
-import com.farias.jengine.examples.chess.pieces.ChessPiece;
-import com.farias.jengine.examples.chess.pieces.Side;
 import com.farias.jengine.toolkit3d.IsometricCamera;
 import com.farias.jengine.toolkit3d.LitMaterials;
 import com.farias.jengine.toolkit3d.Models;

@@ -1,9 +1,12 @@
-package com.farias.jengine.examples.chess.pieces;
+package com.farias.jengine.examples.chess.model.pieces;
 
 import java.util.List;
 
-import com.farias.jengine.examples.chess.BoardTile;
-import com.farias.jengine.examples.chess.ChessBoard;
+import com.farias.jengine.examples.chess.model.BoardTile;
+import com.farias.jengine.examples.chess.model.ChessBoard;
+import com.farias.jengine.examples.chess.model.ChessPiece;
+import com.farias.jengine.examples.chess.model.PieceType;
+import com.farias.jengine.examples.chess.model.Side;
 
 public final class Knight extends ChessPiece {
 

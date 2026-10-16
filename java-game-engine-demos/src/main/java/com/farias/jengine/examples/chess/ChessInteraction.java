@@ -4,7 +4,9 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
-import com.farias.jengine.examples.chess.pieces.ChessPiece;
+import com.farias.jengine.examples.chess.model.BoardTile;
+import com.farias.jengine.examples.chess.model.ChessGame;
+import com.farias.jengine.examples.chess.model.ChessPiece;
 
 /**
  * O que o jogador está apontando e escolhendo: a peça selecionada, o que está

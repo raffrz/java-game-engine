@@ -1,16 +1,16 @@
-package com.farias.jengine.examples.chess;
+package com.farias.jengine.examples.chess.model;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
-import com.farias.jengine.examples.chess.pieces.ChessPiece;
-import com.farias.jengine.examples.chess.pieces.Side;
 
 /**
  * As regras do jogo sobre o {@link ChessBoard}: quais movimentos valem e o que
- * acontece quando uma peça se move. Não sabe de seleção, hover nem cliques
- * (ver {@link ChessInteraction}), nem de renderização, janela ou engine.
+ * acontece quando uma peça se move. É a porta de entrada do pacote de modelo:
+ * quem está fora dele move peças só por {@link #move}, que valida o lance.
+ * Não sabe de seleção, hover nem cliques ({@code ChessInteraction}), nem de
+ * renderização, janela ou engine.
  */
 public final class ChessGame {
 

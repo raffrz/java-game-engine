@@ -1,6 +1,4 @@
-package com.farias.jengine.examples.chess.pieces;
-
-import com.farias.jengine.examples.chess.ChessBoard;
+package com.farias.jengine.examples.chess.model;
 
 /**
  * Um lado do jogo e a orientação dele no tabuleiro: as pretas começam em

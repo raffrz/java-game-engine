@@ -1,22 +1,27 @@
-package com.farias.jengine.examples.chess.pieces;
+package com.farias.jengine.examples.chess.model;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
-import com.farias.jengine.examples.chess.BoardTile;
-import com.farias.jengine.examples.chess.ChessBoard;
+import com.farias.jengine.examples.chess.model.pieces.Bishop;
+import com.farias.jengine.examples.chess.model.pieces.King;
+import com.farias.jengine.examples.chess.model.pieces.Knight;
+import com.farias.jengine.examples.chess.model.pieces.Pawn;
+import com.farias.jengine.examples.chess.model.pieces.Queen;
+import com.farias.jengine.examples.chess.model.pieces.Rook;
 
 /**
- * Uma peça e a casa onde ela está. Cada tipo de peça é uma subclasse que sabe
- * como se move ({@link #getValidMoves} e {@link #getPathToTarget}).
+ * Uma peça e a casa onde ela está. Cada tipo de peça é uma subclasse, no
+ * pacote {@code model.pieces}, que sabe como se move ({@link #getValidMoves} e
+ * {@link #getPathToTarget}); crie peças por {@link #of}.
  *
  * <p>
  * A igualdade é por identidade: duas peças do mesmo tipo e lado são peças
  * diferentes, e a peça continua a mesma quando muda de casa
  * ({@link #moveTo}).
  */
-public abstract sealed class ChessPiece permits Pawn, Rook, Knight, Bishop, Queen, King {
+public abstract class ChessPiece {
 
     /** Direções (dx, dz) na horizontal e na vertical. */
     protected static final int[][] ORTHOGONAL = { { 1, 0 }, { -1, 0 }, { 0, 1 }, { 0, -1 } };
@@ -50,10 +55,11 @@ public abstract sealed class ChessPiece permits Pawn, Rook, Knight, Bishop, Quee
     }
 
     /**
-     * Põe a peça em {@code tile}. Não valida o movimento nem trata captura;
-     * quem chama confere {@link #getValidMoves} antes.
+     * Põe a peça em {@code tile}. Só o {@link ChessBoard#move} chama, para
+     * nenhuma peça mudar de casa por fora das regras; por isso é
+     * package-private.
      */
-    public void moveTo(BoardTile tile) {
+    void moveTo(BoardTile tile) {
         this.tile = tile;
     }
 

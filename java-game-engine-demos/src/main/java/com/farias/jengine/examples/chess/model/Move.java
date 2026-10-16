@@ -1,9 +1,7 @@
-package com.farias.jengine.examples.chess;
+package com.farias.jengine.examples.chess.model;
 
 import java.util.List;
 import java.util.Optional;
-
-import com.farias.jengine.examples.chess.pieces.ChessPiece;
 
 /**
  * Um lance já feito: {@code piece} saiu de {@code from} e foi para {@code to}

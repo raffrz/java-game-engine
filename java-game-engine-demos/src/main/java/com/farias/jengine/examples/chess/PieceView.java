@@ -2,9 +2,9 @@ package com.farias.jengine.examples.chess;
 
 import org.joml.Vector3f;
 
-import com.farias.jengine.examples.chess.pieces.ChessPiece;
-import com.farias.jengine.examples.chess.pieces.PieceType;
-import com.farias.jengine.examples.chess.pieces.Side;
+import com.farias.jengine.examples.chess.model.ChessPiece;
+import com.farias.jengine.examples.chess.model.PieceType;
+import com.farias.jengine.examples.chess.model.Side;
 import com.farias.jengine.toolkit3d.Picking;
 import com.farias.jengine.toolkit3d.Ray;
 import com.farias.jengine.toolkit3d.TexturedModel;

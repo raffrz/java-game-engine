@@ -4,12 +4,14 @@ import java.nio.file.Path;
 
 import org.joml.Vector3f;
 
+import com.farias.jengine.examples.chess.model.ChessBoard;
+import com.farias.jengine.examples.chess.model.ChessGame;
+import com.farias.jengine.examples.chess.model.ChessPiece;
 import com.farias.jengine.assets.Assets;
 import com.farias.jengine.assets.AssetsModule;
 import com.farias.jengine.core.Engine;
 import com.farias.jengine.core.EngineContext;
 import com.farias.jengine.core.Timer;
-import com.farias.jengine.examples.chess.pieces.ChessPiece;
 import com.farias.jengine.toolkit3d.DirectionalLight;
 import com.farias.jengine.toolkit3d.Toolkit3DModule;
 import com.farias.jengine.toolkit3d.IsometricCamera;
