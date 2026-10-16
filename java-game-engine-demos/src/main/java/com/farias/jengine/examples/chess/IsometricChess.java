@@ -35,8 +35,9 @@ import com.farias.jengine.toolkit2d.Toolkit2DModule;
  *
  * <h2>Quem faz o quê</h2>
  * <ul>
- * <li>{@link ChessGame}, {@link ChessBoard}, {@link ChessPiece}: estado do
- * jogo.</li>
+ * <li>{@link ChessGame}, {@link ChessBoard}, {@link ChessPiece}: regras e
+ * estado do jogo.</li>
+ * <li>{@link ChessInteraction}: seleção, hover e o que um clique faz.</li>
  * <li>{@link ChessCameraControls}: teclado e mouse → câmera.</li>
  * <li>{@link ChessScene} e {@link PieceView}: modelos, animação e picking.</li>
  * <li>{@link ChessRenderer}: passes de sombra, cena e UI.</li>
@@ -51,7 +52,8 @@ import com.farias.jengine.toolkit2d.Toolkit2DModule;
  * esquerdo seleciona a peça, que sobe e fica girando; clicar de novo nela, ou
  * fora de qualquer peça, desfaz a seleção. Com uma peça selecionada, passar o
  * mouse sobre um destino válido destaca (tint) o caminho até ele, junto com a
- * casa de origem. ESC fecha.
+ * casa de origem, e clicar nele move a peça (capturando a adversária que
+ * estiver lá). ESC fecha.
  *
  * <h2>Picking</h2>
  * {@link IsometricCamera#rayAt} gera o raio da mesma câmera que desenha a
@@ -78,6 +80,7 @@ public class IsometricChess {
     private final Input input;
 
     private final ChessGame game = new ChessGame();
+    private final ChessInteraction interaction = new ChessInteraction(game);
     private final IsometricCamera camera = new IsometricCamera(CAMERA_OFFSET, CAMERA_SIZE);
     private final ChessCameraControls cameraControls;
     private final ChessScene scene;
@@ -134,7 +137,7 @@ public class IsometricChess {
 
             cameraControls.update(deltaTime);
             handleMouseInteraction();
-            scene.update(game, deltaTime);
+            scene.update(game, interaction, deltaTime);
             renderer.render(scene);
         }
     }
@@ -144,21 +147,16 @@ public class IsometricChess {
     }
 
     /**
-     * Hover e clique numa peça ou numa casa. A peça tem prioridade: o raio que
-     * acerta uma peça também acerta a casa embaixo dela, mas o clique só
-     * seleciona a peça. No hover, a casa sob uma peça é a casa dela (e não a
-     * que o raio atinge atrás), para o caminho até uma captura aparecer.
+     * Picking do cursor: informa à {@link ChessInteraction} a peça atingida ou,
+     * sem peça, a casa do tabuleiro, e repassa o clique. O que o clique faz é
+     * decidido lá.
      */
     private void handleMouseInteraction() {
         Ray ray = camera.rayAt(input.getMouseX(), input.getMouseY(), window);
         ChessPiece piece = scene.pieceAt(ray);
-        BoardTile tile = piece == null ? scene.tileAt(ray) : null;
-
-        game.hoverPiece(piece);
-        game.hoverTile(piece != null ? piece.tile() : tile);
+        interaction.hover(piece, piece == null ? scene.tileAt(ray) : null);
         if (input.isMouseButtonPressed(MouseButton.LEFT)) {
-            game.selectPiece(piece);
-            game.selectTile(tile);
+            interaction.click();
         }
     }
 

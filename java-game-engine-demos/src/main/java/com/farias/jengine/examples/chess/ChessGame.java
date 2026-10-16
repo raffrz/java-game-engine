@@ -1,87 +1,66 @@
 package com.farias.jengine.examples.chess;
 
+import java.util.ArrayList;
 import java.util.List;
-import java.util.Optional;
 
 import com.farias.jengine.examples.chess.pieces.ChessPiece;
+import com.farias.jengine.examples.chess.pieces.Side;
 
 /**
- * Estado do jogo: o {@link ChessBoard} e a peça e a casa selecionadas e sob o
- * cursor. Não depende de renderização, janela nem da engine; quem desenha o
- * jogo (ver {@code ChessScene}) lê este estado e mostra como quiser.
+ * As regras do jogo sobre o {@link ChessBoard}: quais movimentos valem e o que
+ * acontece quando uma peça se move. Não sabe de seleção, hover nem cliques
+ * (ver {@link ChessInteraction}), nem de renderização, janela ou engine.
  */
 public final class ChessGame {
 
     private final ChessBoard board = ChessBoard.initialPosition();
-    private ChessPiece selectedPiece;
-    private ChessPiece hoveredPiece;
-    private BoardTile selectedTile;
-    private BoardTile hoveredTile;
+    private final List<ChessPiece> recentCaptures = new ArrayList<>();
 
+    /** As peças em jogo. */
     public List<ChessPiece> pieces() {
         return board.pieces();
     }
 
-    /**
-     * Seleciona {@code piece}. Selecionar a peça que já está selecionada, ou
-     * {@code null}, desfaz a seleção.
-     */
-    public void selectPiece(ChessPiece piece) {
-        selectedPiece = piece != null && piece.equals(selectedPiece) ? null : piece;
-    }
-
-    public Optional<ChessPiece> selectedPiece() {
-        return Optional.ofNullable(selectedPiece);
-    }
-
-    /**
-     * Seleciona {@code tile}. Selecionar a casa que já está selecionada, ou
-     * {@code null}, desfaz a seleção.
-     */
-    public void selectTile(BoardTile tile) {
-        selectedTile = tile != null && tile.equals(selectedTile) ? null : tile;
-    }
-
-    public Optional<BoardTile> selectedTile() {
-        return Optional.ofNullable(selectedTile);
-    }
-
-    /** Marca {@code piece} como a peça sob o cursor; {@code null} desfaz o hover. */
-    public void hoverPiece(ChessPiece piece) {
-        hoveredPiece = piece;
-    }
-
-    public Optional<ChessPiece> hoveredPiece() {
-        return Optional.ofNullable(hoveredPiece);
-    }
-
-    /**
-     * Marca {@code tile} como a casa sob o cursor; {@code null} desfaz o
-     * hover. Só vale com uma peça selecionada: a casa sob o cursor é o destino
-     * do movimento.
-     */
-    public void hoverTile(BoardTile tile) {
-        hoveredTile = selectedPiece != null ? tile : null;
-    }
-
-    public Optional<BoardTile> hoveredTile() {
-        return Optional.ofNullable(hoveredTile);
-    }
-
-    /**
-     * O caminho da peça selecionada até a casa sob o cursor (ver
-     * {@link ChessPiece#getPathToTarget}). Vazio sem peça selecionada, sem casa
-     * sob o cursor ou se ela não é um destino válido.
-     */
-    public List<BoardTile> hoveredPath() {
-        if (selectedPiece == null || hoveredTile == null) {
-            return List.of();
-        }
-        return selectedPiece.getPathToTarget(board, hoveredTile);
+    /** As peças de {@code side} capturadas até agora, na ordem da captura. */
+    public List<ChessPiece> captured(Side side) {
+        return board.captured(side);
     }
 
     /** As casas para onde {@code piece} pode ir no tabuleiro atual. */
-    public List<BoardTile> validTiles(ChessPiece piece) {
+    public List<BoardTile> validMoves(ChessPiece piece) {
         return piece.getValidMoves(board);
+    }
+
+    /**
+     * O caminho de {@code piece} até {@code target} (ver
+     * {@link ChessPiece#getPathToTarget}); vazio se não é um movimento válido.
+     */
+    public List<BoardTile> pathTo(ChessPiece piece, BoardTile target) {
+        return piece.getPathToTarget(board, target);
+    }
+
+    /**
+     * Move {@code piece} para {@code target}, capturando a peça que estiver
+     * lá. Não faz nada se não é um movimento válido.
+     *
+     * @return se a peça foi movida
+     */
+    public boolean move(ChessPiece piece, BoardTile target) {
+        if (!validMoves(piece).contains(target)) {
+            return false;
+        }
+        board.move(piece, target).ifPresent(recentCaptures::add);
+        return true;
+    }
+
+    /**
+     * As peças capturadas desde a última chamada, na ordem em que foram
+     * capturadas. Esvazia a lista: é para um consumidor só (a cena, uma vez por
+     * frame).
+     */
+    public List<ChessPiece> takeRecentCaptures() {
+        List<ChessPiece> captures = List.copyOf(recentCaptures);
+        recentCaptures.clear();
+        return captures;
     }
 }

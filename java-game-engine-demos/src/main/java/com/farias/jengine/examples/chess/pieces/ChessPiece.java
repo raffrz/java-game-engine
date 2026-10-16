@@ -13,7 +13,8 @@ import com.farias.jengine.examples.chess.ChessBoard;
  *
  * <p>
  * A igualdade é por identidade: duas peças do mesmo tipo e lado são peças
- * diferentes, e a peça continua a mesma quando muda de casa.
+ * diferentes, e a peça continua a mesma quando muda de casa
+ * ({@link #moveTo}).
  */
 public abstract sealed class ChessPiece permits Pawn, Rook, Knight, Bishop, Queen, King {
 
@@ -28,7 +29,7 @@ public abstract sealed class ChessPiece permits Pawn, Rook, Knight, Bishop, Quee
 
     private final PieceType type;
     private final Side side;
-    private final BoardTile tile;
+    private BoardTile tile;
 
     protected ChessPiece(PieceType type, Side side, BoardTile tile) {
         this.type = type;
@@ -46,6 +47,14 @@ public abstract sealed class ChessPiece permits Pawn, Rook, Knight, Bishop, Quee
             case QUEEN -> new Queen(side, tile);
             case KING -> new King(side, tile);
         };
+    }
+
+    /**
+     * Põe a peça em {@code tile}. Não valida o movimento nem trata captura;
+     * quem chama confere {@link #getValidMoves} antes.
+     */
+    public void moveTo(BoardTile tile) {
+        this.tile = tile;
     }
 
     public PieceType type() {

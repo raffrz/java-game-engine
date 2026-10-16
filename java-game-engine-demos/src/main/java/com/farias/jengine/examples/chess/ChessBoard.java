@@ -10,8 +10,9 @@ import com.farias.jengine.examples.chess.pieces.PieceType;
 import com.farias.jengine.examples.chess.pieces.Side;
 
 /**
- * O tabuleiro 8x8 e as peças sobre ele, com x e z de 0 a 7. As pretas começam
- * em z = 0 e z = 1, as brancas em z = 6 e z = 7.
+ * O tabuleiro 8x8, as peças sobre ele e as já capturadas, com x e z de 0 a 7.
+ * As pretas começam em z = 0 e z = 1, as brancas em z = 6 e z = 7. Todo
+ * movimento passa por {@link #move}.
  */
 public final class ChessBoard {
 
@@ -23,6 +24,8 @@ public final class ChessBoard {
     };
 
     private final List<ChessPiece> pieces = new ArrayList<>();
+    private final List<ChessPiece> capturedWhites = new ArrayList<>();
+    private final List<ChessPiece> capturedBlacks = new ArrayList<>();
 
     /** Um tabuleiro na posição inicial. */
     public static ChessBoard initialPosition() {
@@ -34,6 +37,34 @@ public final class ChessBoard {
             board.pieces.add(ChessPiece.of(BACK_RANK[x], Side.WHITE, new BoardTile(x, SIZE - 1)));
         }
         return board;
+    }
+
+    /**
+     * Põe {@code piece} em {@code target}, capturando a peça que estiver lá.
+     * Não confere se o movimento é válido (ver {@link ChessPiece#getValidMoves});
+     * só garante que duas peças nunca dividem uma casa.
+     *
+     * @return a peça capturada, ou vazio se a casa estava livre
+     */
+    public Optional<ChessPiece> move(ChessPiece piece, BoardTile target) {
+        Optional<ChessPiece> captured = pieceAt(target);
+        captured.ifPresent(this::capturePiece);
+        piece.moveTo(target);
+        return captured;
+    }
+
+    /** As peças de {@code side} capturadas até agora, na ordem da captura. */
+    public List<ChessPiece> captured(Side side) {
+        return Collections.unmodifiableList(side == Side.BLACK ? capturedBlacks : capturedWhites);
+    }
+
+    private void capturePiece(ChessPiece piece) {
+        pieces.remove(piece);
+        if (piece.side() == Side.BLACK) {
+            capturedBlacks.add(piece);
+        } else {
+            capturedWhites.add(piece);
+        }
     }
 
     public static boolean contains(int x, int z) {

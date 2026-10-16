@@ -9,6 +9,7 @@ import org.joml.Vector3f;
 
 import com.farias.jengine.assets.Assets;
 import com.farias.jengine.examples.chess.pieces.ChessPiece;
+import com.farias.jengine.examples.chess.pieces.Side;
 import com.farias.jengine.toolkit3d.IsometricCamera;
 import com.farias.jengine.toolkit3d.LitMaterials;
 import com.farias.jengine.toolkit3d.Models;
@@ -30,6 +31,10 @@ import com.farias.jengine.renderer.Texture;
  * vertical (plano XY) e é deitado com rotação de 90° em X. Cada casa tem o
  * próprio material (as texturas são compartilhadas), para o tint do caminho
  * valer só para ela.
+ *
+ * <p>
+ * Peças capturadas continuam na cena: são levadas para fora do tabuleiro,
+ * atrás da última fileira de quem capturou, e saem do picking.
  */
 final class ChessScene {
 
@@ -38,6 +43,9 @@ final class ChessScene {
     private static final float SHININESS = 48f;
     private static final Vector3f PATH_TINT_COLOR = new Vector3f(0.2f, 1f, 0.2f);
     private static final float PATH_TINT_STRENGTH = 0.35f;
+    /** Distância da primeira fileira de capturadas à última fileira do tabuleiro. */
+    private static final float CAPTURED_ROW_DISTANCE = 1.5f;
+    private static final float CAPTURED_ROW_SPACING = 1f;
 
     /** O modelo da casa (x, z) fica em {@code tileModels[x][z]}. */
     private final TexturedModel[][] tileModels = new TexturedModel[ChessBoard.SIZE][ChessBoard.SIZE];
@@ -62,10 +70,14 @@ final class ChessScene {
         return pieceViews.stream().map(PieceView::model).toList();
     }
 
-    void update(ChessGame game, float deltaTime) {
-        Optional<ChessPiece> selectedPiece = game.selectedPiece();
-        Optional<ChessPiece> hoveredPiece = game.hoveredPiece();
+    void update(ChessGame game, ChessInteraction interaction, float deltaTime) {
+        Optional<ChessPiece> selectedPiece = interaction.selectedPiece();
+        Optional<ChessPiece> hoveredPiece = interaction.hoveredPiece();
         hoveredPieceModels.clear();
+        for (ChessPiece captured : game.takeRecentCaptures()) {
+            int slot = game.captured(captured.side()).indexOf(captured);
+            viewOf(captured).capture(restingPlace(captured.side(), slot));
+        }
         // a câmera pode ter girado desde o último frame; o brilho acompanha
         Vector3f directionToEye = camera.directionToEye();
         for (PieceView view : pieceViews) {
@@ -77,28 +89,38 @@ final class ChessScene {
                 hoveredPieceModels.add(view.model());
             }
         }
-        highlightPath(game.hoveredPath(), selectedPiece);
+        highlight(interaction.highlightedTiles());
     }
 
-    /**
-     * Destaca as casas de {@code path} e, se ele não está vazio, a casa de
-     * origem da peça selecionada; as outras ficam sem tint.
-     */
-    private void highlightPath(List<BoardTile> path, Optional<ChessPiece> selectedPiece) {
+    /** Destaca as casas de {@code tiles}; as outras ficam sem tint. */
+    private void highlight(List<BoardTile> tiles) {
         for (TexturedModel[] column : tileModels) {
             for (TexturedModel tile : column) {
                 tile.lit().tint(PATH_TINT_COLOR, 0f);
             }
         }
-        if (path.isEmpty()) {
-            return;
-        }
-        selectedPiece.map(ChessPiece::tile).ifPresent(this::tintTile);
-        path.forEach(this::tintTile);
+        tiles.forEach(this::tintTile);
     }
 
     private void tintTile(BoardTile tile) {
         tileModels[tile.x()][tile.z()].lit().tint(PATH_TINT_COLOR, PATH_TINT_STRENGTH);
+    }
+
+    private PieceView viewOf(ChessPiece piece) {
+        return pieceViews.stream().filter(view -> view.piece() == piece).findFirst().orElseThrow();
+    }
+
+    /**
+     * Onde fica a {@code slot}-ésima peça capturada de {@code capturedSide}
+     * (ver {@link ChessGame#captured}): fora do tabuleiro, atrás da última
+     * fileira de quem capturou (brancas em z = 7, pretas em z = 0), em
+     * fileiras de {@code SIZE} peças ao longo de x.
+     */
+    private static Vector3f restingPlace(Side capturedSide, int slot) {
+        boolean byWhite = capturedSide == Side.BLACK;
+        float distance = CAPTURED_ROW_DISTANCE + (slot / ChessBoard.SIZE) * CAPTURED_ROW_SPACING;
+        float z = byWhite ? ChessBoard.SIZE - 1 + distance : -distance;
+        return new Vector3f(slot % ChessBoard.SIZE, 0f, z);
     }
 
     /** Os modelos das peças sob o cursor, conforme o último {@link #update}. */
@@ -106,12 +128,15 @@ final class ChessScene {
         return hoveredPieceModels;
     }
 
-    /** A peça mais próxima atingida pelo raio, ou null se nenhuma. */
+    /** A peça em jogo mais próxima atingida pelo raio, ou null se nenhuma. */
     ChessPiece pieceAt(Ray ray) {
         ChessPiece closest = null;
         float closestT = Float.POSITIVE_INFINITY;
 
         for (PieceView view : pieceViews) {
+            if (view.isCaptured()) {
+                continue;
+            }
             float t = view.hit(ray);
             if (!Float.isNaN(t) && t < closestT) {
                 closestT = t;
