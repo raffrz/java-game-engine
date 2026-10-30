@@ -31,7 +31,6 @@ import com.farias.jengine.toolkit2d.Toolkit2D;
 import com.farias.jengine.toolkit2d.Toolkit2DModule;
 import com.farias.jengine.toolkit2d.Ui;
 import com.farias.jengine.toolkit3d.DirectionalLight;
-import com.farias.jengine.toolkit3d.IsometricCamera;
 import com.farias.jengine.toolkit3d.LitMaterial;
 import com.farias.jengine.toolkit3d.LitMaterials;
 import com.farias.jengine.toolkit3d.ShadowMap;
@@ -52,8 +51,8 @@ import com.farias.procgeo.nodes.StandardNodes;
  * material, ver {@link CityMeshes}) e desenha com sombras.
  *
  * <p>
- * Controles: setas/WASD movem, roda do mouse = zoom, botao do meio ou Q/E giram,
- * R gera outra cidade (nova seed), Esc sai.
+ * Camera de perspectiva em orbita. Controles: setas/WASD movem no chao, roda = zoom, arrastar (botao esquerdo ou
+ * do meio) orbita, Q/E giram, R gera outra cidade (nova seed), Esc sai.
  */
 public final class ProceduralCityDemo {
 
@@ -62,11 +61,8 @@ public final class ProceduralCityDemo {
     private static final int BLOCKS = 5;
     private static final long FIRST_SEED = 2026L;
 
-    private static final float CAMERA_OFFSET = 200f;
-    private static final float CAMERA_SIZE = 110f;
-    private static final float PAN_SPEED = 0.9f;
-    private static final float ZOOM_PER_NOTCH = 6f;
-    private static final float ROTATE_SENSITIVITY = 0.4f;
+    private static final float PAN_SPEED = 0.8f;
+    private static final float ROTATE_SENSITIVITY = 0.3f;
     private static final float KEY_ROTATE_SPEED = 60f;
 
     private static final Vector3f LIGHT_DIRECTION = new Vector3f(0.45f, 1f, 0.6f);
@@ -79,7 +75,7 @@ public final class ProceduralCityDemo {
     private final Ui ui;
     private final LitMaterials litMaterials;
     private final ShadowMap shadow;
-    private final IsometricCamera camera = new IsometricCamera(CAMERA_OFFSET, CAMERA_SIZE);
+    private final OrbitCamera camera = new OrbitCamera(35f, 38f, 330f);
     private final Matrix4f identity = new Matrix4f();
     private final RenderPassDescriptor scenePass = new RenderPassDescriptor("procedural-city")
             .clearColor(0.62f, 0.76f, 0.92f, 1f)
@@ -97,6 +93,7 @@ public final class ProceduralCityDemo {
     private long seed = FIRST_SEED;
     private String stats = "";
     private double lastMouseX;
+    private double lastMouseY;
 
     public static void main(String[] args) {
         launch();
@@ -127,7 +124,7 @@ public final class ProceduralCityDemo {
 
         DirectionalLight light = DirectionalLight.covering(LIGHT_DIRECTION, new Vector3f(0f, 0f, 0f), LIGHT_RADIUS);
         shadow = context.require(Shadows.class).create(light, SHADOW_MAP_SIZE);
-        camera.target().set(0f, 15f, 0f);
+        camera.target().set(0f, 8f, 0f);
         generate();
     }
 
@@ -195,27 +192,24 @@ public final class ProceduralCityDemo {
     // ---- camera ----
 
     private void moveCamera(float deltaTime) {
-        double yaw = Math.toRadians(camera.yaw());
-        float eyeX = (float) Math.sin(yaw);
-        float eyeZ = (float) Math.cos(yaw);
         float forward = axis(Key.UP, Key.W, Key.DOWN, Key.S);
         float right = axis(Key.RIGHT, Key.D, Key.LEFT, Key.A);
-        float speed = PAN_SPEED * camera.size() * deltaTime;
+        float speed = PAN_SPEED * camera.distance() * deltaTime;
+        camera.pan(forward * speed, right * speed);
 
-        // para frente = afastando-se do olho, no plano do chao
-        camera.target().x += (-eyeX * forward + eyeZ * right) * speed;
-        camera.target().z += (-eyeZ * forward - eyeX * right) * speed;
+        camera.zoom((float) input.getScrollY());
+        camera.rotate(axis(Key.E, Key.E, Key.Q, Key.Q) * KEY_ROTATE_SPEED * deltaTime, 0f);
 
-        camera.zoom((float) -input.getScrollY() * ZOOM_PER_NOTCH);
-        camera.rotate((axis(Key.E, Key.E, Key.Q, Key.Q)) * KEY_ROTATE_SPEED * deltaTime);
-
+        // arrastar com o botao esquerdo ou do meio orbita (horizontal = yaw, vertical = pitch)
         double mouseX = input.getMouseX();
-        if (input.isMouseButtonPressed(MouseButton.MIDDLE)) {
-            lastMouseX = mouseX;
-        } else if (input.isMouseButtonDown(MouseButton.MIDDLE)) {
-            camera.rotate((float) (mouseX - lastMouseX) * ROTATE_SENSITIVITY);
-            lastMouseX = mouseX;
+        double mouseY = input.getMouseY();
+        boolean pressed = input.isMouseButtonPressed(MouseButton.LEFT) || input.isMouseButtonPressed(MouseButton.MIDDLE);
+        boolean dragging = input.isMouseButtonDown(MouseButton.LEFT) || input.isMouseButtonDown(MouseButton.MIDDLE);
+        if (dragging && !pressed) {
+            camera.rotate((float) (mouseX - lastMouseX) * -ROTATE_SENSITIVITY, (float) (mouseY - lastMouseY) * ROTATE_SENSITIVITY);
         }
+        lastMouseX = mouseX;
+        lastMouseY = mouseY;
     }
 
     private float axis(Key positive, Key positiveAlt, Key negative, Key negativeAlt) {
@@ -240,7 +234,7 @@ public final class ProceduralCityDemo {
         int centerX = window.getWidth() / 2;
         ui.begin();
         ui.textCentered(ui.defaultFont(), "CIDADE PROCEDURAL - " + stats.toUpperCase(), centerX, 18, 12);
-        ui.textCentered(ui.defaultFont(), "SETAS/WASD = MOVER | RODA = ZOOM | Q/E OU BOTAO DO MEIO = GIRAR | R = NOVA CIDADE",
+        ui.textCentered(ui.defaultFont(), "SETAS/WASD = MOVER | RODA = ZOOM | ARRASTAR = ORBITAR | Q/E = GIRAR | R = NOVA CIDADE",
                 centerX, 38, 10);
         renderer.endFrame();
     }

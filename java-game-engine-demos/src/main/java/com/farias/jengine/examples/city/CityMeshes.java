@@ -16,12 +16,16 @@ import com.farias.procgeo.core.mesh.Triangulator;
 /**
  * Adaptador entre a biblioteca procedural-geometry e o renderer: converte a malha
  * (faces poligonais, atributos) em {@link MeshData} triangulado, um por material.
- * Normais por face (shading chapado); o atributo de vertice {@code tone} vira a
- * coordenada U, que escolhe a cor numa paleta (ver {@link CityPalettes}).
+ * Normais por canto ({@link Mesh#cornerNormals}): faces marcadas com o atributo FACE {@code smooth} se misturam com as
+ * vizinhas dentro de {@link #CREASE_DEGREES} (superficies curvas lisas); as demais ficam chapadas. O atributo de
+ * vertice {@code tone} vira a coordenada U, que escolhe a cor numa paleta (ver {@link CityPalettes}).
  */
 final class CityMeshes {
 
     static final String DEFAULT_MATERIAL = "wall";
+
+    /** Angulo maximo entre faces "suaves" (atributo {@code smooth}) para as normais serem misturadas. */
+    static final double CREASE_DEGREES = 50.0;
 
     private CityMeshes() {
     }
@@ -34,6 +38,14 @@ final class CityMeshes {
         }
         Attribute material = mesh.attributes().get("material");
         Attribute tone = mesh.attributes().get("tone");
+        Attribute smoothAttribute = mesh.attributes().get("smooth");
+        boolean[] smooth = new boolean[mesh.faceCount()];
+        if (smoothAttribute != null) {
+            for (int f = 0; f < smooth.length; f++) {
+                smooth[f] = (Boolean) smoothAttribute.get(f);
+            }
+        }
+        Vec3[] cornerNormals = mesh.cornerNormals(CREASE_DEGREES, smooth);
         List<Integer> triangle = new ArrayList<>();
 
         for (int f = 0; f < mesh.faceCount(); f++) {
@@ -46,18 +58,27 @@ final class CityMeshes {
             if (triangle.isEmpty()) {
                 continue;
             }
-            Vec3 normal = mesh.faceNormal(f);
             int paletteSize = paletteSizes.getOrDefault(name, 1);
             Builder builder = builders.computeIfAbsent(name, k -> new Builder());
             for (int vertex : triangle) {
                 double t = tone == null ? 0.5 : (Double) tone.get(vertex);
-                builder.add(mesh.position(vertex), normal, paletteU(t, paletteSize));
+                builder.add(mesh.position(vertex), cornerNormal(mesh, cornerNormals, f, vertex), paletteU(t, paletteSize));
             }
         }
 
         Map<String, MeshData> result = new LinkedHashMap<>();
         builders.forEach((name, builder) -> result.put(name, builder.build()));
         return result;
+    }
+
+    /** Normal do canto de {@code face} que usa {@code vertex}. */
+    private static Vec3 cornerNormal(Mesh mesh, Vec3[] cornerNormals, int face, int vertex) {
+        for (int c = mesh.faceStart(face); c < mesh.faceStart(face) + mesh.faceSize(face); c++) {
+            if (mesh.cornerVertex(c) == vertex) {
+                return cornerNormals[c];
+            }
+        }
+        return mesh.faceNormal(face);
     }
 
     /** Centro do texel escolhido por {@code tone} em [0, 1) numa paleta de {@code size} cores. */

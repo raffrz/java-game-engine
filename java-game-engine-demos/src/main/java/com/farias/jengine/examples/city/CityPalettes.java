@@ -40,6 +40,10 @@ final class CityPalettes {
         COLORS.put("car_body", new int[] {0xC0392B, 0x2E6DA4, 0xE5B80B, 0xECECEC, 0x2C2C2C, 0x3A8D5A, 0xD9731A, 0x7D4E9E});
         COLORS.put("car_glass", new int[] {0x1E2A33});
         COLORS.put("tire", new int[] {0x151515});
+        COLORS.put("concrete", new int[] {0xA7A59E, 0x8F8D88, 0xB5B2AA, 0x9A9892, 0x7F7E7A});
+        COLORS.put("plaza", new int[] {0xBDB9AF});
+        COLORS.put("awning", new int[] {0xB23A3A, 0x2F6B8F, 0x2F7D4F, 0xD9A21B});
+        COLORS.put("foliage", new int[] {0x5E9E3F, 0x7BB04A, 0x4C8A3A, 0x9CB84A, 0x6FA356, 0xC9A23A});
         COLORS.put("water", new int[] {0x4A86B8});
     }
 
