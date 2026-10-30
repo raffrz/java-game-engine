@@ -26,9 +26,6 @@ import com.farias.procgeo.graph.PortType;
  * house_block   quatro casas por quarteirao
  * courtyard     quatro blocos em volta de um patio
  * tree, park    arvore; parque com caminhos, lago, bancos e arvores espalhadas
- * waffle       fachada brutalista: grade de aberturas profundas em concreto (inset + extrude + vidro no fundo)
- * waffle_block  4 fachadas waffle + laje de cobertura e soffit; civic_hall / terraced_hall / inverted_hall = predios publicos
- * pilotis, steps colunas instanciadas em grade; escadaria monumental
  * lamp, car     poste e carro (carro usa instancias para as rodas)
  * street, road  faixa de rua; faixa com tracejado e carros
  * *_grid        ruas nas duas direcoes (instancias, com variantes sorteadas)
@@ -42,8 +39,7 @@ final class CityGraphs {
 
     static GraphLibrary library() {
         return new GraphLibrary()
-                .add(windows()).add(awning()).add(facade()).add(waffle()).add(waffleBlock()).add(pilotis()).add(steps())
-                .add(civicHall()).add(terracedHall()).add(invertedHall()).add(towerBody()).add(tower()).add(spire()).add(steppedTower())
+                .add(windows()).add(awning()).add(facade()).add(towerBody()).add(tower()).add(spire()).add(steppedTower())
                 .add(roundTower()).add(house()).add(houseBlock()).add(courtyard()).add(tree()).add(broadleaf()).add(park())
                 .add(lamp()).add(car()).add(street()).add(road()).add(sidewalkGrid()).add(roadGrid()).add(city());
     }
@@ -460,160 +456,6 @@ final class CityGraphs {
         return g.build();
     }
 
-    // ================= predios publicos brutalistas =================
-
-    /**
-     * Fachada brutalista ("waffle"): grade em concreto aparente; cada celula ganha moldura (inset) e uma abertura profunda
-     * (extrude para dentro), com vidro so no fundo (faces voltadas a +Z abaixo de meia profundidade).
-     */
-    private static GraphAsset waffle() {
-        GraphBuilder g = asset("waffle");
-        g.input(num("width", 12)).input(num("height", 10)).input(integer("cols", 4)).input(integer("rows", 3))
-                .input(num("depth", 1.2)).input(num("margin", 0.6)).input(num("lit", 0.3));
-        node(g, "vx", "core.int_math", "operation", "add", "a", in("cols"), "b", 1);
-        node(g, "vz", "core.int_math", "operation", "add", "a", in("rows"), "b", 1);
-        node(g, "grid", "core.create_grid", "size_x", in("width"), "size_z", in("height"),
-                "vertices_x", out("vx", "result"), "vertices_z", out("vz", "result"));
-        Ref stood = rotate(g, "stand", out("grid", "mesh"), new Vec3(90, 0, 0));
-        Ref raised = translate(g, "up", stood, vec(g, "lift", 0.0, math(g, "half", "multiply", in("height"), 0.5), 0.0));
-        node(g, "paint", "core.set_material", "geometry", raised, "material", "concrete");
-        node(g, "framed", "core.inset_faces", "geometry", out("paint", "geometry"), "amount", in("margin"), "inner_attribute", "waffle_inner");
-        node(g, "holes", "core.extrude", "geometry", out("framed", "geometry"), "selection", flag(g, "waffleInner", "waffle_inner"),
-                "distance", math(g, "deepen", "multiply", in("depth"), -1.0));
-
-        Ref[] n = normal(g, "x");
-        Ref[] p = position(g, "x");
-        Ref bottom = and(g, "holeBottom", cmp(g, "facing", "gt", n[2], 0.9),
-                cmp(g, "deepEnough", "lt", p[2], math(g, "halfDeep", "multiply", in("depth"), -0.5)));
-        node(g, "litRnd", "core.random_value", "probability", in("lit"));
-        Ref lit = and(g, "glassLit", bottom, out("litRnd", "bool"));
-        Ref dark = and(g, "glassDark", bottom, not(g, "notLit", out("litRnd", "bool")));
-        node(g, "glassA", "core.set_material", "geometry", out("holes", "geometry"), "selection", lit, "material", "window_lit");
-        node(g, "glassB", "core.set_material", "geometry", out("glassA", "geometry"), "selection", dark, "material", "window_dark");
-        output(g, "geometry", PortType.GEOMETRY, out("glassB", "geometry"));
-        return g.build();
-    }
-
-    /** Volume brutalista: quatro fachadas waffle, laje de cobertura com beiral e soffit (visivel quando em balanco). */
-    private static GraphAsset waffleBlock() {
-        GraphBuilder g = asset("waffle_block");
-        g.input(integer("cols_x", 6)).input(integer("cols_z", 4)).input(integer("floors", 3)).input(num("cell", 3.0))
-                .input(num("floor_h", 3.6)).input(num("depth", 1.2)).input(num("margin", 0.6)).input(num("lit", 0.3));
-        Ref w = math(g, "w", "multiply", in("cols_x"), in("cell"));
-        Ref d = math(g, "d", "multiply", in("cols_z"), in("cell"));
-        Ref h = math(g, "h", "multiply", in("floors"), in("floor_h"));
-        Ref offZ = vec(g, "offZ", 0.0, 0.0, math(g, "hd", "multiply", d, 0.5));
-        Ref offX = vec(g, "offX", 0.0, 0.0, math(g, "hw", "multiply", w, 0.5));
-
-        String[] names = {"front", "back", "right", "left"};
-        double[] yaw = {0, 180, 90, -90};
-        Ref[] parts = new Ref[6];
-        for (int i = 0; i < 4; i++) {
-            boolean alongX = i < 2;
-            sub(g, names[i] + "Facade", "waffle", "width", alongX ? w : d, "height", h, "cols", alongX ? in("cols_x") : in("cols_z"),
-                    "rows", in("floors"), "depth", in("depth"), "margin", in("margin"), "lit", in("lit"));
-            Ref moved = translate(g, names[i] + "Move", out(names[i] + "Facade", "geometry"), alongX ? offZ : offX);
-            parts[i] = rotate(g, names[i], moved, new Vec3(0, yaw[i], 0));
-        }
-        parts[4] = part(g, "roofSlab", vec(g, "roofSize", math(g, "roofW", "add", w, 1.4), 0.9, math(g, "roofD", "add", d, 1.4)),
-                vec(g, "roofAt", 0.0, math(g, "roofY", "add", h, 0.45), 0.0), "concrete");
-        parts[5] = part(g, "soffit", vec(g, "soffitSize", w, 0.9, d), new Vec3(0, -0.45, 0), "concrete");
-        output(g, "geometry", PortType.GEOMETRY, join(g, "all", parts));
-        output(g, "width", PortType.FLOAT, w);
-        output(g, "depth", PortType.FLOAT, d);
-        output(g, "height", PortType.FLOAT, math(g, "top", "add", h, 0.9));
-        return g.build();
-    }
-
-    /** Pilotis: colunas robustas de concreto, uma instancia por vertice de uma grade. */
-    private static GraphAsset pilotis() {
-        GraphBuilder g = asset("pilotis");
-        g.input(integer("cols_x", 4)).input(integer("cols_z", 3)).input(num("span", 6.5)).input(num("height", 5.5)).input(num("size", 1.6));
-        node(g, "gapsX", "core.int_math", "operation", "subtract", "a", in("cols_x"), "b", 1);
-        node(g, "gapsZ", "core.int_math", "operation", "subtract", "a", in("cols_z"), "b", 1);
-        node(g, "layout", "core.create_grid", "size_x", math(g, "spanX", "multiply", out("gapsX", "result"), in("span")),
-                "size_z", math(g, "spanZ", "multiply", out("gapsZ", "result"), in("span")),
-                "vertices_x", in("cols_x"), "vertices_z", in("cols_z"));
-        node(g, "spots", "core.mesh_to_points", "geometry", out("layout", "mesh"));
-        Ref column = part(g, "column", vec(g, "columnSize", in("size"), in("height"), in("size")),
-                vec(g, "columnAt", 0.0, math(g, "columnY", "multiply", in("height"), 0.5), 0.0), "concrete");
-        node(g, "columns", "core.instance_on_points", "points", out("spots", "points"), "instance", column);
-        output(g, "geometry", PortType.GEOMETRY, out("columns", "instances"));
-        return g.build();
-    }
-
-    /** Escadaria monumental: seis degraus, o mais alto junto ao predio (z = 0), descendo para +Z. */
-    private static GraphAsset steps() {
-        GraphBuilder g = asset("steps");
-        g.input(num("width", 12));
-        Ref[] treads = new Ref[6];
-        for (int i = 0; i < 6; i++) {
-            double h = 0.3 * (6 - i);
-            treads[i] = part(g, "step" + i, vec(g, "stepSize" + i, in("width"), h, 0.7), new Vec3(0, h / 2, 0.7 * i + 0.35), "concrete");
-        }
-        output(g, "geometry", PortType.GEOMETRY, join(g, "all", treads));
-        return g.build();
-    }
-
-    /** Predio civico: volume waffle em balanco sobre pilotis, torre de escada com frestas verticais e escadaria, numa praca. */
-    private static GraphAsset civicHall() {
-        GraphBuilder g = asset("civic_hall");
-        Ref plaza = part(g, "plaza", new Vec3(27, 0.22, 27), new Vec3(0, 0.11, 0), "plaza");
-        sub(g, "legs", "pilotis", "cols_x", 4, "cols_z", 3, "span", 6.5, "height", 5.7, "size", 1.7);
-        Ref legsUp = translate(g, "legsUp", out("legs", "geometry"), new Vec3(0, 0.2, -1));
-        sub(g, "hall", "waffle_block", "cols_x", 8, "cols_z", 5, "floors", 4, "floor_h", 3.4);
-        Ref hallUp = translate(g, "hallUp", out("hall", "geometry"), new Vec3(0, 5.8, -1));
-        sub(g, "core", "waffle_block", "cols_x", 3, "cols_z", 3, "floors", 1, "cell", 2.0, "floor_h", 24.0, "margin", 0.55, "lit", 0.0);
-        Ref coreUp = translate(g, "coreUp", out("core", "geometry"), new Vec3(9.5, 0.2, 9.5));
-        sub(g, "stairs", "steps", "width", 10.0);
-        Ref stairsUp = translate(g, "stairsUp", out("stairs", "geometry"), new Vec3(-4, 0.2, 7.5));
-        output(g, "geometry", PortType.GEOMETRY, join(g, "all", plaza, legsUp, hallUp, coreUp, stairsUp));
-        return g.build();
-    }
-
-    /** Predio em terracos: tres volumes waffle recuando em direcao ao fundo, com escadaria e torre de escada. */
-    private static GraphAsset terracedHall() {
-        GraphBuilder g = asset("terraced_hall");
-        Ref plaza = part(g, "plaza", new Vec3(27, 0.22, 27), new Vec3(0, 0.11, 0), "plaza");
-        sub(g, "base", "waffle_block", "cols_x", 8, "cols_z", 6, "floors", 2);
-        sub(g, "middle", "waffle_block", "cols_x", 6, "cols_z", 4, "floors", 2);
-        sub(g, "upper", "waffle_block", "cols_x", 4, "cols_z", 3, "floors", 2);
-        Ref baseUp = translate(g, "baseUp", out("base", "geometry"), new Vec3(0, 0.2, -1.5));
-        Ref middleUp = translate(g, "middleUp", out("middle", "geometry"),
-                vec(g, "middleAt", 0.0, math(g, "middleY", "add", out("base", "height"), 0.2), -4.5));
-        Ref upperUp = translate(g, "upperUp", out("upper", "geometry"),
-                vec(g, "upperAt", 0.0, math(g, "upperY", "add", math(g, "twoTiers", "add", out("base", "height"), out("middle", "height")), 0.2), -7.0));
-        sub(g, "tower", "waffle_block", "cols_x", 3, "cols_z", 3, "floors", 1, "cell", 2.0, "floor_h", 22.0, "margin", 0.55, "lit", 0.0);
-        Ref towerUp = translate(g, "towerUp", out("tower", "geometry"), new Vec3(-9.5, 0.2, 9.5));
-        sub(g, "stairs", "steps", "width", 14.0);
-        Ref stairsUp = translate(g, "stairsUp", out("stairs", "geometry"), new Vec3(2, 0.2, 7.5));
-        output(g, "geometry", PortType.GEOMETRY, join(g, "all", plaza, baseUp, middleUp, upperUp, towerUp, stairsUp));
-        return g.build();
-    }
-
-    /** Volume invertido: nucleo estreito e tres volumes cada vez maiores empilhados (soffits expostos), mais monolitos na praca. */
-    private static GraphAsset invertedHall() {
-        GraphBuilder g = asset("inverted_hall");
-        Ref plaza = part(g, "plaza", new Vec3(27, 0.22, 27), new Vec3(0, 0.11, 0), "plaza");
-        sub(g, "core", "waffle_block", "cols_x", 3, "cols_z", 3, "floors", 3, "lit", 0.15);
-        sub(g, "tierA", "waffle_block", "cols_x", 4, "cols_z", 4, "floors", 2);
-        sub(g, "tierB", "waffle_block", "cols_x", 5, "cols_z", 4, "floors", 2);
-        sub(g, "tierC", "waffle_block", "cols_x", 6, "cols_z", 5, "floors", 2);
-        Ref coreUp = translate(g, "coreUp", out("core", "geometry"), new Vec3(0, 0.2, 0));
-        Ref y1 = math(g, "y1", "add", out("core", "height"), 0.2);
-        Ref y2 = math(g, "y2", "add", y1, out("tierA", "height"));
-        Ref y3 = math(g, "y3", "add", y2, out("tierB", "height"));
-        Ref aUp = translate(g, "aUp", out("tierA", "geometry"), vec(g, "aAt", 0.0, y1, 0.0));
-        Ref bUp = translate(g, "bUp", out("tierB", "geometry"), vec(g, "bAt", 0.0, y2, 0.0));
-        Ref cUp = translate(g, "cUp", out("tierC", "geometry"), vec(g, "cAt", 0.0, y3, 0.0));
-        Ref monolith = part(g, "monolith", new Vec3(3, 11, 3), new Vec3(-10, 5.7, 10), "concrete");
-        Ref cube = part(g, "cube", new Vec3(4, 4, 4), new Vec3(10, 2.2, 10), "concrete");
-        sub(g, "stairs", "steps", "width", 8.0);
-        Ref stairsUp = translate(g, "stairsUp", out("stairs", "geometry"), new Vec3(-3, 0.2, 5.8));
-        output(g, "geometry", PortType.GEOMETRY, join(g, "all", plaza, coreUp, aUp, bUp, cUp, monolith, cube, stairsUp));
-        return g.build();
-    }
-
     // ================= casas =================
 
     /**
@@ -1001,18 +843,15 @@ final class CityGraphs {
         sub(g, "housesA", "house_block", "wide", 2, "deep", 2);
         sub(g, "housesB", "house_block", "wide", 3, "deep", 2);
         sub(g, "yard", "courtyard");
-        sub(g, "civic", "civic_hall");
-        sub(g, "terraced", "terraced_hall");
-        sub(g, "inverted", "inverted_hall");
         sub(g, "podiumBase", "tower", "cols_x", 7, "cols_z", 7, "floors", 3, "floor_h", 3.4);
         sub(g, "podiumTop", "tower", "cols_x", 4, "cols_z", 4, "floors", 16);
         Ref podiumUp = translate(g, "podiumTopUp", out("podiumTop", "geometry"), new Vec3(0, 10.2, 0));
         Ref podium = join(g, "podium", out("podiumBase", "geometry"), podiumUp);
 
         Ref[] lots = {out("skyscraper", "geometry"), out("skyscraper2", "geometry"), out("midrise", "geometry"), out("slab", "geometry"),
-                out("warehouse", "geometry"), out("cylinder", "geometry"), out("parkLot", "geometry"), out("housesA", "geometry"),
-                out("housesB", "geometry"), out("yard", "geometry"), podium,
-                out("civic", "geometry"), out("terraced", "geometry"), out("inverted", "geometry")};
+                out("warehouse", "geometry"), out("cylinder", "geometry"), out("parkLot", "geometry"),
+                out("housesA", "geometry"),
+                out("housesB", "geometry"), out("yard", "geometry"), podium};
         Ref[] variants = new Ref[lots.length];
         for (int i = 0; i < lots.length; i++) {
             node(g, "lot" + i, "core.geometry_to_instance", "geometry", lots[i]);
@@ -1035,8 +874,15 @@ final class CityGraphs {
         node(g, "turn", "core.combine_xyz", "y", out("yaw", "result"));
         node(g, "stretch", "core.random_value", "min_float", 0.85, "max_float", 1.25);
         node(g, "scale", "core.combine_xyz", "x", 1.0, "y", out("stretch", "float"), "z", 1.0);
+        // o quarteirao central (perto da origem) e sempre um parque; os demais sorteiam
+        Ref[] block = position(g, "blk");
+        Ref central = and(g, "central", cmp(g, "nearX", "lt", fmath(g, "absBx", "abs", block[0], 0.0), 1.0),
+                cmp(g, "nearZ", "lt", fmath(g, "absBz", "abs", block[2], 0.0), 1.0));
+        sub(g, "centralPark", "park", "size", 28.0, "density", 0.03);
+        node(g, "centralSpot", "core.instance_on_points", "points", out("tonedPoints", "geometry"), "instance",
+                out("centralPark", "geometry"), "selection", central);
         node(g, "lots", "core.instance_on_points", "points", out("tonedPoints", "geometry"), "instance", choices,
-                "pick_instance", true, "instance_index", out("pick", "int"), "rotation", out("turn", "vector"),
+                "selection", not(g, "notCentral", central), "pick_instance", true, "instance_index", out("pick", "int"), "rotation", out("turn", "vector"),
                 "scale", out("scale", "vector"));
 
         // postes nos quatro cantos de cada quarteirao
@@ -1049,7 +895,7 @@ final class CityGraphs {
         node(g, "lamps", "core.instance_on_points", "points", out("blockPoints", "points"), "instance", out("lampCluster", "instances"));
 
         join(g, "world", out("ground", "geometry"), out("sidewalks", "geometry"), out("roads", "geometry"), out("lots", "instances"),
-                out("lamps", "instances"));
+                out("centralSpot", "instances"), out("lamps", "instances"));
         node(g, "flat", "core.realize_instances", "geometry", out("world", "geometry"));
         output(g, "geometry", PortType.GEOMETRY, out("flat", "geometry"));
         return g.build();
