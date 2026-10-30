@@ -45,7 +45,7 @@ import com.farias.procgeo.nodes.StandardNodes;
 
 /**
  * Cidade procedural: ruas e predios variados (torres, galpoes, predios cilindricos,
- * casas com telhado, parques com arvores) gerados em tempo de execucao por grafos da
+ * casas com telhado de telhas, parques com arvores), todos com muito detalhe (janelas com requadro, sacadas, meio-fio, sinalizacao) gerados em tempo de execucao por grafos da
  * biblioteca procedural-geometry (ver {@link CityGraphs}). O demo so executa o grafo
  * "city" com uma seed, converte a malha resultante em meshes do renderer (um por
  * material, ver {@link CityMeshes}) e desenha com sombras.
@@ -182,6 +182,8 @@ public final class ProceduralCityDemo {
                 case "window_lit" -> material.emission(texture, 0.55f);
                 case "shopfront" -> material.emission(texture, 0.4f);
                 case "lamp" -> material.emission(texture, 0.95f);
+                case "headlight", "light_red", "light_amber", "light_green" -> material.emission(texture, 0.9f);
+                case "taillight" -> material.emission(texture, 0.7f);
                 default -> {
                 }
             }

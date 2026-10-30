@@ -14,7 +14,7 @@ import com.farias.jengine.renderer.Texture;
  * dos nomes de uniform. Criado por {@link LitMaterials#create(Texture)}.
  *
  * <p>
- * Por padrão é fosco, não recebe sombra, não tem tint e a luz vem de
+ * Por padrão é fosco, não recebe sombra, não tem tint, não emite e a luz vem de
  * (1, 1, 1): de cima e de frente para quem olha a cena dos eixos positivos.
  *
  * <pre>{@code
@@ -27,6 +27,7 @@ public final class LitMaterial extends Material {
 
     private static final int TEXTURE_UNIT = 0;
     private static final int SHADOW_MAP_UNIT = 1;
+    private static final int EMISSION_MAP_UNIT = 2;
 
     LitMaterial(Shader shader, Texture texture) {
         super(shader);
@@ -35,6 +36,7 @@ public final class LitMaterial extends Material {
         setFloat("specularStrength", 0f);
         setInt("receiveShadows", 0);
         tint(new Vector3f(1f, 1f, 1f), 0f);
+        setInt("useEmission", 0);
     }
 
     /**
@@ -87,6 +89,22 @@ public final class LitMaterial extends Material {
     public LitMaterial tint(Vector3f color, float strength) {
         setVector3f("tintColor", color);
         setFloat("tintStrength", strength);
+        return this;
+    }
+
+    /**
+     * Brilho próprio: soma a cor de {@code map} (lida na mesma UV da textura de
+     * cor) vezes {@code strength} depois da luz, então a emissão não recebe
+     * luz, sombra nem tint. Por padrão desligado; {@code strength = 0} apaga o
+     * efeito.
+     *
+     * @param map      cor emitida por texel
+     * @param strength multiplicador da cor emitida
+     */
+    public LitMaterial emission(Texture map, float strength) {
+        setTexture("emissionMap", map, EMISSION_MAP_UNIT);
+        setFloat("emissionStrength", strength);
+        setInt("useEmission", 1);
         return this;
     }
 

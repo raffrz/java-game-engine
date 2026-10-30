@@ -43,6 +43,23 @@ final class CityPalettes {
         COLORS.put("awning", new int[] {0xB23A3A, 0x2F6B8F, 0x2F7D4F, 0xD9A21B});
         COLORS.put("foliage", new int[] {0x5E9E3F, 0x7BB04A, 0x4C8A3A, 0x9CB84A, 0x6FA356, 0xC9A23A});
         COLORS.put("water", new int[] {0x4A86B8});
+        COLORS.put("tile", new int[] {0xA8553A, 0x8A4B3A, 0x6B6F76, 0x4F5560, 0x7A5F4A});
+        COLORS.put("shutter", new int[] {0x2F6B4A, 0x2F4F6B, 0x7A2E2E, 0xF1EEE6, 0x5A3A24});
+        COLORS.put("flowers", new int[] {0xE0507A, 0xF2C230, 0xD94B3A, 0xB57BE0, 0xF4F4F4});
+        COLORS.put("railing", new int[] {0x3C4046});
+        COLORS.put("stone", new int[] {0x8D8A82, 0x77746D, 0x9B978C});
+        COLORS.put("curb", new int[] {0xB5B3AB});
+        COLORS.put("paving", new int[] {0xB9B7AD});
+        COLORS.put("tank", new int[] {0x8B6B4A});
+        COLORS.put("headlight", new int[] {0xFFF3C4});
+        COLORS.put("taillight", new int[] {0xC21818});
+        COLORS.put("rim", new int[] {0xC9CED3});
+        COLORS.put("signal", new int[] {0x2B2F33});
+        COLORS.put("light_red", new int[] {0xFF3B2F});
+        COLORS.put("light_amber", new int[] {0xFFB020});
+        COLORS.put("light_green", new int[] {0x35E07A});
+        COLORS.put("hydrant", new int[] {0xC62828});
+        COLORS.put("bin", new int[] {0x3E5C4A});
     }
 
     private CityPalettes() {

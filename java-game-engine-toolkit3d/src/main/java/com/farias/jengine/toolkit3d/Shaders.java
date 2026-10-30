@@ -55,7 +55,10 @@ public final class Shaders {
      * superfície para a câmera (exata em projeção ortográfica, aproximação em
      * perspectiva). Sombra, quando {@code receiveShadows != 0}:
      * {@code shadowMap} (profundidade do ponto de vista da luz, filtro 3x3),
-     * {@code lightSpaceMatrix} e {@code shadowBias}.
+     * {@code lightSpaceMatrix} e {@code shadowBias}. Emissão, quando
+     * {@code useEmission != 0}: {@code emissionMap} (lido na mesma UV da
+     * textura de cor) vezes {@code emissionStrength}, somada depois da luz, sem
+     * receber luz, sombra nem tint.
      */
     public static final String STANDARD_FRAGMENT = """
             #version 330 core
@@ -72,6 +75,9 @@ public final class Shaders {
             uniform float shininess;
             uniform vec3 tintColor;
             uniform float tintStrength;
+            uniform sampler2D emissionMap;
+            uniform int useEmission;
+            uniform float emissionStrength;
 
             in vec2 tex_coords;
             in vec3 fragNormal;
@@ -116,7 +122,8 @@ public final class Shaders {
                 float specular = specularStrength * highlight * (diffuse > 0.0 ? 1.0 : 0.0) * (1.0 - shadow);
 
                 vec3 albedo = mix(texColor.rgb, tintColor, tintStrength);
-                fragColor = vec4(albedo * light + vec3(specular), texColor.a);
+                vec3 emission = useEmission != 0 ? texture(emissionMap, tex_coords).rgb * emissionStrength : vec3(0.0);
+                fragColor = vec4(albedo * light + vec3(specular) + emission, texColor.a);
             }
             """;
 

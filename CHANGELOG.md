@@ -10,6 +10,9 @@
   câmeras que se movem.
 - `LitMaterial.tint(color, strength)`: mistura uma cor sobre a superfície (destaque de hover ou
   seleção), com os uniforms `tintColor` e `tintStrength` no shader padrão.
+- `LitMaterial.emission(map, strength)`: brilho próprio, a cor do mapa de emissão (mesma UV da textura
+  de cor) somada depois da luz, sem receber luz, sombra nem tint; uniforms `emissionMap`,
+  `useEmission` e `emissionStrength` no shader padrão. Desligado por padrão.
 
 ### Demos
 - `IsometricChess`: contorno da peça sob o cursor, zoom pela roda e rotação arrastando com o botão

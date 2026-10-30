@@ -176,7 +176,9 @@ Registrar o mesmo tipo duas vezes lança exceção (`EngineContext.registerServi
   mouse, da mesma matriz, então o que é desenhado e o que é clicado coincidem.
 - **`LitMaterial`** (`litMaterials.create(texture)`): é um `Material` com métodos tipados no lugar
   dos nomes de uniform: `light`, `glossy` (brilho especular branco, estilo plástico) e
-  `receiving(ShadowMap)`. Por padrão é fosco, não recebe sombra e a luz vem de (1, 1, 1). Usa o
+  `tint`, `emission(map, strength)` (brilho próprio: a cor do mapa, na mesma UV, é somada depois
+  da luz, sem sombra nem tint; desligado por padrão) e `receiving(ShadowMap)`. Por padrão é fosco,
+  não recebe sombra, não emite e a luz vem de (1, 1, 1). Usa o
   shader padrão (`Shaders.STANDARD_*`), criado sob demanda e pertencente ao `Renderer`. É o único
   material lit: o par `LIT_*` e as sobrecargas que recebiam um `Shader` foram removidos.
 - **`ShadowMap`** (`shadows.create(light, size[, bias])`): o mapa de profundidade, a luz, o
