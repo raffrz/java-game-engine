@@ -1,5 +1,7 @@
 package com.farias.jengine.examples.city;
 
+import java.util.Map;
+
 import com.farias.procgeo.core.math.Vec3;
 import com.farias.procgeo.graph.GraphAsset;
 import com.farias.procgeo.graph.GraphBuilder;
@@ -8,13 +10,21 @@ import com.farias.procgeo.graph.GraphLibrary;
 import com.farias.procgeo.graph.GraphRef;
 import com.farias.procgeo.graph.NodeInputDefinition;
 import com.farias.procgeo.graph.PortType;
+import com.farias.procgeo.graph.ValueKind;
 
 /**
  * Os grafos da cidade, todos compostos so de nos genericos da biblioteca
  * procedural-geometry (o nucleo da lib nao conhece "cidade" nem "predio").
- * Cada asset e um subgrafo reutilizavel com interface publica:
+ * Cada asset e um subgrafo reutilizavel com interface publica, pensado para ser exportado e reaproveitado em outros jogos:
  *
  * <pre>
+ * -- pecas genericas (sem nada de "cidade"): usadas por todos os assets abaixo --
+ * box_part, cylinder_part   caixa (com bevel e suavizacao opcionais) e cilindro com posicao e material
+ * line_points, grid_points, step_count   pontos em linha; pontos nos vertices de uma grade; quantidade de passos num comprimento
+ * parapet, roof_gear, roof_mast, water_tank   laje com parapeito; aparelhos de teto; mastro; caixa d'agua
+ * house_*, fence_*, hedge_unit   partes da casa (telhado, telhas, tabeiras, lucarnas, chamine, porta, varanda, quintal, cerca...)
+ *
+ * -- assets compostos --
  * windows       moldura, requadro em relevo, caixilho e vidro recuado (3 insets + 2 extrudes), vitrines com caixilho,
  *               marquises, peitoris, sacadas e venezianas com floreira (instancias nos centros dos vidros)
  * sill, balcony, shutters, awning   acessorios de janela
@@ -24,7 +34,7 @@ import com.farias.procgeo.graph.PortType;
  * stepped_tower torre em recuos coroada por uma torre menor de teto plano
  * round_tower   cilindro (circulo varrido por perfil vertical) + janelas + discos de piso + laje, parapeito e equipamentos
  * dormer        lucarna com janela
- * house         paredes + telhado de 2 aguas de telhas individuais + cumeeira, tabeiras, lucarnas, chamine, varanda com
+ * house         subgrafos: paredes + telhado de 2 aguas de telhas individuais + cumeeira, tabeiras, lucarnas, chamine, varanda com
  *               degraus/colunas/balaustrada, porta, caminho de lajotas, quintal com mureta, cerca de ripas, sebes e canteiros
  * house_block   quatro casas por quarteirao
  * bench, fountain, courtyard   banco; fonte; quatro blocos em volta de um patio com fonte, caminhos, bancos, postes e arvores
@@ -45,15 +55,70 @@ final class CityGraphs {
     static GraphLibrary library() {
         return new GraphLibrary()
                 .add(windows()).add(awning()).add(sill()).add(balcony()).add(shutters()).add(facade()).add(towerBody()).add(tower())
-                .add(steppedTower()).add(roundTower()).add(dormer()).add(house()).add(houseBlock()).add(bench()).add(fountain())
+                .add(steppedTower()).add(roundTower()).add(dormer()).add(houseBlock()).add(bench()).add(fountain())
                 .add(courtyard()).add(tree()).add(broadleaf()).add(park()).add(lamp()).add(signal()).add(streetKit()).add(streetTree())
-                .add(car()).add(street()).add(pavement()).add(road()).add(sidewalkGrid()).add(roadGrid()).add(city());
+                .add(car()).add(street()).add(pavement()).add(road()).add(sidewalkGrid()).add(roadGrid()).add(city())
+                // house e seus subgrafos
+                .add(windowPanesAsset()).add(shopfrontsAsset()).add(paneSpotsAsset()).add(windowFittingsAsset())
+                .add(blockPointsAsset()).add(cityLotsAsset()).add(cityBlocksAsset()).add(cityCornerLampsAsset())
+                .add(cityStreetTreesAsset()).add(citySignalsAsset())
+                .add(parkPondAsset()).add(parkFurnitureAsset()).add(parkPlantableAsset()).add(parkScatterAsset())
+                .add(parkTreesAsset()).add(parkBedsAsset())
+                .add(roadZonesAsset()).add(roadDashesAsset()).add(roadEdgesAsset()).add(roadCurbsAsset()).add(roadCrosswalksAsset())
+                .add(roadStopLinesAsset()).add(roadTrafficAsset())
+                .add(linePointsAsset()).add(gridPointsAsset()).add(stepCountAsset()).add(parapetAsset()).add(roofGearAsset()).add(roofMastAsset()).add(waterTankAsset())
+                .add(boxPartAsset()).add(cylinderPartAsset()).add(houseColumnAsset()).add(houseGableWindowAsset())
+                .add(houseRoofShellAsset()).add(houseRoofTilesAsset()).add(houseRoofTrimAsset()).add(houseDormersAsset())
+                .add(houseChimneyAsset()).add(houseDoorAsset()).add(houseBalustradeAsset()).add(housePorchAsset())
+                .add(houseWalkwayAsset()).add(houseYardAsset()).add(fenceRailAsset()).add(fencePicketsAsset())
+                .add(fenceRailsAsset()).add(fencePostsAsset()).add(houseFenceAsset()).add(hedgeUnitAsset())
+                .add(houseHedgesAsset()).add(houseMailboxAsset()).add(houseBackTreesAsset()).add(houseAsset());
     }
 
     // ---- helpers para escrever grafos de forma enxuta ----
 
-    /** Porta de saida de um no ({@code GraphInterface.INPUT_NODE} = entrada publica do grafo). */
-    private record Ref(String node, String port) {
+    /**
+     * Porta de saida de um no ({@code GraphInterface.INPUT_NODE} = entrada publica do grafo). Quando {@code lazy} nao e nulo, e
+     * o resultado de um {@code scalar_math} com constante que ainda nao virou no: {@code vec()} o embute no
+     * {@code combine_vec3_transform} ((x, y, z) * scale + offset) e qualquer outro consumidor o materializa como no normal.
+     */
+    private record Ref(String node, String port, Lazy lazy) {
+        Ref(String node, String port) {
+            this(node, port, null);
+        }
+    }
+
+    /** {@code result = a op b} (b constante) ainda sem no; equivale a {@code base * scale + offset}. */
+    private static final class Lazy {
+        final String op;
+        final double b;
+        final Ref a;
+        final Ref base;
+        final double scale;
+        final double offset;
+        boolean made;
+
+        Lazy(String op, double b, Ref a, Ref base, double scale, double offset) {
+            this.op = op;
+            this.b = b;
+            this.a = a;
+            this.base = base;
+            this.scale = scale;
+            this.offset = offset;
+        }
+    }
+
+    /** Cria o no de um valor adiado (e os de que ele depende), uma unica vez; devolve a porta real. */
+    private static Ref real(GraphBuilder g, Ref r) {
+        Lazy l = r.lazy();
+        if (l == null) {
+            return r;
+        }
+        if (!l.made) {
+            l.made = true;
+            node(g, r.node(), "core.scalar_math", "operation", l.op, "a", real(g, l.a), "b", l.b);
+        }
+        return new Ref(r.node(), r.port());
     }
 
     private static Ref in(String name) {
@@ -75,10 +140,17 @@ final class CityGraphs {
         return id;
     }
 
+    /** Chamada de subgrafo cuja saida publica e {@code geometry}. */
+    private static Ref use(GraphBuilder g, String id, String asset, Object... kv) {
+        sub(g, id, asset, kv);
+        return out(id, "geometry");
+    }
+
     private static void wire(GraphBuilder g, String id, GraphBuilder.NodeHandle handle, Object[] kv) {
         for (int i = 0; i < kv.length; i += 2) {
             String port = (String) kv[i];
-            if (kv[i + 1] instanceof Ref r) {
+            if (kv[i + 1] instanceof Ref r0) {
+                Ref r = real(g, r0);
                 g.connect(r.node(), r.port(), id, port);
             } else {
                 handle.set(port, kv[i + 1]);
@@ -86,8 +158,27 @@ final class CityGraphs {
         }
     }
 
-    /** Aritmetica de valores (FLOAT). */
+    /**
+     * Aritmetica de valores (FLOAT). Com {@code a} ligado e {@code b} constante em add/subtract/multiply/divide, o no so e
+     * criado se alguem alem do {@link #vec} usar o resultado.
+     */
     private static Ref math(GraphBuilder g, String id, String op, Object a, Object b) {
+        if (a instanceof Ref ra && b instanceof Number nb) {
+            double k = nb.doubleValue();
+            Lazy inner = ra.lazy();
+            Ref base = inner == null ? ra : inner.base;
+            double s0 = inner == null ? 1 : inner.scale, o0 = inner == null ? 0 : inner.offset;
+            double[] so = switch (op) {
+                case "multiply" -> new double[] {s0 * k, o0 * k};
+                case "add" -> new double[] {s0, o0 + k};
+                case "subtract" -> new double[] {s0, o0 - k};
+                case "divide" -> k == 0 ? null : new double[] {s0 / k, o0 / k};
+                default -> null;
+            };
+            if (so != null) {
+                return new Ref(id, "result", new Lazy(op, k, ra, base, so[0], so[1]));
+            }
+        }
         node(g, id, "core.scalar_math", "operation", op, "a", a, "b", b);
         return out(id, "result");
     }
@@ -98,8 +189,26 @@ final class CityGraphs {
         return out(id, "result");
     }
 
+    /** Vetor de tres componentes; os valores adiados de {@link #math} viram escala e deslocamento de um {@code combine_vec3_transform}. */
     private static Ref vec(GraphBuilder g, String id, Object x, Object y, Object z) {
-        node(g, id, "core.combine_vec3", "x", x, "y", y, "z", z);
+        Object[] c = {x, y, z};
+        String[] names = {"x", "y", "z"};
+        double[] scale = {1, 1, 1}, offset = {0, 0, 0};
+        boolean folded = false;
+        for (int i = 0; i < 3; i++) {
+            if (c[i] instanceof Ref r && r.lazy() != null) {
+                scale[i] = r.lazy().scale;
+                offset[i] = r.lazy().offset;
+                c[i] = r.lazy().base;
+                folded = true;
+            }
+        }
+        if (!folded) {
+            node(g, id, "core.combine_vec3", "x", x, "y", y, "z", z);
+            return out(id, "vector");
+        }
+        node(g, id, "core.combine_vec3_transform", "x", c[0], "y", c[1], "z", c[2],
+                "scale", new Vec3(scale[0], scale[1], scale[2]), "offset", new Vec3(offset[0], offset[1], offset[2]));
         return out(id, "vector");
     }
 
@@ -119,7 +228,7 @@ final class CityGraphs {
     }
 
     /** Atributo booleano (FACE) lido como Field. */
-    private static Ref flag(GraphBuilder g, String id, String name) {
+    private static Ref flag(GraphBuilder g, String id, Object name) {
         node(g, id, "core.attribute", "name", name);
         return out(id, "bool");
     }
@@ -171,16 +280,13 @@ final class CityGraphs {
         return out(id, "geometry");
     }
 
-    /** Caixa com material, centrada em {@code at}; o bevel vem de {@link #BEVELS} pelo id da peca (e deixa a caixa suave). */
+    /**
+     * Caixa com material, centrada em {@code at} (Vec3 ou Ref): chamada do subgrafo {@code box_part}; o bevel vem de
+     * {@link #BEVELS} pelo id da peca (e deixa a caixa suave).
+     */
     private static Ref part(GraphBuilder g, String id, Object size, Object at, String material) {
-        double[] bevel = BEVELS.getOrDefault(id, new double[] {0, 1});
-        node(g, id + "_box", "core.create_box", "size", size, "bevel", bevel[0] * BEVEL_SCALE, "bevel_segments", (int) bevel[1]);
-        Ref shaped = out(id + "_box", "mesh");
-        if (bevel[0] * BEVEL_SCALE > 0) {
-            shaped = smooth(g, id + "_smooth", shaped);
-        }
-        node(g, id + "_at", "core.translate", "geometry", shaped, "offset", at);
-        node(g, id, "core.set_material", "geometry", out(id + "_at", "geometry"), "material", material);
+        double bevel = BEVELS.getOrDefault(id, new double[] {0, 1})[0] * BEVEL_SCALE;
+        sub(g, id, "box_part", "size", size, "position", at, "material", material, "bevel", bevel);
         return out(id, "geometry");
     }
 
@@ -201,13 +307,15 @@ final class CityGraphs {
     }
 
     private static void output(GraphBuilder g, String name, PortType type, Ref from) {
-        g.output(name, type, from.node(), from.port());
+        Ref r = real(g, from);
+        g.output(name, type, r.node(), r.port());
     }
 
     /** Junta as saidas de {@code parts} num no novo {@code id} (entrada multi do Join). */
     private static Ref join(GraphBuilder g, String id, Ref... parts) {
         node(g, id, "core.join_geometry");
-        for (Ref p : parts) {
+        for (Ref p0 : parts) {
+            Ref p = real(g, p0);
             g.connect(p.node(), p.port(), id, "geometry");
         }
         return out(id, "geometry");
@@ -223,29 +331,38 @@ final class CityGraphs {
         return out(id, "geometry");
     }
 
-    // ---- pecas compostas reutilizadas por varios assets ----
-
-    /** Pontos em linha reta de {@code start} a {@code end} ({@code count} pontos, count &gt;= 2). */
-    private static Ref linePoints(GraphBuilder g, String id, Object start, Object end, Object count) {
-        node(g, id + "Line", "core.create_line", "start", start, "end", end, "count", count);
-        node(g, id, "core.curve_to_points", "geometry", out(id + "Line", "curve"));
-        return out(id, "points");
-    }
-
-    /** Cilindro de eixo Y com a base em y = 0: parede varrida por uma linha vertical (suave) + tampa de cima. */
-    private static Ref cylinder(GraphBuilder g, String id, Object radius, Object height, int segments, String material) {
-        node(g, id + "_ring", "core.create_circle", "radius", radius, "segments", segments);
-        node(g, id + "_profile", "core.create_line", "start", vec(g, id + "_peak", 0.0, height, 0.0), "end", new Vec3(0, 0, 0));
-        node(g, id + "_wall", "core.curve_to_mesh", "geometry", out(id + "_ring", "curve"), "profile", out(id + "_profile", "curve"));
-        node(g, id + "_lid", "core.curve_to_mesh", "geometry", out(id + "_ring", "curve"));
-        Ref lid = translate(g, id + "_lidat", out(id + "_lid", "mesh"), vec(g, id + "_lidy", 0.0, height, 0.0));
-        Ref both = join(g, id + "_both", smooth(g, id + "_smooth", out(id + "_wall", "mesh")), lid);
-        node(g, id, "core.set_material", "geometry", both, "material", material);
+    /** Gira ({@code rotation}, graus) e depois move ({@code translation}) num so no ({@code core.transform_geometry}). */
+    private static Ref place(GraphBuilder g, String id, Ref geometry, Object translation, Object rotation) {
+        node(g, id, "core.transform_geometry", "geometry", geometry, "translation", translation, "rotation", rotation);
         return out(id, "geometry");
     }
 
+    /** Espelha em torno do plano perpendicular a {@code axis} ("x", "y" ou "z") que passa pela origem local; o original fica. */
+    private static Ref mirror(GraphBuilder g, String id, Ref geometry, String axis) {
+        node(g, id, "core.mirror", "geometry", geometry, "axis", axis);
+        return out(id, "geometry");
+    }
+
+    // ---- pecas compostas reutilizadas por varios assets ----
+
+    /** Pontos em linha reta de {@code start} a {@code end} ({@code count} pontos, count &gt;= 2): chamada do subgrafo {@code line_points}. */
+    private static Ref linePoints(GraphBuilder g, String id, Object start, Object end, Object count) {
+        sub(g, id, "line_points", "start", start, "end", end, "count", count);
+        return out(id, "points");
+    }
+
+    /** Cilindro de eixo Y com a base em {@code at}: chamada do subgrafo {@code cylinder_part} (radius/height aceitam Ref). */
+    private static Ref cylinder(GraphBuilder g, String id, Object radius, Object height, int segments, String material, Object at) {
+        sub(g, id, "cylinder_part", "radius", radius, "height", height, "segments", segments, "position", at, "material", material);
+        return out(id, "geometry");
+    }
+
+    private static Ref cylinder(GraphBuilder g, String id, Object radius, Object height, int segments, String material) {
+        return cylinder(g, id, radius, height, segments, material, new Vec3(0, 0, 0));
+    }
+
     /** Laje com parapeito: a face de cima ganha inset e o anel sobe. */
-    private static Ref parapet(GraphBuilder g, String id, Ref slab, double inset, double rise) {
+    private static Ref parapet(GraphBuilder g, String id, Ref slab, Object inset, Object rise) {
         Ref[] n = normal(g, id + "Slab");
         Ref top = cmp(g, id + "Top", "gt", n[1], 0.95);
         node(g, id + "Frame", "core.inset_faces", "geometry", slab, "selection", top, "amount", inset, "inner_attribute", id + "_inner");
@@ -255,7 +372,7 @@ final class CityGraphs {
     }
 
     /** Aparelhos de teto (ar-condicionado com ventoinhas e exaustores) espalhados sobre {@code area}, uma malha no nivel do teto. */
-    private static Ref roofGear(GraphBuilder g, String id, Ref area, double density) {
+    private static Ref roofGear(GraphBuilder g, String id, Ref area, Object density) {
         node(g, id + "Scatter", "core.distribute_points", "geometry", area, "density", density);
         Ref box = part(g, id + "Ac", new Vec3(1.6, 0.9, 1.1), new Vec3(0, 0.45, 0), "metal");
         Ref fanA = translate(g, id + "FanA", cylinder(g, id + "FanDiscA", 0.36, 0.06, 10, "tire"), new Vec3(-0.4, 0.9, 0));
@@ -300,12 +417,75 @@ final class CityGraphs {
         return join(g, id, legA, legB, legC, legD, barrel, lid, hoopLow, hoopHigh);
     }
 
+    // ---- utilitarios genericos (assets) ----
+
+    /** Pontos igualmente espacados de {@code start} a {@code end}. */
+    private static GraphAsset linePointsAsset() {
+        GraphBuilder g = asset("line_points");
+        g.input(vec3In("start", new Vec3(0, 0, 0))).input(vec3In("end", new Vec3(0, 0, 1))).input(integer("count", 2));
+        node(g, "line", "core.create_line", "start", in("start"), "end", in("end"), "count", in("count"));
+        node(g, "points", "core.curve_to_points", "geometry", out("line", "curve"));
+        g.output("points", PortType.GEOMETRY, "points", "points");
+        return g.build();
+    }
+
+    /** Pontos nos vertices de uma grade XZ centrada na origem. */
+    private static GraphAsset gridPointsAsset() {
+        GraphBuilder g = asset("grid_points");
+        g.input(num("size_x", 1.0)).input(num("size_z", 1.0)).input(integer("vertices_x", 2)).input(integer("vertices_z", 2));
+        node(g, "grid", "core.create_grid", "size_x", in("size_x"), "size_z", in("size_z"), "vertices_x", in("vertices_x"),
+                "vertices_z", in("vertices_z"));
+        node(g, "points", "core.mesh_to_points", "geometry", out("grid", "mesh"));
+        g.output("points", PortType.GEOMETRY, "points", "points");
+        return g.build();
+    }
+
+    /** Quantidade de pontos para cobrir {@code length} em passos de {@code step}: round(length / step), depois {@code operation} com {@code extra} (add 1 = vertices; max 2 = minimo). */
+    private static GraphAsset stepCountAsset() {
+        GraphBuilder g = asset("step_count");
+        g.input(num("length", 10)).input(num("step", 1)).input(NodeInputDefinition.of("operation", PortType.STRING).withDefault("add"))
+                .input(integer("extra", 1));
+        Ref steps = math(g, "steps", "divide", in("length"), in("step"));
+        node(g, "rounded", "core.to_int", "value", steps, "mode", "round");
+        node(g, "result", "core.int_math", "operation", in("operation"), "a", out("rounded", "result"), "b", in("extra"));
+        g.output("result", PortType.INT, "result", "result");
+        return g.build();
+    }
+
+    // ---- pecas de telhado reutilizaveis (assets) ----
+
+    /** Laje com parapeito: a face de cima ganha inset e o anel sobe. */
+    private static GraphAsset parapetAsset() {
+        GraphBuilder g = asset("parapet");
+        g.input(NodeInputDefinition.of("geometry", PortType.GEOMETRY)).input(num("inset", 0.5)).input(num("rise", 0.8));
+        return finish(g, parapet(g, "rim", in("geometry"), in("inset"), in("rise")));
+    }
+
+    /** Aparelhos de teto (ar-condicionado e exaustores) espalhados sobre {@code area}. */
+    private static GraphAsset roofGearAsset() {
+        GraphBuilder g = asset("roof_gear");
+        g.input(NodeInputDefinition.of("area", PortType.GEOMETRY)).input(num("density", 0.07));
+        return finish(g, roofGear(g, "gear", in("area"), in("density")));
+    }
+
+    /** Mastro de antena com travessas e luz de aeronave (base em y = 0). */
+    private static GraphAsset roofMastAsset() {
+        GraphBuilder g = asset("roof_mast");
+        return finish(g, mast(g, "mast"));
+    }
+
+    /** Caixa d'agua sobre quatro pernas (base em y = 0). */
+    private static GraphAsset waterTankAsset() {
+        GraphBuilder g = asset("water_tank");
+        return finish(g, waterTank(g, "tank"));
+    }
+
     // ================= predios =================
 
     /**
-     * Janelas: paredes (|normal.y| &lt; 0.3) acima do terreo, sorteadas, ganham moldura (inset), requadro saliente em relevo,
-     * caixilho e vidro recuado (tres insets + dois extrudes). Os centros dos vidros viram pontos onde se penduram peitoris,
-     * sacadas e (nas casas) venezianas com floreira. Terreo (abaixo de "ground"): vitrines com caixilho e marquises.
+     * Janelas: ligacao de quatro etapas. {@code window_panes} abre as janelas dos andares de cima, {@code shopfronts} as
+     * vitrines do terreo, {@code pane_spots} acha o centro de cada vidro e nele se penduram {@code window_fittings}
+     * (peitoris, venezianas, sacadas) e as marquises das vitrines.
      */
     private static GraphAsset windows() {
         GraphBuilder g = asset("windows");
@@ -315,15 +495,28 @@ final class CityGraphs {
                 .input(NodeInputDefinition.of("awnings", PortType.BOOL).withDefault(true))
                 .input(NodeInputDefinition.of("sills", PortType.BOOL).withDefault(true))
                 .input(NodeInputDefinition.of("cottage", PortType.BOOL).withDefault(false));
+        sub(g, "panes", "window_panes", "geometry", in("geometry"), "chance", in("chance"), "ground", in("ground"),
+                "depth", in("depth"), "margin", in("margin"));
+        sub(g, "windowSpots", "pane_spots", "geometry", out("panes", "frames"), "attribute", "pane");
+        sub(g, "fittings", "window_fittings", "points", out("windowSpots", "points"), "col", in("col"), "margin", in("margin"),
+                "row", in("row"), "ground", in("ground"), "balconies", in("balconies"), "sills", in("sills"), "cottage", in("cottage"));
+        sub(g, "shops", "shopfronts", "geometry", out("panes", "geometry"), "ground", in("ground"));
+        sub(g, "shopSpots", "pane_spots", "geometry", out("shops", "frames"), "attribute", "shop_pane");
+        sub(g, "awningPart", "awning");
+        node(g, "awningSet", "core.instance_on_points", "points", out("shopSpots", "points"), "instance", out("awningPart", "geometry"),
+                "selection", in("awnings"));
+        return finish(g, join(g, "withAwnings", out("shops", "geometry"), out("awningSet", "instances"), out("fittings", "geometry")));
+    }
 
+    /** Janelas dos andares de cima: moldura, requadro, caixilho e vidro recuado. {@code frames} = a parede antes do recuo (para achar os vidros). */
+    private static GraphAsset windowPanesAsset() {
+        GraphBuilder g = asset("window_panes");
+        g.input(NodeInputDefinition.of("geometry", PortType.GEOMETRY)).input(num("chance", 0.5)).input(num("ground", 3.5))
+                .input(num("depth", 0.3)).input(num("margin", 0.35));
         Ref[] n = normal(g, "w");
-        Ref nAbs = fmath(g, "nAbs", "abs", n[1], 0.0);
-        Ref isWall = cmp(g, "isWall", "lt", nAbs, 0.3);
+        Ref isWall = cmp(g, "isWall", "lt", fmath(g, "nAbs", "abs", n[1], 0.0), 0.3);
         Ref[] p = position(g, "w");
         Ref above = cmp(g, "above", "gt", p[1], in("ground"));
-        Ref below = cmp(g, "below", "lt", p[1], in("ground"));
-
-        // 1) janelas dos andares de cima: moldura -> requadro -> caixilho -> vidro
         node(g, "chanceRnd", "core.random_value", "probability", in("chance"));
         Ref window = and(g, "window", and(g, "wallAbove", isWall, above), out("chanceRnd", "bool"));
         node(g, "framed", "core.inset_faces", "geometry", in("geometry"), "selection", window,
@@ -337,7 +530,6 @@ final class CityGraphs {
         Ref pane = flag(g, "paneFaces", "pane");
         Ref casing = and(g, "casing", inner, not(g, "notInner2", inner2));
         Ref sash = and(g, "sash", inner2, not(g, "notPane", pane));
-
         node(g, "litRnd", "core.random_value", "probability", 0.4);
         Ref lit = and(g, "lit", pane, out("litRnd", "bool"));
         Ref dark = and(g, "dark", pane, not(g, "notLit", out("litRnd", "bool")));
@@ -346,34 +538,24 @@ final class CityGraphs {
         node(g, "matLit", "core.set_material", "geometry", out("matSash", "geometry"), "selection", lit, "material", "window_lit");
         node(g, "matDark", "core.set_material", "geometry", out("matLit", "geometry"), "selection", dark, "material", "window_dark");
         node(g, "casingOut", "core.extrude", "geometry", out("matDark", "geometry"), "selection", casing, "distance", 0.07);
-        Ref inward = math(g, "inward", "multiply", in("depth"), -1.0);
-        node(g, "recess", "core.extrude", "geometry", out("casingOut", "geometry"), "selection", pane, "distance", inward);
+        node(g, "recess", "core.extrude", "geometry", out("casingOut", "geometry"), "selection", pane,
+                "distance", math(g, "inward", "multiply", in("depth"), -1.0));
+        output(g, "geometry", PortType.GEOMETRY, out("recess", "geometry"));
+        output(g, "frames", PortType.GEOMETRY, out("sashed", "geometry"));
+        return g.build();
+    }
 
-        // acessorios por janela: um ponto no centro de cada vidro (medido antes do recuo, no plano da parede)
-        node(g, "paneSpots", "core.mesh_to_points", "geometry", out("sashed", "geometry"), "mode", "faces");
-        node(g, "windowSpots", "core.delete_geometry", "geometry", out("paneSpots", "points"),
-                "selection", not(g, "notPaneSpot", flag(g, "paneSpot", "pane")));
-        node(g, "bareWindowSpots", "core.clear_attributes", "geometry", out("windowSpots", "geometry"));
-        node(g, "windowTone", "core.random_value");
-        node(g, "toneSpots", "core.set_attribute", "geometry", out("bareWindowSpots", "geometry"), "name", "tone", "domain", "point",
-                "type", "float", "value", out("windowTone", "float"));
-        sub(g, "sillPart", "sill", "col", in("col"), "margin", in("margin"), "row", in("row"));
-        node(g, "sillSet", "core.instance_on_points", "points", out("toneSpots", "geometry"), "instance", out("sillPart", "geometry"),
-                "selection", in("sills"));
-        sub(g, "shutterPart", "shutters", "col", in("col"), "margin", in("margin"), "row", in("row"));
-        node(g, "shutterSet", "core.instance_on_points", "points", out("toneSpots", "geometry"), "instance", out("shutterPart", "geometry"),
-                "selection", in("cottage"));
-        sub(g, "balconyPart", "balcony", "col", in("col"), "row", in("row"));
-        node(g, "balconyRnd", "core.random_value", "probability", in("balconies"));
-        Ref[] bp = position(g, "bal");
-        Ref upperFloor = cmp(g, "balUpper", "gt", bp[1], math(g, "balMin", "add", in("ground"), math(g, "balRow", "multiply", in("row"), 0.4)));
-        node(g, "balconySet", "core.instance_on_points", "points", out("toneSpots", "geometry"), "instance", out("balconyPart", "geometry"),
-                "selection", and(g, "balconyWanted", out("balconyRnd", "bool"), upperFloor));
-
-        // 2) vitrines no terreo: moldura, caixilho e vidro recuado
+    /** Vitrines do terreo (abaixo de {@code ground}): moldura, caixilho e vidro recuado. {@code frames} = antes do recuo. */
+    private static GraphAsset shopfrontsAsset() {
+        GraphBuilder g = asset("shopfronts");
+        g.input(NodeInputDefinition.of("geometry", PortType.GEOMETRY)).input(num("ground", 3.5));
+        Ref[] n = normal(g, "w");
+        Ref isWall = cmp(g, "isWall", "lt", fmath(g, "nAbs", "abs", n[1], 0.0), 0.3);
+        Ref[] p = position(g, "w");
+        Ref below = cmp(g, "below", "lt", p[1], in("ground"));
         node(g, "shopRnd", "core.random_value", "probability", 0.8);
         Ref shop = and(g, "shop", and(g, "wallBelow", isWall, below), out("shopRnd", "bool"));
-        node(g, "shopFrame", "core.inset_faces", "geometry", out("recess", "geometry"), "selection", shop,
+        node(g, "shopFrame", "core.inset_faces", "geometry", in("geometry"), "selection", shop,
                 "amount", 0.3, "inner_attribute", "shop_inner");
         Ref shopInner = flag(g, "shopInner", "shop_inner");
         node(g, "shopCased", "core.inset_faces", "geometry", out("shopFrame", "geometry"), "selection", shopInner,
@@ -383,21 +565,45 @@ final class CityGraphs {
         node(g, "shopSashMat", "core.set_material", "geometry", out("shopCased", "geometry"), "selection", shopSash, "material", "metal");
         node(g, "shopMat", "core.set_material", "geometry", out("shopSashMat", "geometry"), "selection", shopPane, "material", "shopfront");
         node(g, "shopRecess", "core.extrude", "geometry", out("shopMat", "geometry"), "selection", shopPane, "distance", -0.25);
-
-        // marquises: uma instancia por vitrine, no centro do vidro
-        node(g, "shopPoints", "core.mesh_to_points", "geometry", out("shopCased", "geometry"), "mode", "faces");
-        node(g, "shopSpots", "core.delete_geometry", "geometry", out("shopPoints", "points"),
-                "selection", not(g, "notShop", flag(g, "awningShop", "shop_pane")));
-        node(g, "bareSpots", "core.clear_attributes", "geometry", out("shopSpots", "geometry")); // so a posicao interessa
-        node(g, "awningTone", "core.random_value");
-        node(g, "awningSpots", "core.set_attribute", "geometry", out("bareSpots", "geometry"), "name", "tone", "domain", "point",
-                "type", "float", "value", out("awningTone", "float"));
-        sub(g, "awningPart", "awning");
-        node(g, "awningSet", "core.instance_on_points", "points", out("awningSpots", "geometry"), "instance", out("awningPart", "geometry"),
-                "selection", in("awnings"));
-        output(g, "geometry", PortType.GEOMETRY, join(g, "withAwnings", out("shopRecess", "geometry"), out("awningSet", "instances"),
-                out("sillSet", "instances"), out("shutterSet", "instances"), out("balconySet", "instances")));
+        output(g, "geometry", PortType.GEOMETRY, out("shopRecess", "geometry"));
+        output(g, "frames", PortType.GEOMETRY, out("shopCased", "geometry"));
         return g.build();
+    }
+
+    /** Um ponto no centro de cada face com o atributo booleano {@code attribute}, sem os outros atributos e com um tom de cor sorteado. */
+    private static GraphAsset paneSpotsAsset() {
+        GraphBuilder g = asset("pane_spots");
+        g.input(NodeInputDefinition.of("geometry", PortType.GEOMETRY)).input(NodeInputDefinition.of("attribute", PortType.STRING).withDefault("pane"));
+        node(g, "faces", "core.mesh_to_points", "geometry", in("geometry"), "mode", "faces");
+        node(g, "kept", "core.delete_geometry", "geometry", out("faces", "points"),
+                "selection", not(g, "notPane", flag(g, "isPane", in("attribute"))));
+        node(g, "bare", "core.clear_attributes", "geometry", out("kept", "geometry")); // so a posicao interessa
+        node(g, "tone", "core.random_value");
+        node(g, "toned", "core.set_attribute", "geometry", out("bare", "geometry"), "name", "tone", "domain", "point",
+                "type", "float", "value", out("tone", "float"));
+        g.output("points", PortType.GEOMETRY, "toned", "geometry");
+        return g.build();
+    }
+
+    /** Peitoris, venezianas (casas) e sacadas, uma instancia por ponto de {@code points} (centros dos vidros). */
+    private static GraphAsset windowFittingsAsset() {
+        GraphBuilder g = asset("window_fittings");
+        g.input(NodeInputDefinition.of("points", PortType.GEOMETRY)).input(num("col", 3.0)).input(num("margin", 0.35)).input(num("row", 3.2))
+                .input(num("ground", 3.5)).input(num("balconies", 0.0))
+                .input(NodeInputDefinition.of("sills", PortType.BOOL).withDefault(true))
+                .input(NodeInputDefinition.of("cottage", PortType.BOOL).withDefault(false));
+        sub(g, "sillPart", "sill", "col", in("col"), "margin", in("margin"), "row", in("row"));
+        node(g, "sillSet", "core.instance_on_points", "points", in("points"), "instance", out("sillPart", "geometry"), "selection", in("sills"));
+        sub(g, "shutterPart", "shutters", "col", in("col"), "margin", in("margin"), "row", in("row"));
+        node(g, "shutterSet", "core.instance_on_points", "points", in("points"), "instance", out("shutterPart", "geometry"),
+                "selection", in("cottage"));
+        sub(g, "balconyPart", "balcony", "col", in("col"), "row", in("row"));
+        node(g, "balconyRnd", "core.random_value", "probability", in("balconies"));
+        Ref[] bp = position(g, "bal");
+        Ref upperFloor = cmp(g, "balUpper", "gt", bp[1], math(g, "balMin", "add", in("ground"), math(g, "balRow", "multiply", in("row"), 0.4)));
+        node(g, "balconySet", "core.instance_on_points", "points", in("points"), "instance", out("balconyPart", "geometry"),
+                "selection", and(g, "balconyWanted", out("balconyRnd", "bool"), upperFloor));
+        return finish(g, join(g, "all", out("sillSet", "instances"), out("shutterSet", "instances"), out("balconySet", "instances")));
     }
 
     /** Marquise: tela inclinada para baixo, com friso frontal, na frente (+Z) e no topo da vitrine. */
@@ -405,9 +611,8 @@ final class CityGraphs {
         GraphBuilder g = asset("awning");
         Ref canopy = part(g, "canopy", new Vec3(2.7, 0.08, 1.2), new Vec3(0, 0, 0.6), "awning");
         Ref valance = part(g, "valance", new Vec3(2.7, 0.22, 0.05), new Vec3(0, -0.12, 1.2), "awning");
-        Ref armL = part(g, "armL", new Vec3(0.05, 0.05, 1.2), new Vec3(-1.3, -0.1, 0.6), "metal");
-        Ref armR = part(g, "armR", new Vec3(0.05, 0.05, 1.2), new Vec3(1.3, -0.1, 0.6), "metal");
-        Ref tilted = rotate(g, "tilt", join(g, "awningBody", canopy, valance, armL, armR), new Vec3(18, 0, 0));
+        Ref arms = mirror(g, "arms", part(g, "armR", new Vec3(0.05, 0.05, 1.2), new Vec3(1.3, -0.1, 0.6), "metal"), "x");
+        Ref tilted = rotate(g, "tilt", join(g, "awningBody", canopy, valance, arms), new Vec3(18, 0, 0));
         output(g, "geometry", PortType.GEOMETRY, translate(g, "hang", tilted, new Vec3(0, 1.1, 0.04)));
         return g.build();
     }
@@ -419,11 +624,9 @@ final class CityGraphs {
         Ref width = math(g, "sillW", "add", math(g, "sillSpan", "subtract", in("col"), math(g, "sillM2", "multiply", in("margin"), 2.0)), 0.4);
         Ref bottom = math(g, "sillBottom", "multiply", math(g, "sillHalf", "subtract", math(g, "rowHalf", "multiply", in("row"), 0.5), in("margin")), -1.0);
         Ref slab = part(g, "sillSlab", vec(g, "sillSize", width, 0.12, 0.38), vec(g, "sillAt", 0.0, math(g, "sillY", "subtract", bottom, 0.04), 0.17), "trim");
-        Ref bracketL = part(g, "sillBracketL", vec(g, "sillBrSize", 0.1, 0.18, 0.2),
-                vec(g, "sillBrLAt", math(g, "sillBrXL", "multiply", math(g, "sillBrHalf", "multiply", width, 0.5), -0.7), math(g, "sillBrY", "subtract", bottom, 0.15), 0.1), "trim");
-        Ref bracketR = part(g, "sillBracketR", vec(g, "sillBrSizeR", 0.1, 0.18, 0.2),
-                vec(g, "sillBrRAt", math(g, "sillBrXR", "multiply", math(g, "sillBrHalfR", "multiply", width, 0.5), 0.7), math(g, "sillBrYR", "subtract", bottom, 0.15), 0.1), "trim");
-        output(g, "geometry", PortType.GEOMETRY, join(g, "all", slab, bracketL, bracketR));
+        Ref brackets = mirror(g, "sillBrackets", part(g, "sillBracketR", new Vec3(0.1, 0.18, 0.2),
+                vec(g, "sillBrRAt", math(g, "sillBrXR", "multiply", math(g, "sillBrHalfR", "multiply", width, 0.5), 0.7), math(g, "sillBrYR", "subtract", bottom, 0.15), 0.1), "trim"), "x");
+        output(g, "geometry", PortType.GEOMETRY, join(g, "all", slab, brackets));
         return g.build();
     }
 
@@ -433,17 +636,15 @@ final class CityGraphs {
         g.input(num("col", 3.0)).input(num("row", 3.2));
         Ref width = math(g, "balW", "subtract", in("col"), 0.3);
         Ref half = math(g, "balHalf", "multiply", width, 0.5);
-        Ref negHalf = math(g, "balNegHalf", "multiply", half, -1.0);
         Ref floorY = math(g, "balFloor", "multiply", in("row"), -0.5);
         Ref slab = part(g, "balSlab", vec(g, "balSlabSize", width, 0.14, 1.1), vec(g, "balSlabAt", 0.0, math(g, "balSlabY", "add", floorY, 0.05), 0.55), "trim");
         Ref rail = part(g, "balRail", vec(g, "balRailSize", width, 0.06, 0.08), vec(g, "balRailAt", 0.0, math(g, "balRailY", "add", floorY, 1.13), 1.06), "railing");
-        Ref sideL = part(g, "balSideL", new Vec3(0.06, 0.06, 1.0), vec(g, "balSideLAt", negHalf, math(g, "balSideLY", "add", floorY, 1.13), 0.55), "railing");
         Ref sideR = part(g, "balSideR", new Vec3(0.06, 0.06, 1.0), vec(g, "balSideRAt", half, math(g, "balSideRY", "add", floorY, 1.13), 0.55), "railing");
         Ref glass = part(g, "balGlass", vec(g, "balGlassSize", math(g, "balGlassW", "subtract", width, 0.12), 0.85, 0.03),
                 vec(g, "balGlassAt", 0.0, math(g, "balGlassY", "add", floorY, 0.67), 1.06), "window_dark");
-        Ref postL = part(g, "balPostL", new Vec3(0.08, 1.1, 0.08), vec(g, "balPostLAt", negHalf, math(g, "balPostLY", "add", floorY, 0.67), 1.06), "railing");
         Ref postR = part(g, "balPostR", new Vec3(0.08, 1.1, 0.08), vec(g, "balPostRAt", half, math(g, "balPostRY", "add", floorY, 0.67), 1.06), "railing");
-        output(g, "geometry", PortType.GEOMETRY, join(g, "all", slab, rail, sideL, sideR, glass, postL, postR));
+        Ref sides = mirror(g, "balSides", join(g, "balRightSide", sideR, postR), "x");
+        output(g, "geometry", PortType.GEOMETRY, join(g, "all", slab, rail, glass, sides));
         return g.build();
     }
 
@@ -453,8 +654,6 @@ final class CityGraphs {
         g.input(num("col", 3.0)).input(num("margin", 0.35)).input(num("row", 3.2));
         Ref height = math(g, "shHeight", "subtract", in("row"), math(g, "shM2", "multiply", in("margin"), 2.0));
         Ref offset = math(g, "shOffset", "add", math(g, "shEdge", "subtract", math(g, "shHalfCol", "multiply", in("col"), 0.5), in("margin")), 0.27);
-        Ref negOffset = math(g, "shNegOffset", "multiply", offset, -1.0);
-        Ref left = part(g, "shutterL", vec(g, "shLSize", 0.42, height, 0.07), vec(g, "shLAt", negOffset, 0.0, 0.035), "shutter");
         Ref right = part(g, "shutterR", vec(g, "shRSize", 0.42, height, 0.07), vec(g, "shRAt", offset, 0.0, 0.035), "shutter");
         // ripas: uma linha de pontos em cada veneziana
         Ref slatsPts = linePoints(g, "slatPts", vec(g, "slatA", 0.0, math(g, "slatLow", "multiply", height, -0.42), 0.0),
@@ -462,13 +661,13 @@ final class CityGraphs {
         Ref slat = part(g, "slat", new Vec3(0.36, 0.04, 0.03), new Vec3(0, 0, 0.085), "trim");
         node(g, "slatsL", "core.instance_on_points", "points", slatsPts, "instance", slat);
         Ref slatsR = translate(g, "slatsRAt", out("slatsL", "instances"), vec(g, "slatsROffset", offset, 0.0, 0.0));
-        Ref slatsLeft = translate(g, "slatsLAt", out("slatsL", "instances"), vec(g, "slatsLOffset", negOffset, 0.0, 0.0));
+        Ref pair = mirror(g, "shutterPair", join(g, "rightShutter", right, slatsR), "x");
         Ref bottom = math(g, "shBottom", "multiply", math(g, "shHalfRow", "subtract", math(g, "shRowHalf", "multiply", in("row"), 0.5), in("margin")), -1.0);
         Ref boxWidth = math(g, "flowerW", "subtract", math(g, "flowerSpan", "subtract", in("col"), math(g, "flowerM2", "multiply", in("margin"), 2.0)), -0.1);
         Ref box = part(g, "flowerBox", vec(g, "flowerSize", boxWidth, 0.22, 0.3), vec(g, "flowerAt", 0.0, math(g, "flowerY", "subtract", bottom, 0.36), 0.2), "trunk");
         Ref bloom = part(g, "flowerBloom", vec(g, "bloomSize", math(g, "bloomW", "subtract", boxWidth, 0.08), 0.16, 0.24),
                 vec(g, "bloomAt", 0.0, math(g, "bloomY", "subtract", bottom, 0.2), 0.2), "flowers");
-        output(g, "geometry", PortType.GEOMETRY, join(g, "all", left, right, slatsLeft, slatsR, box, bloom));
+        output(g, "geometry", PortType.GEOMETRY, join(g, "all", pair, box, bloom));
         return g.build();
     }
 
@@ -541,8 +740,7 @@ final class CityGraphs {
         }
 
         // pilares de canto: uma instancia por vertice de uma grade 2x2 do tamanho da planta
-        node(g, "plan", "core.create_grid", "size_x", w, "size_z", d, "vertices_x", 2, "vertices_z", 2);
-        node(g, "corners", "core.mesh_to_points", "geometry", out("plan", "mesh"));
+        sub(g, "corners", "grid_points", "size_x", w, "size_z", d, "vertices_x", 2, "vertices_z", 2);
         Ref pier = part(g, "pier", vec(g, "pierSize", 0.8, h, 0.8), vec(g, "pierAt", 0.0, math(g, "pierY", "multiply", h, 0.5), 0.0), "trim");
         node(g, "piers", "core.instance_on_points", "points", out("corners", "points"), "instance", pier);
         parts[4] = out("piers", "instances");
@@ -586,7 +784,7 @@ final class CityGraphs {
         // laje: caixa um pouco maior; a face de cima ganha inset e o anel sobe como parapeito
         Ref slab = part(g, "slabPart", vec(g, "slabSize", math(g, "slabW", "add", w, 0.6), 0.6, math(g, "slabD", "add", d, 0.6)),
                 vec(g, "slabAt", 0.0, math(g, "slabY", "add", h, 0.3), 0.0), "roof");
-        Ref rim = parapet(g, "rim", slab, 0.55, 0.7);
+        Ref rim = use(g, "rim", "parapet", "geometry", slab, "inset", 0.55, "rise", 0.7);
 
         // casa de maquinas (com porta), mastro e caixa d'agua
         Ref unitD = math(g, "unitD", "multiply", d, 0.3);
@@ -594,15 +792,15 @@ final class CityGraphs {
                 vec(g, "unitAt", 0.0, math(g, "unitY", "add", h, 1.4), 0.0), "metal");
         Ref unitDoor = part(g, "unitDoor", new Vec3(0.9, 1.2, 0.08),
                 vec(g, "unitDoorAt", 0.0, math(g, "unitDoorY", "add", h, 1.2), math(g, "unitDoorZ", "add", math(g, "unitHalf", "multiply", unitD, 0.5), 0.04)), "door");
-        Ref antenna = translate(g, "antennaAt", mast(g, "mast"),
+        Ref antenna = translate(g, "antennaAt", use(g, "mast", "roof_mast"),
                 vec(g, "antennaPos", math(g, "antennaX", "multiply", w, 0.28), roofTop, math(g, "antennaZ", "multiply", d, 0.28)));
-        Ref tank = translate(g, "tankAt", waterTank(g, "tank"),
+        Ref tank = translate(g, "tankAt", use(g, "tank", "water_tank"),
                 vec(g, "tankPos", math(g, "tankX", "multiply", w, -0.33), roofTop, math(g, "tankZ", "multiply", d, -0.33)));
 
         // aparelhos de teto espalhados na laje (instancias de varios tipos)
         node(g, "roofArea", "core.create_grid", "size_x", math(g, "areaW", "subtract", w, 3.0), "size_z", math(g, "areaD", "subtract", d, 3.0));
         Ref areaUp = translate(g, "areaUp", out("roofArea", "mesh"), vec(g, "areaAt", 0.0, roofTop, 0.0));
-        Ref gear = roofGear(g, "gear", areaUp, 0.07);
+        Ref gear = use(g, "gear", "roof_gear", "area", areaUp, "density", 0.07);
 
         output(g, "geometry", PortType.GEOMETRY, join(g, "all", out("body", "geometry"), cornice, rim, unit, unitDoor, antenna, tank, gear));
         output(g, "height", PortType.FLOAT, roofTop);
@@ -657,25 +855,21 @@ final class CityGraphs {
         Ref plinth = cylinder(g, "plinthDisc", math(g, "plinthR", "add", in("radius"), 0.5), 0.7, 28, "stone");
 
         // laje com cornija e parapeito
-        Ref cornice = translate(g, "corniceAt", cylinder(g, "corniceDisc", math(g, "corniceR", "add", in("radius"), 0.75), 0.3, 28, "trim"),
-                vec(g, "corniceAtPos", 0.0, math(g, "corniceY", "subtract", h, 0.15), 0.0));
-        Ref slab = translate(g, "slabAt", cylinder(g, "slabDisc", math(g, "slabR", "add", in("radius"), 0.45), 0.6, 28, "roof"),
-                vec(g, "slabAtPos", 0.0, h, 0.0));
-        Ref rim = parapet(g, "rim", slab, 0.5, 0.8);
+        Ref cornice = cylinder(g, "corniceDisc", math(g, "corniceR", "add", in("radius"), 0.75), 0.3, 28, "trim", vec(g, "corniceAtPos", 0.0, math(g, "corniceY", "subtract", h, 0.15), 0.0));
+        Ref slab = cylinder(g, "slabDisc", math(g, "slabR", "add", in("radius"), 0.45), 0.6, 28, "roof", vec(g, "slabAtPos", 0.0, h, 0.0));
+        Ref rim = use(g, "rim", "parapet", "geometry", slab, "inset", 0.5, "rise", 0.8);
         Ref roofTop = math(g, "roofTop", "add", h, 0.6);
 
         // casa de maquinas cilindrica, mastro, caixa d'agua e aparelhos
-        Ref machine = translate(g, "machineAt", cylinder(g, "machine", math(g, "machineR", "multiply", in("radius"), 0.32), 2.0, 16, "metal"),
-                vec(g, "machinePos", 0.0, roofTop, 0.0));
-        Ref machineCap = translate(g, "machineCapAt", cylinder(g, "machineCap", math(g, "machineCapR", "multiply", in("radius"), 0.36), 0.15, 16, "trim"),
-                vec(g, "machineCapPos", 0.0, math(g, "machineCapY", "add", roofTop, 2.0), 0.0));
-        Ref antenna = translate(g, "antennaAt", mast(g, "mast"), vec(g, "antennaPos", 0.0, math(g, "antennaY", "add", roofTop, 2.15), 0.0));
-        Ref tank = translate(g, "tankAt", waterTank(g, "tank"),
+        Ref machine = cylinder(g, "machine", math(g, "machineR", "multiply", in("radius"), 0.32), 2.0, 16, "metal", vec(g, "machinePos", 0.0, roofTop, 0.0));
+        Ref machineCap = cylinder(g, "machineCap", math(g, "machineCapR", "multiply", in("radius"), 0.36), 0.15, 16, "trim", vec(g, "machineCapPos", 0.0, math(g, "machineCapY", "add", roofTop, 2.0), 0.0));
+        Ref antenna = translate(g, "antennaAt", use(g, "mast", "roof_mast"), vec(g, "antennaPos", 0.0, math(g, "antennaY", "add", roofTop, 2.15), 0.0));
+        Ref tank = translate(g, "tankAt", use(g, "tank", "water_tank"),
                 vec(g, "tankPos", math(g, "tankX", "multiply", in("radius"), -0.55), roofTop, math(g, "tankZ", "multiply", in("radius"), 0.3)));
         node(g, "areaRing", "core.create_circle", "radius", math(g, "areaR", "subtract", in("radius"), 2.2), "segments", 24);
         node(g, "areaFill", "core.curve_to_mesh", "geometry", out("areaRing", "curve"));
         Ref areaUp = translate(g, "areaUp", out("areaFill", "mesh"), vec(g, "areaAt", 0.0, roofTop, 0.0));
-        Ref gear = roofGear(g, "gear", areaUp, 0.05);
+        Ref gear = use(g, "gear", "roof_gear", "area", areaUp, "density", 0.05);
 
         output(g, "geometry", PortType.GEOMETRY, join(g, "all", out("win", "geometry"), out("floorDiscs", "instances"), plinth, cornice, rim,
                 machine, machineCap, antenna, tank, gear));
@@ -697,253 +891,6 @@ final class CityGraphs {
         return g.build();
     }
 
-    /** Coluna de varanda: base, fuste cilindrico e capitel (base em y = 0, 2.6 de altura). */
-    private static Ref column(GraphBuilder g, String id) {
-        Ref base = cylinder(g, id + "Base", 0.17, 0.2, 8, "trim");
-        Ref shaft = translate(g, id + "ShaftAt", cylinder(g, id + "Shaft", 0.11, 2.2, 8, "trim"), new Vec3(0, 0.2, 0));
-        Ref capital = translate(g, id + "CapitalAt", cylinder(g, id + "Capital", 0.17, 0.2, 8, "trim"), new Vec3(0, 2.4, 0));
-        return join(g, id, base, shaft, capital);
-    }
-
-    /**
-     * Casa completa: paredes com janelas, venezianas e floreiras, telhado de 2 aguas (caixa cujos vertices de cima vao ao eixo)
-     * coberto de telhas individuais, cumeeira, tabeiras, lucarnas e janela redonda no oitao, chamine com pecas, varanda com
-     * degraus, colunas e balaustrada, porta com bandeira e luminaria, caminho de lajotas, quintal com mureta, cerca de ripas,
-     * canteiros, sebes e caixa de correio, e tom de cor proprio.
-     */
-    private static GraphAsset house() {
-        GraphBuilder g = asset("house");
-        g.input(integer("cols_x", 2)).input(integer("cols_z", 2)).input(num("chance", 0.6));
-        sub(g, "body", "tower_body", "cols_x", in("cols_x"), "cols_z", in("cols_z"), "floors", 2, "cell", 3.0,
-                "floor_h", 2.8, "chance", in("chance"), "ground_zone", 0.0, "margin", 0.55, "balconies", 0.0,
-                "cottage", true, "pilasters", false, "plinth", 0.5);
-        Ref w = out("body", "width"), d = out("body", "depth"), h = out("body", "height");
-        Ref hd = math(g, "hd", "multiply", d, 0.5);
-
-        // telhado de 2 aguas (45 graus: a altura e metade da largura)
-        Ref roofW = math(g, "roofW", "add", w, 0.8);
-        Ref roofH = math(g, "roofH", "multiply", roofW, 0.5);
-        Ref roofD = math(g, "roofD", "add", d, 0.8);
-        node(g, "roofBox", "core.create_box", "size", vec(g, "roofSize", roofW, roofH, roofD));
-        Ref[] p = position(g, "r");
-        Ref upper = cmp(g, "upper", "gt", p[1], 0.0);
-        node(g, "pull", "core.switch_float", "condition", upper, "if_true", fmath(g, "negX", "negate", p[0], 0.0), "if_false", 0.0);
-        node(g, "pullVec", "core.combine_xyz", "x", out("pull", "result"));
-        node(g, "ridge", "core.set_position", "geometry", out("roofBox", "mesh"), "offset", out("pullVec", "vector"));
-        node(g, "clean", "core.merge_by_distance", "geometry", out("ridge", "geometry"), "distance", 0.01);
-        Ref roofUp = translate(g, "roofUp", out("clean", "geometry"),
-                vec(g, "roofAt", 0.0, math(g, "roofY", "add", h, math(g, "halfRoof", "multiply", roofH, 0.5)), 0.0));
-        Ref[] n = normal(g, "r");
-        node(g, "roof", "core.set_material", "geometry", roofUp, "selection", cmp(g, "slope", "gt", n[1], 0.3), "material", "roof");
-
-        // telhas: uma grade por agua, cada celula com inset + extrude de altura sorteada, deitada sobre a agua
-        Ref slopeLen = math(g, "slopeLen", "multiply", roofW, 0.70711);
-        node(g, "tileRowsF", "core.to_int", "value", math(g, "tileRowsRaw", "divide", slopeLen, 0.42), "mode", "round");
-        node(g, "tileRows", "core.int_math", "operation", "add", "a", out("tileRowsF", "result"), "b", 1);
-        node(g, "tileColsF", "core.to_int", "value", math(g, "tileColsRaw", "divide", roofD, 0.5), "mode", "round");
-        node(g, "tileCols", "core.int_math", "operation", "add", "a", out("tileColsF", "result"), "b", 1);
-        node(g, "tileGrid", "core.create_grid", "size_x", slopeLen, "size_z", roofD,
-                "vertices_x", out("tileRows", "result"), "vertices_z", out("tileCols", "result"));
-        node(g, "tileFrame", "core.inset_faces", "geometry", out("tileGrid", "mesh"), "amount", 0.03, "inner_attribute", "tile_inner");
-        node(g, "tileHeight", "core.random_value", "min_float", 0.03, "max_float", 0.085);
-        node(g, "tileRaise", "core.extrude", "geometry", out("tileFrame", "geometry"), "selection", flag(g, "tileInner", "tile_inner"),
-                "distance", out("tileHeight", "float"));
-        node(g, "tilePaint", "core.set_material", "geometry", out("tileRaise", "geometry"), "material", "tile");
-        Ref slopeMidY = math(g, "slopeMidY", "add", h, math(g, "slopeMidHalf", "multiply", roofH, 0.5));
-        Ref slopeX = math(g, "slopeX", "multiply", roofW, 0.25);
-        Ref tilesRight = translate(g, "tilesRightAt", rotate(g, "tilesRightTurn", out("tilePaint", "geometry"), new Vec3(0, 0, -45)),
-                vec(g, "tilesRightPos", math(g, "tilesRightX", "add", slopeX, 0.014), math(g, "tilesRightY", "add", slopeMidY, 0.014), 0.0));
-        Ref tilesLeft = translate(g, "tilesLeftAt", rotate(g, "tilesLeftTurn", out("tilePaint", "geometry"), new Vec3(0, 0, 45)),
-                vec(g, "tilesLeftPos", math(g, "tilesLeftX", "multiply", math(g, "tilesLeftBase", "add", slopeX, 0.014), -1.0),
-                        math(g, "tilesLeftY", "add", slopeMidY, 0.014), 0.0));
-
-        // cumeeira, tabeiras nos oitoes e janela redonda
-        Ref ridgeY = math(g, "ridgeY", "add", h, roofH);
-        Ref ridgeCap = translate(g, "ridgeCapAt", rotate(g, "ridgeCapTurn",
-                part(g, "ridgeCap", vec(g, "ridgeSize", 0.36, 0.36, math(g, "ridgeLen", "add", roofD, 0.2)), new Vec3(0, 0, 0), "trim"), new Vec3(0, 0, 45)),
-                vec(g, "ridgeCapPos", 0.0, ridgeY, 0.0));
-        Ref board = part(g, "board", vec(g, "boardSize", math(g, "boardLen", "add", slopeLen, 0.25), 0.1, 0.1), new Vec3(0, 0, 0), "trim");
-        Ref boardR = rotate(g, "boardRTurn", board, new Vec3(0, 0, -45));
-        Ref boardL = rotate(g, "boardLTurn", board, new Vec3(0, 0, 45));
-        Ref boardOffset = math(g, "boardOffset", "add", slopeX, 0.1);
-        Ref boardZ = math(g, "boardZ", "multiply", roofD, 0.5);
-        Ref boardZNeg = math(g, "boardZNeg", "multiply", boardZ, -1.0);
-        Ref boardLeftX = math(g, "boardLeftX", "multiply", boardOffset, -1.0);
-        Ref boards = join(g, "boards",
-                translate(g, "boardRF", boardR, vec(g, "boardRFAt", boardOffset, slopeMidY, boardZ)),
-                translate(g, "boardRB", boardR, vec(g, "boardRBAt", boardOffset, slopeMidY, boardZNeg)),
-                translate(g, "boardLF", boardL, vec(g, "boardLFAt", boardLeftX, slopeMidY, boardZ)),
-                translate(g, "boardLB", boardL, vec(g, "boardLBAt", boardLeftX, slopeMidY, boardZNeg)));
-        Ref gableFrame = cylinder(g, "gableFrame", 0.58, 0.06, 14, "trim");
-        Ref gableGlass = translate(g, "gableGlassAt", cylinder(g, "gableGlass", 0.42, 0.06, 14, "window_dark"), new Vec3(0, 0.03, 0));
-        Ref gableBar = part(g, "gableBar", new Vec3(0.8, 0.05, 0.1), new Vec3(0, 0.06, 0), "trim");
-        Ref gableWindow = rotate(g, "gableWindowTurn", join(g, "gableWindowAll", gableFrame, gableGlass, gableBar), new Vec3(90, 0, 0));
-        Ref gableY = math(g, "gableY", "add", h, math(g, "gableRise", "multiply", roofH, 0.38));
-        Ref gableFront = translate(g, "gableFrontAt", gableWindow, vec(g, "gableFrontPos", 0.0, gableY, math(g, "gableFrontZ", "add", boardZ, 0.02)));
-        Ref gableBack = translate(g, "gableBackAt", rotate(g, "gableBackTurn", gableWindow, new Vec3(0, 180, 0)),
-                vec(g, "gableBackPos", 0.0, gableY, math(g, "gableBackZ", "subtract", boardZNeg, 0.02)));
-
-        // lucarnas: uma por agua, a 30% da largura do telhado
-        sub(g, "dormerRight", "dormer");
-        sub(g, "dormerLeft", "dormer");
-        Ref dormerX = math(g, "dormerX", "multiply", roofW, 0.3);
-        Ref dormerY = math(g, "dormerY", "add", h, math(g, "dormerDrop", "subtract", math(g, "dormerHalf", "multiply", roofW, 0.5), dormerX));
-        Ref dormerZ = math(g, "dormerZ", "multiply", roofD, 0.2);
-        Ref dormerRight = translate(g, "dormerRightAt", out("dormerRight", "geometry"), vec(g, "dormerRightPos", dormerX, dormerY, dormerZ));
-        Ref dormerLeft = translate(g, "dormerLeftAt", rotate(g, "dormerLeftTurn", out("dormerLeft", "geometry"), new Vec3(0, 180, 0)),
-                vec(g, "dormerLeftPos", math(g, "dormerLeftX", "multiply", dormerX, -1.0), dormerY, math(g, "dormerLeftZ", "multiply", dormerZ, -1.0)));
-
-        // chamine: corpo, faixas, tampa e duas pecas de barro
-        Ref chimneyX = math(g, "chimneyX", "multiply", w, 0.22);
-        Ref chimneyZ = math(g, "chimneyZ", "multiply", d, -0.2);
-        Ref chimneyY = math(g, "chimneyY", "add", h, math(g, "chimneyRise", "multiply", roofH, 0.8));
-        Ref chimney = part(g, "chimney", new Vec3(0.8, 2.8, 0.8), vec(g, "chimneyAt", chimneyX, chimneyY, chimneyZ), "brick");
-        Ref chimneyBand = part(g, "chimneyBand", new Vec3(0.92, 0.12, 0.92), vec(g, "chimneyBandAt", chimneyX, math(g, "chimneyBandY", "add", chimneyY, 0.9), chimneyZ), "trim");
-        Ref chimneyCap = part(g, "chimneyCap", new Vec3(1.05, 0.18, 1.05),
-                vec(g, "chimneyCapAt", chimneyX, math(g, "chimneyCapY", "add", chimneyY, 1.4), chimneyZ), "trim");
-        Ref potA = translate(g, "chimneyPotA", cylinder(g, "potA", 0.15, 0.45, 8, "brick"), vec(g, "potAPos", math(g, "potAX", "subtract", chimneyX, 0.2), math(g, "potAY", "add", chimneyY, 1.49), chimneyZ));
-        Ref potB = translate(g, "chimneyPotB", cylinder(g, "potB", 0.15, 0.45, 8, "brick"), vec(g, "potBPos", math(g, "potBX", "add", chimneyX, 0.2), math(g, "potBY", "add", chimneyY, 1.49), chimneyZ));
-
-        // porta com bandeira, requadro, luminaria e macaneta
-        Ref doorFront = math(g, "doorFront", "add", hd, 0.05);
-        Ref door = part(g, "door", new Vec3(1.2, 2.2, 0.15), vec(g, "doorAt", 0.0, 1.1, doorFront), "door");
-        Ref doorLight = part(g, "doorLight", new Vec3(0.7, 0.8, 0.04), vec(g, "doorLightAt", 0.0, 1.55, math(g, "doorLightZ", "add", hd, 0.14)), "window_dark");
-        Ref doorKnob = part(g, "doorKnob", new Vec3(0.09, 0.09, 0.1), vec(g, "doorKnobAt", 0.42, 1.0, math(g, "doorKnobZ", "add", hd, 0.17)), "lamp");
-        Ref frame = part(g, "frame", new Vec3(1.7, 2.45, 0.1), vec(g, "frameAt", 0.0, 1.225, math(g, "frameZ", "add", hd, 0.02)), "trim");
-        Ref lintel = part(g, "lintel", new Vec3(1.95, 0.2, 0.26), vec(g, "lintelAt", 0.0, 2.55, math(g, "lintelZ", "add", hd, 0.1)), "trim");
-        Ref wallLamp = part(g, "wallLamp", new Vec3(0.18, 0.3, 0.18), vec(g, "wallLampAt", -1.2, 1.9, math(g, "wallLampZ", "add", hd, 0.1)), "lamp");
-
-        // varanda: laje, degraus, colunas, balaustrada com corrimao e telhadinho com frisos
-        Ref porchZ = math(g, "porchZ", "add", hd, 0.9);
-        Ref porch = part(g, "porch", new Vec3(3.8, 0.25, 1.8), vec(g, "porchAt", 0.0, 0.125, porchZ), "trim");
-        Ref stepZ = math(g, "stepZ", "add", hd, 2.05);
-        Ref stepA = part(g, "stepA", new Vec3(3.2, 0.14, 0.5), vec(g, "stepAAt", 0.0, 0.07, stepZ), "sidewalk");
-        Ref postZ = math(g, "postZ", "add", hd, 1.6);
-        Ref colL = translate(g, "colLAt", column(g, "colL"), vec(g, "colLPos", -1.6, 0.25, postZ));
-        Ref colR = translate(g, "colRAt", column(g, "colR"), vec(g, "colRPos", 1.6, 0.25, postZ));
-        Ref balusterPts = linePoints(g, "balusterPts", vec(g, "balA", -1.5, 0.25, postZ), vec(g, "balB", 1.5, 0.25, postZ), 13);
-        Ref[] bp = position(g, "bal");
-        Ref balusterOpen = cmp(g, "balusterOpen", "gt", fmath(g, "balusterAbs", "abs", bp[0], 0.0), 0.85);
-        Ref baluster = part(g, "baluster", new Vec3(0.05, 0.75, 0.05), new Vec3(0, 0.375, 0), "trim");
-        node(g, "balusters", "core.instance_on_points", "points", balusterPts, "instance", baluster, "selection", balusterOpen);
-        Ref handrailL = part(g, "handrailL", new Vec3(0.65, 0.07, 0.09), vec(g, "handrailLAt", -1.275, 1.05, postZ), "trim");
-        Ref handrailR = part(g, "handrailR", new Vec3(0.65, 0.07, 0.09), vec(g, "handrailRAt", 1.275, 1.05, postZ), "trim");
-        Ref porchRoofZ = math(g, "porchRoofZ", "add", hd, 0.95);
-        Ref porchRoof = part(g, "porchRoof", new Vec3(4.2, 0.18, 2.2), vec(g, "porchRoofAt", 0.0, 2.95, porchRoofZ), "roof");
-        Ref porchFascia = part(g, "porchFascia", new Vec3(4.3, 0.2, 0.08), vec(g, "porchFasciaAt", 0.0, 2.88, math(g, "porchFasciaZ", "add", hd, 2.07)), "trim");
-        Ref porchCeiling = part(g, "porchCeiling", new Vec3(3.9, 0.05, 1.9), vec(g, "porchCeilingAt", 0.0, 2.82, porchZ), "trim");
-
-        // caminho de lajotas ate o portao
-        Ref flagPts = linePoints(g, "flagPts", vec(g, "flagA", 0.0, 0.05, math(g, "flagStart", "add", hd, 2.7)),
-                vec(g, "flagB", 0.0, 0.05, math(g, "flagEnd", "add", hd, 3.7)), 4);
-        Ref flagstone = part(g, "flagstone", new Vec3(1.1, 0.07, 0.5), new Vec3(0, 0.035, 0), "sidewalk");
-        node(g, "flagstones", "core.instance_on_points", "points", flagPts, "instance", flagstone);
-
-        // quintal: gramado com mureta de pedra (o anel do inset sobe)
-        Ref yardW = math(g, "yardW", "add", w, 4.0);
-        Ref yardD = math(g, "yardD", "add", d, 5.0);
-        node(g, "yard", "core.create_grid", "size_x", yardW, "size_z", yardD);
-        Ref yardUp = translate(g, "yardUp", out("yard", "mesh"), new Vec3(0, 0.05, 1.0));
-        node(g, "yardFrame", "core.inset_faces", "geometry", yardUp, "amount", 0.18, "inner_attribute", "yard_inner");
-        node(g, "curbUp", "core.extrude", "geometry", out("yardFrame", "geometry"),
-                "selection", not(g, "notYardInner", flag(g, "yardInner", "yard_inner")), "offset", new Vec3(0, 0.2, 0));
-        Ref[] yp = position(g, "y");
-        node(g, "curbPaint", "core.set_material", "geometry", out("curbUp", "geometry"), "selection", cmp(g, "curbHigh", "gt", yp[1], 0.08),
-                "material", "stone");
-        node(g, "lawnPaint", "core.set_material", "geometry", out("curbPaint", "geometry"), "selection", cmp(g, "lawnLow", "lt", yp[1], 0.08),
-                "material", "grass");
-
-        // cerca de ripas no perimetro do quintal (menos o vao do portao) com postes e travessas
-        Ref fenceW = math(g, "fenceW", "subtract", yardW, 0.3);
-        Ref fenceD = math(g, "fenceD", "subtract", yardD, 0.3);
-        node(g, "picketColsF", "core.to_int", "value", math(g, "picketColsRaw", "divide", fenceW, 0.45), "mode", "round");
-        node(g, "picketCols", "core.int_math", "operation", "add", "a", out("picketColsF", "result"), "b", 1);
-        node(g, "picketRowsF", "core.to_int", "value", math(g, "picketRowsRaw", "divide", fenceD, 0.45), "mode", "round");
-        node(g, "picketRows", "core.int_math", "operation", "add", "a", out("picketRowsF", "result"), "b", 1);
-        node(g, "picketGrid", "core.create_grid", "size_x", fenceW, "size_z", fenceD,
-                "vertices_x", out("picketCols", "result"), "vertices_z", out("picketRows", "result"));
-        node(g, "picketPts", "core.mesh_to_points", "geometry", out("picketGrid", "mesh"));
-        Ref[] fp = position(g, "fence");
-        Ref halfFenceW = math(g, "halfFenceW", "multiply", fenceW, 0.5);
-        Ref halfFenceD = math(g, "halfFenceD", "multiply", fenceD, 0.5);
-        Ref onSide = cmp(g, "onSide", "gt", fmath(g, "fenceAbsX", "abs", fp[0], 0.0), math(g, "sideLimit", "subtract", halfFenceW, 0.05));
-        Ref onEnd = cmp(g, "onEnd", "gt", fmath(g, "fenceAbsZ", "abs", fp[2], 0.0), math(g, "endLimit", "subtract", halfFenceD, 0.05));
-        Ref inGate = and(g, "inGate", cmp(g, "gateFront", "gt", fp[2], math(g, "gateLimit", "subtract", halfFenceD, 0.05)),
-                cmp(g, "gateNear", "lt", fmath(g, "gateAbsX", "abs", fp[0], 0.0), 0.95));
-        node(g, "perimeter", "core.boolean_math", "operation", "or", "a", onSide, "b", onEnd);
-        Ref picketHere = and(g, "picketHere", out("perimeter", "result"), not(g, "notGate", inGate));
-        Ref picket = part(g, "picket", new Vec3(0.07, 0.95, 0.05), new Vec3(0, 0.475, 0), "fence");
-        Ref picketTip = part(g, "picketTip", new Vec3(0.1, 0.05, 0.08), new Vec3(0, 0.97, 0), "fence");
-        node(g, "pickets", "core.instance_on_points", "points", out("picketPts", "points"), "instance", join(g, "picketAll", picket, picketTip),
-                "selection", picketHere);
-        Ref frontLen = math(g, "railFrontLen", "subtract", halfFenceW, 0.95);
-        Ref frontMid = math(g, "railFrontMid", "multiply", math(g, "railFrontSum", "add", halfFenceW, 0.95), 0.5);
-        Ref frontMidNeg = math(g, "railFrontMidNeg", "multiply", frontMid, -1.0);
-        Ref fenceRails = join(g, "fenceRails",
-                fenceRail(g, "railBack", fenceW, 0.0, math(g, "railBackZ", "multiply", halfFenceD, -1.0), true),
-                fenceRail(g, "railLeft", fenceD, math(g, "railLeftX", "multiply", halfFenceW, -1.0), 0.0, false),
-                fenceRail(g, "railRight", fenceD, halfFenceW, 0.0, false),
-                fenceRail(g, "railFrontL", frontLen, frontMidNeg, halfFenceD, true),
-                fenceRail(g, "railFrontR", frontLen, frontMid, halfFenceD, true));
-        node(g, "fencePosts", "core.create_grid", "size_x", fenceW, "size_z", fenceD, "vertices_x", 2, "vertices_z", 2);
-        node(g, "fencePostPts", "core.mesh_to_points", "geometry", out("fencePosts", "mesh"));
-        Ref post = join(g, "fencePostAll", part(g, "fencePost", new Vec3(0.16, 1.25, 0.16), new Vec3(0, 0.625, 0), "fence"),
-                part(g, "fencePostCap", new Vec3(0.22, 0.06, 0.22), new Vec3(0, 1.28, 0), "fence"));
-        node(g, "fencePostSet", "core.instance_on_points", "points", out("fencePostPts", "points"), "instance", post);
-        Ref gatePostL = translate(g, "gatePostLAt", post, vec(g, "gatePostLPos", -1.0, 0.0, halfFenceD));
-        Ref gatePostR = translate(g, "gatePostRAt", post, vec(g, "gatePostRPos", 1.0, 0.0, halfFenceD));
-        Ref fenceAll = translate(g, "fenceAt", join(g, "fenceJoin", out("pickets", "instances"), fenceRails, out("fencePostSet", "instances"),
-                gatePostL, gatePostR), new Vec3(0, 0.25, 1.0));
-
-        // sebes e canteiros de flores na frente da casa, caixa de correio perto do portao
-        Ref hedgePts = linePoints(g, "hedgePts", vec(g, "hedgeA", math(g, "hedgeNeg", "multiply", math(g, "hedgeHalf", "add", math(g, "hedgeW2", "multiply", w, 0.5), 1.2), -1.0), 0.0, math(g, "hedgeZ", "add", hd, 0.8)),
-                vec(g, "hedgeB", out("hedgeHalf", "result"), 0.0, out("hedgeZ", "result")), 7);
-        Ref[] hp = position(g, "hedge");
-        Ref hedgeOpen = cmp(g, "hedgeOpen", "gt", fmath(g, "hedgeAbs", "abs", hp[0], 0.0), 2.4);
-        Ref hedge = part(g, "hedge", new Vec3(1.3, 0.8, 0.9), new Vec3(0, 0.4, 0), "leaves");
-        Ref bed = part(g, "bed", new Vec3(1.1, 0.14, 0.6), new Vec3(0, 0.07, 0.95), "flowers");
-        Ref bloomA = part(g, "bloomA", new Vec3(0.3, 0.2, 0.3), new Vec3(-0.3, 0.2, 0.95), "flowers");
-        Ref bloomB = part(g, "bloomB", new Vec3(0.3, 0.26, 0.3), new Vec3(0.3, 0.2, 0.95), "flowers");
-        node(g, "hedges", "core.instance_on_points", "points", hedgePts, "instance", join(g, "hedgeAll", hedge, bed, bloomA, bloomB), "selection", hedgeOpen);
-        Ref mailPost = part(g, "mailPost", new Vec3(0.1, 1.1, 0.1), vec(g, "mailPostAt", 1.5, 0.55, math(g, "mailZ", "add", hd, 3.15)), "trunk");
-        Ref mailBox = part(g, "mailBox", new Vec3(0.3, 0.25, 0.5), vec(g, "mailBoxAt", 1.5, 1.2, out("mailZ", "result")), "metal");
-
-        // arvores no fundo do quintal
-        node(g, "backYard", "core.create_grid", "size_x", math(g, "backW", "add", w, 1.0), "size_z", 1.0);
-        Ref backUp = translate(g, "backUp", out("backYard", "mesh"), vec(g, "backAt", 0.0, 0.05, math(g, "backZ", "multiply", hd, -1.0)));
-        node(g, "backScatter", "core.distribute_points", "geometry", backUp, "mode", "count", "count", 2);
-        sub(g, "shrubPine", "tree");
-        sub(g, "shrubOak", "broadleaf", "radius", 1.9, "squash", 0.9, "trunk", 1.8);
-        node(g, "shrubPineI", "core.geometry_to_instance", "geometry", out("shrubPine", "geometry"));
-        node(g, "shrubOakI", "core.geometry_to_instance", "geometry", out("shrubOak", "geometry"));
-        Ref shrubKinds = join(g, "shrubKinds", out("shrubPineI", "instances"), out("shrubOakI", "instances"));
-        node(g, "shrubPick", "core.random_value", "min_int", 0, "max_int", 1);
-        node(g, "shrubSpin", "core.random_value", "min_vector", new Vec3(0, 0, 0), "max_vector", new Vec3(0, 360, 0));
-        node(g, "shrubs", "core.instance_on_points", "points", out("backScatter", "points"), "instance", shrubKinds, "pick_instance", true,
-                "instance_index", out("shrubPick", "int"), "rotation", out("shrubSpin", "vector"), "scale", new Vec3(0.5, 0.5, 0.5));
-
-        // tom de cor proprio da casa (id constante = o mesmo valor para todos os vertices)
-        Ref built = join(g, "built", out("body", "geometry"), out("roof", "geometry"), tilesRight, tilesLeft, ridgeCap, boards, gableFront, gableBack,
-                dormerRight, dormerLeft, chimney, chimneyBand, chimneyCap, potA, potB, door, doorLight, doorKnob, frame, lintel, wallLamp,
-                porch, stepA, colL, colR, out("balusters", "instances"), handrailL, handrailR, porchRoof, porchFascia, porchCeiling,
-                out("flagstones", "instances"), out("lawnPaint", "geometry"), fenceAll, out("hedges", "instances"), mailPost, mailBox,
-                out("shrubs", "instances"));
-        node(g, "toneRnd", "core.random_value", "id", 0);
-        node(g, "tinted", "core.set_attribute", "geometry", built, "name", "tone", "domain", "point", "type", "float",
-                "value", out("toneRnd", "float"));
-        output(g, "geometry", PortType.GEOMETRY, out("tinted", "geometry"));
-        return g.build();
-    }
-
-    /** Travessa da cerca: caixa fina de comprimento {@code length} em duas alturas, ao longo de X ou de Z. */
-    private static Ref fenceRail(GraphBuilder g, String id, Object length, Object x, Object z, boolean alongX) {
-        Object lengthX = alongX ? length : (Object) 0.05;
-        Object lengthZ = alongX ? (Object) 0.05 : length;
-        Ref low = part(g, id + "Low", vec(g, id + "LowSize", lengthX, 0.05, lengthZ), vec(g, id + "LowAt", x, 0.3, z), "fence");
-        Ref high = part(g, id + "High", vec(g, id + "HighSize", lengthX, 0.05, lengthZ), vec(g, id + "HighAt", x, 0.75, z), "fence");
-        return join(g, id, low, high);
-    }
-
     /** Quatro casas viradas para o centro do quarteirao. */
     private static GraphAsset houseBlock() {
         GraphBuilder g = asset("house_block");
@@ -955,8 +902,7 @@ final class CityGraphs {
         for (int i = 0; i < 4; i++) {
             boolean widePair = i == 0 || i == 3;
             sub(g, "house" + names[i], "house", "cols_x", widePair ? in("wide") : in("deep"), "cols_z", in("deep"));
-            Ref turned = rotate(g, "turn" + names[i], out("house" + names[i], "geometry"), new Vec3(0, yaw[i], 0));
-            parts[i] = translate(g, "place" + names[i], turned, new Vec3(at[i][0], 0, at[i][1]));
+            parts[i] = place(g, "place" + names[i], out("house" + names[i], "geometry"), new Vec3(at[i][0], 0, at[i][1]), new Vec3(0, yaw[i], 0));
         }
         output(g, "geometry", PortType.GEOMETRY, join(g, "all", parts));
         return g.build();
@@ -971,13 +917,11 @@ final class CityGraphs {
         Ref backPts = linePoints(g, "backPts", new Vec3(0, 1.15, -0.3), new Vec3(0, 1.5, -0.3), 3);
         Ref backSlat = part(g, "backSlat", new Vec3(2.0, 0.1, 0.05), new Vec3(0, 0, 0), "trunk");
         node(g, "backs", "core.instance_on_points", "points", backPts, "instance", backSlat);
-        Ref legL = part(g, "legL", new Vec3(0.08, 0.95, 0.55), new Vec3(-0.85, 0.475, -0.02), "metal");
         Ref legR = part(g, "legR", new Vec3(0.08, 0.95, 0.55), new Vec3(0.85, 0.475, -0.02), "metal");
-        Ref armL = part(g, "armL", new Vec3(0.08, 0.06, 0.5), new Vec3(-0.9, 1.2, 0.05), "metal");
         Ref armR = part(g, "armR", new Vec3(0.08, 0.06, 0.5), new Vec3(0.9, 1.2, 0.05), "metal");
-        Ref post = part(g, "backPostL", new Vec3(0.06, 0.6, 0.06), new Vec3(-0.85, 1.2, -0.3), "metal");
         Ref postR = part(g, "backPostR", new Vec3(0.06, 0.6, 0.06), new Vec3(0.85, 1.2, -0.3), "metal");
-        output(g, "geometry", PortType.GEOMETRY, join(g, "all", out("seat", "instances"), out("backs", "instances"), legL, legR, armL, armR, post, postR));
+        Ref sides = mirror(g, "sides", join(g, "rightSide", legR, armR, postR), "x");
+        output(g, "geometry", PortType.GEOMETRY, join(g, "all", out("seat", "instances"), out("backs", "instances"), sides));
         return g.build();
     }
 
@@ -985,12 +929,12 @@ final class CityGraphs {
     private static GraphAsset fountain() {
         GraphBuilder g = asset("fountain");
         Ref basin = cylinder(g, "basin", 2.4, 0.55, 28, "stone");
-        Ref basinWater = translate(g, "basinWaterAt", cylinder(g, "basinWater", 2.15, 0.02, 28, "water"), new Vec3(0, 0.47, 0));
-        Ref rim = translate(g, "basinRimAt", cylinder(g, "basinRim", 2.55, 0.12, 28, "trim"), new Vec3(0, 0.55, 0));
+        Ref basinWater = cylinder(g, "basinWater", 2.15, 0.02, 28, "water", new Vec3(0, 0.47, 0));
+        Ref rim = cylinder(g, "basinRim", 2.55, 0.12, 28, "trim", new Vec3(0, 0.55, 0));
         Ref pedestal = cylinder(g, "pedestal", 0.4, 1.5, 12, "stone");
-        Ref bowl = translate(g, "bowlAt", cylinder(g, "bowl", 1.1, 0.3, 20, "stone"), new Vec3(0, 1.4, 0));
-        Ref bowlWater = translate(g, "bowlWaterAt", cylinder(g, "bowlWater", 0.95, 0.02, 20, "water"), new Vec3(0, 1.66, 0));
-        Ref jet = translate(g, "jetAt", cylinder(g, "jet", 0.07, 0.8, 8, "water"), new Vec3(0, 1.7, 0));
+        Ref bowl = cylinder(g, "bowl", 1.1, 0.3, 20, "stone", new Vec3(0, 1.4, 0));
+        Ref bowlWater = cylinder(g, "bowlWater", 0.95, 0.02, 20, "water", new Vec3(0, 1.66, 0));
+        Ref jet = cylinder(g, "jet", 0.07, 0.8, 8, "water", new Vec3(0, 1.7, 0));
         output(g, "geometry", PortType.GEOMETRY, join(g, "all", basin, basinWater, rim, pedestal, bowl, bowlWater, jet));
         return g.build();
     }
@@ -1003,26 +947,24 @@ final class CityGraphs {
         sub(g, "east", "tower", "cols_x", 5, "cols_z", 2, "floors", 4);
         sub(g, "west", "tower", "cols_x", 5, "cols_z", 2, "floors", 4);
         Ref n = translate(g, "northAt", out("north", "geometry"), new Vec3(0, 0, -10));
-        Ref s = translate(g, "southAt", rotate(g, "southTurn", out("south", "geometry"), new Vec3(0, 180, 0)), new Vec3(0, 0, 10));
-        Ref e = translate(g, "eastAt", rotate(g, "eastTurn", out("east", "geometry"), new Vec3(0, 90, 0)), new Vec3(10, 0, 0));
-        Ref wst = translate(g, "westAt", rotate(g, "westTurn", out("west", "geometry"), new Vec3(0, -90, 0)), new Vec3(-10, 0, 0));
+        Ref s = place(g, "southAt", out("south", "geometry"), new Vec3(0, 0, 10), new Vec3(0, 180, 0));
+        Ref e = place(g, "eastAt", out("east", "geometry"), new Vec3(10, 0, 0), new Vec3(0, 90, 0));
+        Ref wst = place(g, "westAt", out("west", "geometry"), new Vec3(-10, 0, 0), new Vec3(0, -90, 0));
         Ref lawn = part(g, "lawn", new Vec3(14, 0.2, 14), new Vec3(0, 0.1, 0), "grass");
         Ref pathX = part(g, "yardPathX", new Vec3(14, 0.06, 1.8), new Vec3(0, 0.22, 0), "sidewalk");
         Ref pathZ = part(g, "yardPathZ", new Vec3(1.8, 0.06, 14), new Vec3(0, 0.22, 0), "sidewalk");
-        Ref plaza = translate(g, "plazaAt", cylinder(g, "plaza", 3.6, 0.1, 28, "sidewalk"), new Vec3(0, 0.2, 0));
+        Ref plaza = cylinder(g, "plaza", 3.6, 0.1, 28, "sidewalk", new Vec3(0, 0.2, 0));
         sub(g, "fountainPart", "fountain");
         Ref fountain = translate(g, "fountainAt", out("fountainPart", "geometry"), new Vec3(0, 0.3, 0));
 
         // bancos nas quatro diagonais do patio, voltados para a fonte; postes e arvores nos cantos
         sub(g, "benchPart", "bench");
-        Ref benchNE = translate(g, "benchNEAt", rotate(g, "benchNETurn", out("benchPart", "geometry"), new Vec3(0, 135, 0)), new Vec3(3.5, 0.2, 3.5));
-        Ref benchNW = translate(g, "benchNWAt", rotate(g, "benchNWTurn", out("benchPart", "geometry"), new Vec3(0, -135, 0)), new Vec3(-3.5, 0.2, 3.5));
-        Ref benchSE = translate(g, "benchSEAt", rotate(g, "benchSETurn", out("benchPart", "geometry"), new Vec3(0, 45, 0)), new Vec3(3.5, 0.2, -3.5));
-        Ref benchSW = translate(g, "benchSWAt", rotate(g, "benchSWTurn", out("benchPart", "geometry"), new Vec3(0, -45, 0)), new Vec3(-3.5, 0.2, -3.5));
-        node(g, "lampSpots", "core.create_grid", "size_x", 13.0, "size_z", 13.0, "vertices_x", 2, "vertices_z", 2);
-        node(g, "lampPts", "core.mesh_to_points", "geometry", out("lampSpots", "mesh"));
-        node(g, "treeSpots", "core.create_grid", "size_x", 10.0, "size_z", 10.0, "vertices_x", 2, "vertices_z", 2);
-        node(g, "treePts", "core.mesh_to_points", "geometry", out("treeSpots", "mesh"));
+        Ref benchNE = place(g, "benchNEAt", out("benchPart", "geometry"), new Vec3(3.5, 0.2, 3.5), new Vec3(0, 135, 0));
+        Ref benchNW = place(g, "benchNWAt", out("benchPart", "geometry"), new Vec3(-3.5, 0.2, 3.5), new Vec3(0, -135, 0));
+        Ref benchSE = place(g, "benchSEAt", out("benchPart", "geometry"), new Vec3(3.5, 0.2, -3.5), new Vec3(0, 45, 0));
+        Ref benchSW = place(g, "benchSWAt", out("benchPart", "geometry"), new Vec3(-3.5, 0.2, -3.5), new Vec3(0, -45, 0));
+        sub(g, "lampPts", "grid_points", "size_x", 13.0, "size_z", 13.0, "vertices_x", 2, "vertices_z", 2);
+        sub(g, "treePts", "grid_points", "size_x", 10.0, "size_z", 10.0, "vertices_x", 2, "vertices_z", 2);
         sub(g, "yardLamp", "lamp");
         sub(g, "yardTree", "broadleaf", "radius", 1.5, "squash", 0.9, "trunk", 1.6);
         node(g, "cornerLamps", "core.instance_on_points", "points", out("lampPts", "points"), "instance", out("yardLamp", "geometry"));
@@ -1078,14 +1020,12 @@ final class CityGraphs {
     private static GraphAsset lamp() {
         GraphBuilder g = asset("lamp");
         Ref base = cylinder(g, "base", 0.3, 0.45, 8, "metal");
-        Ref collar = translate(g, "collarAt", cylinder(g, "collar", 0.18, 0.15, 8, "metal"), new Vec3(0, 0.45, 0));
-        Ref pole = translate(g, "poleAt", cylinder(g, "pole", 0.11, 5.7, 8, "metal"), new Vec3(0, 0.55, 0));
-        Ref ring = translate(g, "ringAt", cylinder(g, "ring", 0.16, 0.1, 8, "metal"), new Vec3(0, 3.2, 0));
-        Ref cap = translate(g, "capAt", cylinder(g, "cap", 0.14, 0.12, 8, "metal"), new Vec3(0, 6.25, 0));
-        Ref armA = translate(g, "armAAt", rotate(g, "armATurn", part(g, "armA", new Vec3(0.9, 0.1, 0.1), new Vec3(0, 0, 0), "metal"), new Vec3(0, 0, 14)),
-                new Vec3(0.4, 6.4, 0));
-        Ref armB = translate(g, "armBAt", rotate(g, "armBTurn", part(g, "armB", new Vec3(0.8, 0.09, 0.09), new Vec3(0, 0, 0), "metal"), new Vec3(0, 0, -6)),
-                new Vec3(1.1, 6.6, 0));
+        Ref collar = cylinder(g, "collar", 0.18, 0.15, 8, "metal", new Vec3(0, 0.45, 0));
+        Ref pole = cylinder(g, "pole", 0.11, 5.7, 8, "metal", new Vec3(0, 0.55, 0));
+        Ref ring = cylinder(g, "ring", 0.16, 0.1, 8, "metal", new Vec3(0, 3.2, 0));
+        Ref cap = cylinder(g, "cap", 0.14, 0.12, 8, "metal", new Vec3(0, 6.25, 0));
+        Ref armA = place(g, "armAAt", part(g, "armA", new Vec3(0.9, 0.1, 0.1), new Vec3(0, 0, 0), "metal"), new Vec3(0.4, 6.4, 0), new Vec3(0, 0, 14));
+        Ref armB = place(g, "armBAt", part(g, "armB", new Vec3(0.8, 0.09, 0.09), new Vec3(0, 0, 0), "metal"), new Vec3(1.1, 6.6, 0), new Vec3(0, 0, -6));
         Ref housing = part(g, "housing", new Vec3(0.8, 0.16, 0.44), new Vec3(1.5, 6.62, 0), "metal");
         Ref visor = part(g, "visor", new Vec3(0.86, 0.04, 0.5), new Vec3(1.5, 6.72, 0), "metal");
         Ref lens = part(g, "lens", new Vec3(0.62, 0.05, 0.34), new Vec3(1.5, 6.52, 0), "lamp");
@@ -1097,7 +1037,7 @@ final class CityGraphs {
     private static GraphAsset signal() {
         GraphBuilder g = asset("signal");
         Ref base = cylinder(g, "sigBase", 0.2, 0.3, 8, "signal");
-        Ref pole = translate(g, "sigPoleAt", cylinder(g, "sigPole", 0.08, 4.2, 8, "signal"), new Vec3(0, 0.3, 0));
+        Ref pole = cylinder(g, "sigPole", 0.08, 4.2, 8, "signal", new Vec3(0, 0.3, 0));
         Ref head = part(g, "sigHead", new Vec3(0.55, 1.25, 0.55), new Vec3(0, 4.75, 0), "signal");
         Ref red = part(g, "lightRed", new Vec3(0.22, 0.22, 0.05), new Vec3(0, 5.1, 0.28), "light_red");
         Ref amber = part(g, "lightAmber", new Vec3(0.22, 0.22, 0.05), new Vec3(0, 4.75, 0.28), "light_amber");
@@ -1116,13 +1056,13 @@ final class CityGraphs {
         GraphBuilder g = asset("street_kit");
         sub(g, "streetLamp", "lamp");
         Ref hydrantBody = cylinder(g, "hydrant", 0.14, 0.55, 8, "hydrant");
-        Ref hydrantCap = translate(g, "hydrantCapAt", cylinder(g, "hydrantCap", 0.17, 0.1, 8, "hydrant"), new Vec3(0, 0.5, 0));
-        Ref hydrantTop = translate(g, "hydrantTopAt", cylinder(g, "hydrantTop", 0.06, 0.1, 6, "metal"), new Vec3(0, 0.6, 0));
+        Ref hydrantCap = cylinder(g, "hydrantCap", 0.17, 0.1, 8, "hydrant", new Vec3(0, 0.5, 0));
+        Ref hydrantTop = cylinder(g, "hydrantTop", 0.06, 0.1, 6, "metal", new Vec3(0, 0.6, 0));
         Ref nozzles = part(g, "hydrantNozzle", new Vec3(0.46, 0.1, 0.1), new Vec3(0, 0.33, 0), "hydrant");
         Ref hydrant = translate(g, "hydrantAt", join(g, "hydrantAll", hydrantBody, hydrantCap, hydrantTop, nozzles), new Vec3(0.8, 0, 0.9));
         Ref binBody = cylinder(g, "bin", 0.25, 0.8, 10, "bin");
-        Ref binLid = translate(g, "binLidAt", cylinder(g, "binLid", 0.28, 0.07, 10, "metal"), new Vec3(0, 0.8, 0));
-        Ref binBand = translate(g, "binBandAt", cylinder(g, "binBand", 0.26, 0.06, 10, "metal"), new Vec3(0, 0.5, 0));
+        Ref binLid = cylinder(g, "binLid", 0.28, 0.07, 10, "metal", new Vec3(0, 0.8, 0));
+        Ref binBand = cylinder(g, "binBand", 0.26, 0.06, 10, "metal", new Vec3(0, 0.5, 0));
         Ref bin = translate(g, "binAt", join(g, "binAll", binBody, binLid, binBand), new Vec3(-0.8, 0, 0.7));
         output(g, "geometry", PortType.GEOMETRY, join(g, "all", out("streetLamp", "geometry"), hydrant, bin));
         return g.build();
@@ -1133,11 +1073,9 @@ final class CityGraphs {
         GraphBuilder g = asset("street_tree");
         sub(g, "crown", "broadleaf", "radius", 1.5, "squash", 0.9, "trunk", 2.4);
         Ref pit = part(g, "pit", new Vec3(1.5, 0.08, 1.5), new Vec3(0, 0.04, 0), "stone");
-        Ref guardA = part(g, "guardA", new Vec3(1.3, 0.1, 0.06), new Vec3(0, 0.45, 0.65), "metal");
-        Ref guardB = part(g, "guardB", new Vec3(1.3, 0.1, 0.06), new Vec3(0, 0.45, -0.65), "metal");
-        Ref guardC = part(g, "guardC", new Vec3(0.06, 0.1, 1.3), new Vec3(0.65, 0.45, 0), "metal");
-        Ref guardD = part(g, "guardD", new Vec3(0.06, 0.1, 1.3), new Vec3(-0.65, 0.45, 0), "metal");
-        output(g, "geometry", PortType.GEOMETRY, join(g, "all", out("crown", "geometry"), pit, guardA, guardB, guardC, guardD));
+        Ref guardA = mirror(g, "guardsZ", part(g, "guardA", new Vec3(1.3, 0.1, 0.06), new Vec3(0, 0.45, 0.65), "metal"), "z");
+        Ref guardC = mirror(g, "guardsX", part(g, "guardC", new Vec3(0.06, 0.1, 1.3), new Vec3(0.65, 0.45, 0), "metal"), "x");
+        output(g, "geometry", PortType.GEOMETRY, join(g, "all", out("crown", "geometry"), pit, guardA, guardC));
         return g.build();
     }
 
@@ -1164,27 +1102,24 @@ final class CityGraphs {
         node(g, "cabRoof", "core.set_material", "geometry", out("cabGlass", "geometry"), "selection", cmp(g, "cabTopFace", "gt", cn[1], 0.9),
                 "material", "car_body");
 
-        Ref headL = part(g, "headL", new Vec3(0.36, 0.15, 0.06), new Vec3(-0.65, 0.7, 2.17), "headlight");
         Ref headR = part(g, "headR", new Vec3(0.36, 0.15, 0.06), new Vec3(0.65, 0.7, 2.17), "headlight");
-        Ref tailL = part(g, "tailL", new Vec3(0.4, 0.12, 0.06), new Vec3(-0.7, 0.72, -2.17), "taillight");
         Ref tailR = part(g, "tailR", new Vec3(0.4, 0.12, 0.06), new Vec3(0.7, 0.72, -2.17), "taillight");
         Ref bumperF = part(g, "bumperF", new Vec3(1.96, 0.2, 0.16), new Vec3(0, 0.4, 2.15), "tire");
         Ref bumperB = part(g, "bumperB", new Vec3(1.96, 0.2, 0.16), new Vec3(0, 0.4, -2.15), "tire");
         Ref grille = part(g, "grille", new Vec3(0.9, 0.12, 0.05), new Vec3(0, 0.62, 2.17), "tire");
         Ref plate = part(g, "plate", new Vec3(0.5, 0.13, 0.03), new Vec3(0, 0.55, -2.17), "trim");
-        Ref mirrorL = part(g, "mirrorL", new Vec3(0.12, 0.1, 0.2), new Vec3(-1.02, 1.0, 0.45), "car_body");
         Ref mirrorR = part(g, "mirrorR", new Vec3(0.12, 0.1, 0.2), new Vec3(1.02, 1.0, 0.45), "car_body");
+        Ref lightsAndMirrors = mirror(g, "lightsAndMirrors", join(g, "rightSide", headR, tailR, mirrorR), "x");
 
         // rodas: pneu + calota (eixo X), uma instancia por vertice de uma grade 2x2
-        Ref tire = translate(g, "tireAt", cylinder(g, "tire", 0.34, 0.26, 12, "tire"), new Vec3(0, -0.13, 0));
-        Ref rim = translate(g, "rimAt", cylinder(g, "rim", 0.2, 0.27, 10, "rim"), new Vec3(0, -0.135, 0));
-        Ref hub = translate(g, "hubAt", cylinder(g, "hub", 0.06, 0.3, 6, "metal"), new Vec3(0, -0.15, 0));
-        Ref wheel = translate(g, "wheelAt", rotate(g, "wheelTurn", join(g, "wheelAll", tire, rim, hub), new Vec3(0, 0, 90)), new Vec3(0, 0.34, 0));
-        node(g, "axles", "core.create_grid", "size_x", 1.9, "size_z", 2.8, "vertices_x", 2, "vertices_z", 2);
-        node(g, "wheelSpots", "core.mesh_to_points", "geometry", out("axles", "mesh"));
+        Ref tire = cylinder(g, "tire", 0.34, 0.26, 12, "tire", new Vec3(0, -0.13, 0));
+        Ref rim = cylinder(g, "rim", 0.2, 0.27, 10, "rim", new Vec3(0, -0.135, 0));
+        Ref hub = cylinder(g, "hub", 0.06, 0.3, 6, "metal", new Vec3(0, -0.15, 0));
+        Ref wheel = place(g, "wheelAt", join(g, "wheelAll", tire, rim, hub), new Vec3(0, 0.34, 0), new Vec3(0, 0, 90));
+        sub(g, "wheelSpots", "grid_points", "size_x", 1.9, "size_z", 2.8, "vertices_x", 2, "vertices_z", 2);
         node(g, "wheels", "core.instance_on_points", "points", out("wheelSpots", "points"), "instance", wheel);
-        output(g, "geometry", PortType.GEOMETRY, join(g, "all", body, out("cabRoof", "geometry"), headL, headR, tailL, tailR, bumperF, bumperB,
-                grille, plate, mirrorL, mirrorR, out("wheels", "instances")));
+        output(g, "geometry", PortType.GEOMETRY, join(g, "all", body, out("cabRoof", "geometry"), lightsAndMirrors, bumperF, bumperB,
+                grille, plate, out("wheels", "instances")));
         return g.build();
     }
 
@@ -1198,14 +1133,28 @@ final class CityGraphs {
         Ref grass = part(g, "grass", vec(g, "grassSize", in("size"), 0.4, in("size")), new Vec3(0, 0.2, 0), "grass");
         Ref pathX = part(g, "pathX", vec(g, "pathXSize", in("size"), 0.12, 2.2), new Vec3(0, 0.4, 0), "sidewalk");
         Ref pathZ = part(g, "pathZ", vec(g, "pathZSize", 2.2, 0.12, in("size")), new Vec3(0, 0.4, 0), "sidewalk");
+        sub(g, "pond", "park_pond", "size", in("size"));
+        sub(g, "furniture", "park_furniture", "size", in("size"));
+        sub(g, "plantable", "park_plantable", "size", in("size"));
+        sub(g, "trees", "park_trees", "size", in("size"), "density", in("density"), "plantable", out("plantable", "plantable"));
+        sub(g, "beds", "park_beds", "size", in("size"), "plantable", out("plantable", "plantable"));
+        return finish(g, join(g, "all", grass, pathX, pathZ, out("pond", "geometry"), out("furniture", "geometry"),
+                out("beds", "geometry"), out("trees", "geometry")));
+    }
 
-        Ref pondR = math(g, "pondR", "multiply", in("size"), 0.17);
+    private static Ref pondRadius(GraphBuilder g, Ref size) {
+        return math(g, "pondR", "multiply", size, 0.17);
+    }
+
+    /** Lago (disco de agua) com borda de pedras sorteadas em volta (instancias nos pontos de um circulo). */
+    private static GraphAsset parkPondAsset() {
+        GraphBuilder g = asset("park_pond");
+        g.input(num("size", 26));
+        Ref pondR = pondRadius(g, in("size"));
         node(g, "pondRing", "core.create_circle", "radius", pondR, "segments", 28);
         node(g, "pondFill", "core.curve_to_mesh", "geometry", out("pondRing", "curve"));
         Ref pondUp = translate(g, "pondUp", out("pondFill", "mesh"), new Vec3(0, 0.47, 0));
         node(g, "pond", "core.set_material", "geometry", pondUp, "material", "water");
-
-        // borda do lago: pedras sorteadas em volta (instancias nos pontos de um circulo)
         node(g, "rimCircle", "core.create_circle", "radius", math(g, "rimR", "add", pondR, 0.35), "segments", 30);
         node(g, "rimPts", "core.curve_to_points", "geometry", out("rimCircle", "curve"));
         Ref rimUp = translate(g, "rimUp", out("rimPts", "points"), new Vec3(0, 0.4, 0));
@@ -1214,38 +1163,59 @@ final class CityGraphs {
         node(g, "rockSpin", "core.random_value", "min_vector", new Vec3(0, 0, 0), "max_vector", new Vec3(0, 360, 0));
         node(g, "rocks", "core.instance_on_points", "points", rimUp, "instance", rock, "rotation", out("rockSpin", "vector"),
                 "scale", out("rockSize", "vector"));
+        return finish(g, join(g, "all", out("pond", "geometry"), out("rocks", "instances")));
+    }
 
-        // bancos: quatro, nos vertices de uma grade em volta do lago, voltados para ele
+    /** Quatro bancos nos vertices de uma grade em volta do lago e quatro postes nos cantos dos caminhos. */
+    private static GraphAsset parkFurnitureAsset() {
+        GraphBuilder g = asset("park_furniture");
+        g.input(num("size", 26));
         sub(g, "benchPart", "bench");
-        node(g, "benchGrid", "core.create_grid", "size_x", math(g, "benchSpan", "multiply", pondR, 2.9), "size_z", out("benchSpan", "result"),
-                "vertices_x", 2, "vertices_z", 2);
-        node(g, "benchPoints", "core.mesh_to_points", "geometry", out("benchGrid", "mesh"));
+        sub(g, "benchPoints", "grid_points", "size_x", math(g, "benchSpan", "multiply", pondRadius(g, in("size")), 2.9),
+                "size_z", out("benchSpan", "result"), "vertices_x", 2, "vertices_z", 2);
         Ref benchUp = translate(g, "benchUp", out("benchPoints", "points"), new Vec3(0, 0.4, 0));
         node(g, "benches", "core.instance_on_points", "points", benchUp, "instance", out("benchPart", "geometry"),
                 "rotation", new Vec3(0, 0, 0));
-
-        // postes nos cantos dos caminhos
         sub(g, "parkLamp", "lamp");
-        node(g, "lampGrid", "core.create_grid", "size_x", math(g, "lampSpan", "multiply", in("size"), 0.78), "size_z", out("lampSpan", "result"),
+        sub(g, "lampPoints", "grid_points", "size_x", math(g, "lampSpan", "multiply", in("size"), 0.78), "size_z", out("lampSpan", "result"),
                 "vertices_x", 2, "vertices_z", 2);
-        node(g, "lampPoints", "core.mesh_to_points", "geometry", out("lampGrid", "mesh"));
         Ref lampUp = translate(g, "lampUp", out("lampPoints", "points"), new Vec3(0, 0.4, 0));
         node(g, "lamps", "core.instance_on_points", "points", lampUp, "instance", out("parkLamp", "geometry"));
+        return finish(g, join(g, "all", out("benches", "instances"), out("lamps", "instances")));
+    }
 
-        // arvores e canteiros: pontos aleatorios, filtrados por Fields (fora do lago e dos caminhos)
-        Ref inner = math(g, "inner", "subtract", in("size"), 6.0);
-        node(g, "spread", "core.create_grid", "size_x", inner, "size_z", inner);
-        Ref spreadUp = translate(g, "spreadUp", out("spread", "mesh"), new Vec3(0, 0.4, 0));
-        node(g, "scatter", "core.distribute_points", "geometry", spreadUp, "density", in("density"));
-        node(g, "bedScatter", "core.distribute_points", "geometry", spreadUp, "density", 0.03);
+    /** Field booleano: onde se pode plantar (fora do lago e dos caminhos). */
+    private static GraphAsset parkPlantableAsset() {
+        GraphBuilder g = asset("park_plantable");
+        g.input(num("size", 26));
+        Ref pondR = pondRadius(g, in("size"));
         Ref[] p = position(g, "p");
         Ref r2 = fmath(g, "r2", "add", fmath(g, "px2", "multiply", p[0], p[0]), fmath(g, "pz2", "multiply", p[2], p[2]));
         Ref farFromPond = cmp(g, "farFromPond", "gt", r2, math(g, "pondClear2", "multiply", math(g, "pondClear", "add", pondR, 2.5),
                 math(g, "pondClearB", "add", pondR, 2.5)));
         Ref offPathX = cmp(g, "offPathX", "gt", fmath(g, "absX", "abs", p[0], 0.0), 2.0);
         Ref offPathZ = cmp(g, "offPathZ", "gt", fmath(g, "absZ", "abs", p[2], 0.0), 2.0);
-        Ref plantable = and(g, "plantable", farFromPond, and(g, "offPaths", offPathX, offPathZ));
-        // tres especies sorteadas por ponto (pinheiro, carvalho, choupo), com tom de cor por arvore
+        output(g, "plantable", PortType.fieldOf(ValueKind.BOOL), and(g, "plantable", farFromPond, and(g, "offPaths", offPathX, offPathZ)));
+        return g.build();
+    }
+
+    /** Pontos aleatorios (por densidade) numa grade de lado {@code size - 6}, no nivel do gramado. */
+    private static GraphAsset parkScatterAsset() {
+        GraphBuilder g = asset("park_scatter");
+        g.input(num("size", 26)).input(num("density", 0.025));
+        Ref inner = math(g, "inner", "subtract", in("size"), 6.0);
+        node(g, "spread", "core.create_grid", "size_x", inner, "size_z", inner);
+        Ref spreadUp = translate(g, "spreadUp", out("spread", "mesh"), new Vec3(0, 0.4, 0));
+        node(g, "scatter", "core.distribute_points", "geometry", spreadUp, "density", in("density"));
+        g.output("points", PortType.GEOMETRY, "scatter", "points");
+        return g.build();
+    }
+
+    /** Arvores nos pontos plantaveis: tres especies sorteadas (pinheiro, carvalho, choupo), com tom de cor, giro e escala. */
+    private static GraphAsset parkTreesAsset() {
+        GraphBuilder g = asset("park_trees");
+        g.input(num("size", 26)).input(num("density", 0.025)).input(fieldIn("plantable", ValueKind.BOOL));
+        sub(g, "scatter", "park_scatter", "size", in("size"), "density", in("density"));
         sub(g, "pine", "tree");
         sub(g, "oak", "broadleaf", "radius", 2.0, "squash", 0.9, "trunk", 2.0);
         sub(g, "poplar", "broadleaf", "radius", 1.0, "squash", 2.4, "trunk", 1.2);
@@ -1260,21 +1230,25 @@ final class CityGraphs {
         node(g, "scale", "core.random_value", "min_vector", new Vec3(0.7, 0.7, 0.7), "max_vector", new Vec3(1.4, 1.4, 1.4));
         node(g, "spin", "core.random_value", "min_vector", new Vec3(0, 0, 0), "max_vector", new Vec3(0, 360, 0));
         node(g, "trees", "core.instance_on_points", "points", out("tonedTrees", "geometry"), "instance", species, "pick_instance", true,
-                "instance_index", out("species_pick", "int"), "selection", plantable, "rotation", out("spin", "vector"),
+                "instance_index", out("species_pick", "int"), "selection", in("plantable"), "rotation", out("spin", "vector"),
                 "scale", out("scale", "vector"));
+        return finish(g, out("trees", "instances"));
+    }
 
+    /** Canteiros de flores (base de pedra + terra florida) nos pontos plantaveis, com tom de cor e giro. */
+    private static GraphAsset parkBedsAsset() {
+        GraphBuilder g = asset("park_beds");
+        g.input(num("size", 26)).input(fieldIn("plantable", ValueKind.BOOL));
+        sub(g, "scatter", "park_scatter", "size", in("size"), "density", 0.03);
         Ref bed = part(g, "gardenBed", new Vec3(1.6, 0.18, 1.1), new Vec3(0, 0.09, 0), "stone");
         Ref soil = part(g, "gardenFlowers", new Vec3(1.35, 0.3, 0.85), new Vec3(0, 0.2, 0), "flowers");
         node(g, "bedTone", "core.random_value");
-        node(g, "tonedBeds", "core.set_attribute", "geometry", out("bedScatter", "points"), "name", "tone", "domain", "point",
+        node(g, "tonedBeds", "core.set_attribute", "geometry", out("scatter", "points"), "name", "tone", "domain", "point",
                 "type", "float", "value", out("bedTone", "float"));
         node(g, "bedSpin", "core.random_value", "min_vector", new Vec3(0, 0, 0), "max_vector", new Vec3(0, 90, 0));
         node(g, "beds", "core.instance_on_points", "points", out("tonedBeds", "geometry"), "instance", join(g, "bedAll", bed, soil),
-                "selection", plantable, "rotation", out("bedSpin", "vector"));
-
-        output(g, "geometry", PortType.GEOMETRY, join(g, "all", grass, pathX, pathZ, out("pond", "geometry"), out("rocks", "instances"),
-                out("benches", "instances"), out("lamps", "instances"), out("beds", "instances"), out("trees", "instances")));
-        return g.build();
+                "selection", in("plantable"), "rotation", out("bedSpin", "vector"));
+        return finish(g, out("beds", "instances"));
     }
 
     // ================= ruas =================
@@ -1299,8 +1273,7 @@ final class CityGraphs {
         GraphBuilder g = asset("pavement");
         g.input(num("length", 100)).input(num("width", 15)).input(num("y", 0.06));
         sub(g, "base", "street", "length", in("length"), "width", in("width"), "y", in("y"), "material", "sidewalk");
-        node(g, "tileRowsF", "core.to_int", "value", math(g, "tileRowsRaw", "divide", in("length"), 1.4), "mode", "round");
-        node(g, "tileRows", "core.int_math", "operation", "add", "a", out("tileRowsF", "result"), "b", 1);
+        sub(g, "tileRows", "step_count", "length", in("length"), "step", 1.4);
         node(g, "tileGrid", "core.create_grid", "size_x", 2.5, "size_z", in("length"), "vertices_x", 3, "vertices_z", out("tileRows", "result"));
         node(g, "tileFrame", "core.inset_faces", "geometry", out("tileGrid", "mesh"), "amount", 0.05, "inner_attribute", "tile_inner");
         Ref tileInner = flag(g, "tileInner", "tile_inner");
@@ -1310,104 +1283,160 @@ final class CityGraphs {
                 "material", "sidewalk");
         Ref lifted = translate(g, "tileLift", out("groutPaint", "geometry"), vec(g, "tileLiftBy", 0.0, math(g, "tileY", "add", in("y"), 0.004), 0.0));
         Ref offset = math(g, "bandOffset", "subtract", math(g, "halfWidth", "multiply", in("width"), 0.5), 1.25);
-        Ref right = translate(g, "tilesRightAt", lifted, vec(g, "tilesRightPos", offset, 0.0, 0.0));
-        Ref left = translate(g, "tilesLeftAt", lifted, vec(g, "tilesLeftPos", math(g, "bandOffsetNeg", "multiply", offset, -1.0), 0.0, 0.0));
-        output(g, "geometry", PortType.GEOMETRY, join(g, "all", out("base", "geometry"), right, left));
+        Ref bands = mirror(g, "bands", translate(g, "tilesRightAt", lifted, vec(g, "tilesRightPos", offset, 0.0, 0.0)), "x");
+        output(g, "geometry", PortType.GEOMETRY, join(g, "all", out("base", "geometry"), bands));
         return g.build();
     }
 
     /**
      * Rua asfaltada: faixa + tracejado central + faixas laterais + meio-fio + faixas de pedestre + linhas de retencao + bueiros +
-     * carros espalhados em duas pistas. Marcacoes, meio-fio e carros so aparecem longe dos cruzamentos (um Field sobre a
-     * posicao ao longo da rua).
+     * carros em duas pistas. Cada elemento e um subgrafo; todos recebem {@code away} (Field: distancia ao cruzamento mais
+     * proximo, medida na posicao do elemento), entao marcacoes, meio-fio e carros so aparecem longe dos cruzamentos.
      */
     private static GraphAsset road() {
         GraphBuilder g = asset("road");
         g.input(num("length", 100)).input(num("width", 10)).input(num("y", 0.12)).input(num("pitch", 40)).input(num("size", 200));
         sub(g, "ribbon", "street", "length", in("length"), "width", in("width"), "y", in("y"), "material", "road");
+        sub(g, "zones", "road_zones", "pitch", in("pitch"), "size", in("size"));
+        Ref away = out("zones", "away");
+        sub(g, "dashes", "road_dashes", "length", in("length"), "y", in("y"), "width", in("width"), "away", away);
+        sub(g, "edges", "road_edges", "length", in("length"), "y", in("y"), "width", in("width"), "away", away);
+        sub(g, "curbs", "road_curbs", "length", in("length"), "y", in("y"), "width", in("width"), "away", away);
+        sub(g, "crossings", "road_crosswalks", "length", in("length"), "y", in("y"), "width", in("width"), "away", away);
+        sub(g, "stops", "road_stop_lines", "length", in("length"), "y", in("y"), "width", in("width"), "away", away,
+                "wrapped", out("zones", "wrapped"));
+        sub(g, "traffic", "road_traffic", "geometry", out("ribbon", "geometry"), "width", in("width"), "away", away);
+        return finish(g, join(g, "all", out("ribbon", "geometry"), out("dashes", "geometry"), out("edges", "geometry"),
+                out("curbs", "geometry"), out("crossings", "geometry"), out("stops", "geometry"), out("traffic", "geometry")));
+    }
 
-        // longe dos cruzamentos: distancia ao cruzamento mais proximo (modulo do passo) acima de meia rua + folga
+    private static NodeInputDefinition fieldIn(String name, ValueKind kind) {
+        return NodeInputDefinition.of(name, PortType.fieldOf(kind));
+    }
+
+    /**
+     * Posicao ao longo da rua em relacao aos cruzamentos (a cada {@code pitch}): {@code wrapped} = distancia assinada ao
+     * cruzamento mais proximo e {@code away} = o modulo dela. Fields, avaliados onde forem usados.
+     */
+    private static GraphAsset roadZonesAsset() {
+        GraphBuilder g = asset("road_zones");
+        g.input(num("pitch", 40)).input(num("size", 200));
         Ref[] p = position(g, "m");
         Ref shifted = fmath(g, "shifted", "add", p[2], math(g, "origin", "add", math(g, "halfSize", "multiply", in("size"), 0.5),
                 math(g, "halfPitch", "multiply", in("pitch"), 0.5)));
         Ref wrapped = fmath(g, "wrapped", "subtract", fmath(g, "mod", "modulo", shifted, in("pitch")), math(g, "halfPitch2", "multiply", in("pitch"), 0.5));
         Ref away = fmath(g, "away", "abs", wrapped, 0.0);
-        Ref halfW = math(g, "halfW", "multiply", in("width"), 0.5);
-        Ref clear = cmp(g, "clear", "gt", away, math(g, "clearance", "add", halfW, 3.5));
+        output(g, "away", PortType.fieldOf(ValueKind.FLOAT), away);
+        output(g, "wrapped", PortType.fieldOf(ValueKind.FLOAT), wrapped);
+        return g.build();
+    }
 
-        // tracejado: pontos de uma linha, uma caixa fina por ponto
+    private static GraphBuilder roadPart(String id) {
+        GraphBuilder g = asset(id);
+        g.input(num("length", 100)).input(num("y", 0.12)).input(num("width", 10)).input(fieldIn("away", ValueKind.FLOAT));
+        return g;
+    }
+
+    /** Tracejado central: uma caixa fina por ponto de uma linha, so longe dos cruzamentos. */
+    private static GraphAsset roadDashesAsset() {
+        GraphBuilder g = roadPart("road_dashes");
         Ref halfLen = math(g, "halfLen", "multiply", in("length"), 0.5);
-        node(g, "dashLine", "core.create_line", "start", vec(g, "dashA", 0.0, math(g, "dashY", "add", in("y"), 0.03), math(g, "dashNeg", "multiply", halfLen, -1.0)),
-                "end", vec(g, "dashB", 0.0, out("dashY", "result"), halfLen),
-                "count", out("dashCount", "result"));
-        node(g, "dashCountF", "core.to_int", "value", math(g, "dashN", "divide", in("length"), 6.0), "mode", "round");
-        node(g, "dashCount", "core.int_math", "operation", "max", "a", out("dashCountF", "result"), "b", 2);
-        node(g, "dashPoints", "core.curve_to_points", "geometry", out("dashLine", "curve"));
+        Ref dashY = math(g, "dashY", "add", in("y"), 0.03);
+        sub(g, "dashCount", "step_count", "length", in("length"), "step", 6.0, "operation", "max", "extra", 2);
+        Ref pts = linePoints(g, "dashPoints", vec(g, "dashA", 0.0, dashY, math(g, "dashNeg", "multiply", halfLen, -1.0)),
+                vec(g, "dashB", 0.0, dashY, halfLen), out("dashCount", "result"));
+        Ref clear = cmp(g, "clear", "gt", in("away"), math(g, "clearance", "add", math(g, "halfW", "multiply", in("width"), 0.5), 3.5));
         Ref dash = part(g, "dash", new Vec3(0.3, 0.03, 2.4), new Vec3(0, 0.015, 0), "marking");
-        node(g, "dashes", "core.instance_on_points", "points", out("dashPoints", "points"), "instance", dash, "selection", clear);
+        node(g, "dashes", "core.instance_on_points", "points", pts, "instance", dash, "selection", clear);
+        return finish(g, out("dashes", "instances"));
+    }
 
-        // faixas laterais continuas (tracos longos) perto das bordas
-        node(g, "edgeCountF", "core.to_int", "value", math(g, "edgeN", "divide", in("length"), 3.0), "mode", "round");
-        node(g, "edgeCount", "core.int_math", "operation", "max", "a", out("edgeCountF", "result"), "b", 2);
-        Ref edgePts = linePoints(g, "edgePts", vec(g, "edgeA", 0.0, out("dashY", "result"), math(g, "edgeNeg", "multiply", halfLen, -1.0)),
-                vec(g, "edgeB", 0.0, out("dashY", "result"), halfLen), out("edgeCount", "result"));
+    /** Faixas laterais continuas (tracos longos) perto das bordas. */
+    private static GraphAsset roadEdgesAsset() {
+        GraphBuilder g = roadPart("road_edges");
+        Ref halfLen = math(g, "halfLen", "multiply", in("length"), 0.5);
+        Ref dashY = math(g, "dashY", "add", in("y"), 0.03);
+        Ref halfW = math(g, "halfW", "multiply", in("width"), 0.5);
+        sub(g, "edgeCount", "step_count", "length", in("length"), "step", 3.0, "operation", "max", "extra", 2);
+        Ref pts = linePoints(g, "edgePts", vec(g, "edgeA", 0.0, dashY, math(g, "edgeNeg", "multiply", halfLen, -1.0)),
+                vec(g, "edgeB", 0.0, dashY, halfLen), out("edgeCount", "result"));
+        Ref clear = cmp(g, "clear", "gt", in("away"), math(g, "clearance", "add", halfW, 3.5));
         Ref edgeSide = math(g, "edgeSide", "subtract", halfW, 0.7);
-        Ref edgeLine = join(g, "edgeLines",
-                part(g, "edgeL", vec(g, "edgeLSize", 0.14, 0.03, 2.7), vec(g, "edgeLAt", math(g, "edgeLX", "multiply", edgeSide, -1.0), 0.015, 0.0), "marking"),
-                part(g, "edgeR", vec(g, "edgeRSize", 0.14, 0.03, 2.7), vec(g, "edgeRAt", edgeSide, 0.015, 0.0), "marking"));
-        node(g, "edges", "core.instance_on_points", "points", edgePts, "instance", edgeLine, "selection", clear);
+        Ref edgeLine = mirror(g, "edgeLines", part(g, "edgeR", new Vec3(0.14, 0.03, 2.7), vec(g, "edgeRAt", edgeSide, 0.015, 0.0), "marking"), "x");
+        node(g, "edges", "core.instance_on_points", "points", pts, "instance", edgeLine, "selection", clear);
+        return finish(g, out("edges", "instances"));
+    }
 
-        // meio-fio nos dois lados, interrompido a meia rua do cruzamento
-        node(g, "curbCountF", "core.to_int", "value", math(g, "curbN", "divide", in("length"), 1.5), "mode", "round");
-        node(g, "curbCount", "core.int_math", "operation", "add", "a", out("curbCountF", "result"), "b", 1);
-        Ref curbPts = linePoints(g, "curbPts", vec(g, "curbA", 0.0, in("y"), math(g, "curbNeg", "multiply", halfLen, -1.0)),
+    /** Meio-fio nos dois lados, interrompido a meia rua do cruzamento. */
+    private static GraphAsset roadCurbsAsset() {
+        GraphBuilder g = roadPart("road_curbs");
+        Ref halfLen = math(g, "halfLen", "multiply", in("length"), 0.5);
+        Ref halfW = math(g, "halfW", "multiply", in("width"), 0.5);
+        sub(g, "curbCount", "step_count", "length", in("length"), "step", 1.5);
+        Ref pts = linePoints(g, "curbPts", vec(g, "curbA", 0.0, in("y"), math(g, "curbNeg", "multiply", halfLen, -1.0)),
                 vec(g, "curbB", 0.0, in("y"), halfLen), out("curbCount", "result"));
-        Ref curbOpen = cmp(g, "curbOpen", "gt", away, math(g, "curbClear", "add", halfW, 0.7));
+        Ref curbOpen = cmp(g, "curbOpen", "gt", in("away"), math(g, "curbClear", "add", halfW, 0.7));
         Ref curbEdge = math(g, "curbEdge", "add", halfW, 0.17);
-        Ref curbPair = join(g, "curbPair",
-                part(g, "curbL", vec(g, "curbLSize", 0.34, 0.2, 1.56), vec(g, "curbLAt", math(g, "curbLX", "multiply", curbEdge, -1.0), 0.08, 0.0), "curb"),
-                part(g, "curbR", vec(g, "curbRSize", 0.34, 0.2, 1.56), vec(g, "curbRAt", curbEdge, 0.08, 0.0), "curb"));
-        node(g, "curbs", "core.instance_on_points", "points", curbPts, "instance", curbPair, "selection", curbOpen);
+        Ref curbPair = mirror(g, "curbPair", part(g, "curbR", new Vec3(0.34, 0.2, 1.56), vec(g, "curbRAt", curbEdge, 0.08, 0.0), "curb"), "x");
+        node(g, "curbs", "core.instance_on_points", "points", pts, "instance", curbPair, "selection", curbOpen);
+        return finish(g, out("curbs", "instances"));
+    }
 
-        // faixas de pedestre: grade fina de pontos, filtrada por Field para a faixa de 2.6 m antes de cada cruzamento
-        node(g, "cwColsF", "core.to_int", "value", math(g, "cwColsRaw", "divide", in("width"), 1.1), "mode", "round");
-        node(g, "cwCols", "core.int_math", "operation", "max", "a", out("cwColsF", "result"), "b", 2);
-        node(g, "cwRowsF", "core.to_int", "value", math(g, "cwRowsRaw", "divide", in("length"), 1.0), "mode", "round");
-        node(g, "cwRows", "core.int_math", "operation", "add", "a", out("cwRowsF", "result"), "b", 1);
+    /** Faixas de pedestre: grade fina de pontos, filtrada por Field para a faixa de 2.6 m antes de cada cruzamento. */
+    private static GraphAsset roadCrosswalksAsset() {
+        GraphBuilder g = roadPart("road_crosswalks");
+        Ref halfW = math(g, "halfW", "multiply", in("width"), 0.5);
+        sub(g, "cwCols", "step_count", "length", in("width"), "step", 1.1, "operation", "max", "extra", 2);
+        sub(g, "cwRows", "step_count", "length", in("length"), "step", 1.0);
         node(g, "cwGrid", "core.create_grid", "size_x", math(g, "cwSpan", "subtract", in("width"), 1.6), "size_z", in("length"),
                 "vertices_x", out("cwCols", "result"), "vertices_z", out("cwRows", "result"));
-        Ref cwUp = translate(g, "cwUp", out("cwGrid", "mesh"), vec(g, "cwAt", 0.0, out("dashY", "result"), 0.0));
+        Ref cwUp = translate(g, "cwUp", out("cwGrid", "mesh"), vec(g, "cwAt", 0.0, math(g, "dashY", "add", in("y"), 0.03), 0.0));
         node(g, "cwPoints", "core.mesh_to_points", "geometry", cwUp);
         Ref stripe = part(g, "stripe", new Vec3(0.6, 0.03, 1.05), new Vec3(0, 0.015, 0), "marking");
-        Ref inBand = and(g, "inBand", cmp(g, "bandNear", "gt", away, math(g, "bandFrom", "add", halfW, 0.8)),
-                cmp(g, "bandFar", "lt", away, math(g, "bandTo", "add", halfW, 3.4)));
+        Ref inBand = and(g, "inBand", cmp(g, "bandNear", "gt", in("away"), math(g, "bandFrom", "add", halfW, 0.8)),
+                cmp(g, "bandFar", "lt", in("away"), math(g, "bandTo", "add", halfW, 3.4)));
         node(g, "crossings", "core.instance_on_points", "points", out("cwPoints", "points"), "instance", stripe, "selection", inBand);
+        return finish(g, out("crossings", "instances"));
+    }
 
-        // linhas de retencao: uma caixa por pista, so no lado de quem chega ao cruzamento
+    /** Linhas de retencao: uma caixa por pista, so no lado de quem chega ao cruzamento. */
+    private static GraphAsset roadStopLinesAsset() {
+        GraphBuilder g = roadPart("road_stop_lines");
+        g.input(fieldIn("wrapped", ValueKind.FLOAT));
+        Ref halfW = math(g, "halfW", "multiply", in("width"), 0.5);
+        Ref[] p = position(g, "m");
+        sub(g, "rows", "step_count", "length", in("length"), "step", 1.0);
         node(g, "stopGrid", "core.create_grid", "size_x", math(g, "stopSpan", "multiply", in("width"), 0.5), "size_z", in("length"),
-                "vertices_x", 2, "vertices_z", out("cwRows", "result"));
-        Ref stopUp = translate(g, "stopUp", out("stopGrid", "mesh"), vec(g, "stopAt", 0.0, out("dashY", "result"), 0.0));
+                "vertices_x", 2, "vertices_z", out("rows", "result"));
+        Ref stopUp = translate(g, "stopUp", out("stopGrid", "mesh"), vec(g, "stopAt", 0.0, math(g, "dashY", "add", in("y"), 0.03), 0.0));
         node(g, "stopPoints", "core.mesh_to_points", "geometry", stopUp);
-        Ref nearStop = and(g, "nearStop", cmp(g, "stopNear", "gt", away, math(g, "stopFrom", "add", halfW, 3.5)),
-                cmp(g, "stopFar", "lt", away, math(g, "stopTo", "add", halfW, 4.5)));
+        Ref nearStop = and(g, "nearStop", cmp(g, "stopNear", "gt", in("away"), math(g, "stopFrom", "add", halfW, 3.5)),
+                cmp(g, "stopFar", "lt", in("away"), math(g, "stopTo", "add", halfW, 4.5)));
         node(g, "arriving", "core.boolean_math", "operation", "or",
-                "a", and(g, "rightLane", cmp(g, "laneRightSide", "gt", p[0], 0.0), cmp(g, "beforeCenter", "lt", wrapped, 0.0)),
-                "b", and(g, "leftLane", cmp(g, "laneLeftSide", "lt", p[0], 0.0), cmp(g, "afterCenter", "gt", wrapped, 0.0)));
-        Ref stopLine = part(g, "stopLine", vec(g, "stopSize", math(g, "stopWidth", "subtract", math(g, "stopHalf", "multiply", in("width"), 0.5), 1.4), 0.03, 0.45),
+                "a", and(g, "rightLane", cmp(g, "laneRightSide", "gt", p[0], 0.0), cmp(g, "beforeCenter", "lt", in("wrapped"), 0.0)),
+                "b", and(g, "leftLane", cmp(g, "laneLeftSide", "lt", p[0], 0.0), cmp(g, "afterCenter", "gt", in("wrapped"), 0.0)));
+        Ref stopLine = part(g, "stopLine", vec(g, "stopSize", math(g, "stopWidth", "subtract", halfW, 1.4), 0.03, 0.45),
                 new Vec3(0, 0.015, 0), "marking");
         node(g, "stops", "core.instance_on_points", "points", out("stopPoints", "points"), "instance", stopLine,
                 "selection", and(g, "stopHere", nearStop, out("arriving", "result")));
+        return finish(g, out("stops", "instances"));
+    }
 
-        // bueiros: tampas de ferro espalhadas pela pista
-        node(g, "manholeSpots", "core.distribute_points", "geometry", out("ribbon", "geometry"), "density", 0.0007);
+    /** Bueiros e carros espalhados sobre a faixa {@code geometry}; os carros ocupam uma de duas pistas, longe dos cruzamentos. */
+    private static GraphAsset roadTrafficAsset() {
+        GraphBuilder g = asset("road_traffic");
+        g.input(NodeInputDefinition.of("geometry", PortType.GEOMETRY)).input(num("width", 10)).input(fieldIn("away", ValueKind.FLOAT));
+        Ref halfW = math(g, "halfW", "multiply", in("width"), 0.5);
+        Ref clear = cmp(g, "clear", "gt", in("away"), math(g, "clearance", "add", halfW, 3.5));
+        node(g, "manholeSpots", "core.distribute_points", "geometry", in("geometry"), "density", 0.0007);
         Ref manhole = join(g, "manholeAll", cylinder(g, "manhole", 0.5, 0.03, 14, "metal"),
-                translate(g, "manholeCoreAt", cylinder(g, "manholeCore", 0.34, 0.036, 10, "tire"), new Vec3(0, 0, 0)));
+                cylinder(g, "manholeCore", 0.34, 0.036, 10, "tire", new Vec3(0, 0, 0)));
         node(g, "manholes", "core.instance_on_points", "points", out("manholeSpots", "points"), "instance", manhole);
 
-        // carros: pontos aleatorios sobre a faixa, empurrados para uma de duas pistas
-        node(g, "carSpots", "core.distribute_points", "geometry", out("ribbon", "geometry"), "density", 0.0035);
+        node(g, "carSpots", "core.distribute_points", "geometry", in("geometry"), "density", 0.0035);
         node(g, "laneRnd", "core.random_value", "min_int", 0, "max_int", 1);
         Ref lane = out("laneRnd", "int");
+        Ref[] p = position(g, "m");
         node(g, "laneX", "core.switch_float", "condition", cmp(g, "laneIsA", "gt", lane, 0.5),
                 "if_true", math(g, "laneRight", "multiply", in("width"), 0.25), "if_false", math(g, "laneLeft", "multiply", in("width"), -0.25));
         node(g, "lanePos", "core.combine_xyz", "x", out("laneX", "result"), "y", p[1], "z", p[2]);
@@ -1419,10 +1448,7 @@ final class CityGraphs {
         node(g, "heading", "core.combine_xyz", "y", fmath(g, "headingDeg", "multiply", lane, 180.0));
         node(g, "cars", "core.instance_on_points", "points", out("colored", "geometry"), "instance", out("vehicle", "geometry"),
                 "selection", clear, "rotation", out("heading", "vector"));
-
-        output(g, "geometry", PortType.GEOMETRY, join(g, "all", out("ribbon", "geometry"), out("dashes", "instances"), out("edges", "instances"),
-                out("curbs", "instances"), out("crossings", "instances"), out("stops", "instances"), out("manholes", "instances"), out("cars", "instances")));
-        return g.build();
+        return finish(g, join(g, "all", out("manholes", "instances"), out("cars", "instances")));
     }
 
     /** Uma rua por linha de pontos (so a borda z &lt; 0 de uma grade de 2 linhas), nas duas direcoes; {@code ribbons} = variantes sorteadas. */
@@ -1445,8 +1471,7 @@ final class CityGraphs {
         Ref options = join(g, "options", choices);
 
         node(g, "count", "core.int_math", "operation", "add", "a", in("blocks"), "b", 1);
-        node(g, "lines", "core.create_grid", "size_x", size, "size_z", 2.0, "vertices_x", out("count", "result"), "vertices_z", 2);
-        node(g, "pts", "core.mesh_to_points", "geometry", out("lines", "mesh"));
+        sub(g, "pts", "grid_points", "size_x", size, "size_z", 2.0, "vertices_x", out("count", "result"), "vertices_z", 2);
         Ref[] p = position(g, "line");
         node(g, "which", "core.random_value", "min_int", 0, "max_int", variants - 1);
         node(g, "alongZ", "core.instance_on_points", "points", out("pts", "points"), "instance", options,
@@ -1480,7 +1505,34 @@ final class CityGraphs {
                 math(g, "sidewalkWidth", "add", in("street_width"), 5.0), "y", 0.06);
         sub(g, "roads", "road_grid", "blocks", in("blocks"), "pitch", pitch, "width", in("street_width"), "y", 0.12);
 
-        // variantes de lote; cada quarteirao sorteia uma
+        sub(g, "lotChoices", "city_lots");
+        sub(g, "lots", "city_blocks", "blocks", in("blocks"), "size", size, "choices", out("lotChoices", "geometry"));
+        sub(g, "lamps", "city_corner_lamps", "blocks", in("blocks"), "size", size, "block_size", in("block_size"));
+        sub(g, "trees", "city_street_trees", "blocks", in("blocks"), "size", size, "block_size", in("block_size"));
+        sub(g, "signals", "city_signals", "blocks", in("blocks"), "size", size);
+
+        join(g, "world", out("ground", "geometry"), out("sidewalks", "geometry"), out("roads", "geometry"), out("lots", "geometry"),
+                out("lamps", "geometry"), out("trees", "geometry"), out("signals", "geometry"));
+        node(g, "flat", "core.realize_instances", "geometry", out("world", "geometry"));
+        output(g, "geometry", PortType.GEOMETRY, out("flat", "geometry"));
+        return g.build();
+    }
+
+    /** Pontos da grade de quarteiroes ({@code blocks} x {@code blocks} celulas, lado total {@code size}): centros das celulas ("faces") ou cruzamentos ("vertices"). */
+    private static GraphAsset blockPointsAsset() {
+        GraphBuilder g = asset("block_points");
+        g.input(integer("blocks", 5)).input(num("size", 200)).input(NodeInputDefinition.of("mode", PortType.STRING).withDefault("faces"));
+        node(g, "count", "core.int_math", "operation", "add", "a", in("blocks"), "b", 1);
+        node(g, "grid", "core.create_grid", "size_x", in("size"), "size_z", in("size"), "vertices_x", out("count", "result"),
+                "vertices_z", out("count", "result"));
+        node(g, "points", "core.mesh_to_points", "geometry", out("grid", "mesh"), "mode", in("mode"));
+        g.output("points", PortType.GEOMETRY, "points", "points");
+        return g.build();
+    }
+
+    /** As variantes de lote (cada quarteirao sorteia uma), prontas como instancias: torres, galpao, cilindro, parque, casas, patio e podio. */
+    private static GraphAsset cityLotsAsset() {
+        GraphBuilder g = asset("city_lots");
         sub(g, "skyscraper", "stepped_tower", "cols_x", 4, "cols_z", 4, "floors", 20);
         sub(g, "skyscraper2", "stepped_tower", "cols_x", 5, "cols_z", 5, "floors", 12);
         sub(g, "midrise", "tower", "cols_x", 5, "cols_z", 4, "floors", 14);
@@ -1493,59 +1545,71 @@ final class CityGraphs {
         sub(g, "yard", "courtyard");
         sub(g, "podiumBase", "tower", "cols_x", 7, "cols_z", 7, "floors", 3, "floor_h", 3.4);
         sub(g, "podiumTop", "tower", "cols_x", 4, "cols_z", 4, "floors", 16);
-        Ref podiumUp = translate(g, "podiumTopUp", out("podiumTop", "geometry"), new Vec3(0, 10.2, 0));
-        Ref podium = join(g, "podium", out("podiumBase", "geometry"), podiumUp);
-
+        Ref podium = join(g, "podium", out("podiumBase", "geometry"),
+                translate(g, "podiumTopUp", out("podiumTop", "geometry"), new Vec3(0, 10.2, 0)));
         Ref[] lots = {out("skyscraper", "geometry"), out("skyscraper2", "geometry"), out("midrise", "geometry"), out("slab", "geometry"),
-                out("warehouse", "geometry"), out("cylinder", "geometry"), out("parkLot", "geometry"),
-                out("housesA", "geometry"),
+                out("warehouse", "geometry"), out("cylinder", "geometry"), out("parkLot", "geometry"), out("housesA", "geometry"),
                 out("housesB", "geometry"), out("yard", "geometry"), podium};
         Ref[] variants = new Ref[lots.length];
         for (int i = 0; i < lots.length; i++) {
             node(g, "lot" + i, "core.geometry_to_instance", "geometry", lots[i]);
             variants[i] = out("lot" + i, "instances");
         }
-        Ref choices = join(g, "choices", variants);
+        return finish(g, join(g, "choices", variants));
+    }
 
-        node(g, "count", "core.int_math", "operation", "add", "a", in("blocks"), "b", 1);
-        node(g, "blockGrid", "core.create_grid", "size_x", size, "size_z", size, "vertices_x", out("count", "result"),
-                "vertices_z", out("count", "result"));
-        node(g, "blockPoints", "core.mesh_to_points", "geometry", out("blockGrid", "mesh"), "mode", "faces");
+    /**
+     * Um lote por quarteirao: sorteia uma das {@code choices} (com giro de 90 graus, esticada em Y e com tom de cor proprio);
+     * o quarteirao central (perto da origem) e sempre um parque.
+     */
+    private static GraphAsset cityBlocksAsset() {
+        GraphBuilder g = asset("city_blocks");
+        g.input(integer("blocks", 5)).input(num("size", 200)).input(NodeInputDefinition.of("choices", PortType.GEOMETRY));
+        sub(g, "blockPoints", "block_points", "blocks", in("blocks"), "size", in("size"), "mode", "faces");
         // tom de cor por quarteirao: atributo do ponto -> da instancia -> dos vertices (ao materializar)
         node(g, "toneRnd", "core.random_value");
         node(g, "tonedPoints", "core.set_attribute", "geometry", out("blockPoints", "points"), "name", "tone",
                 "domain", "point", "type", "float", "value", out("toneRnd", "float"));
-
-        node(g, "pick", "core.random_value", "min_int", 0, "max_int", lots.length - 1);
+        node(g, "pick", "core.random_value", "min_int", 0, "max_int", 10);
         node(g, "quarter", "core.random_value", "min_int", 0, "max_int", 3);
         node(g, "yaw", "core.math", "operation", "multiply", "a", out("quarter", "int"), "b", 90.0);
         node(g, "turn", "core.combine_xyz", "y", out("yaw", "result"));
         node(g, "stretch", "core.random_value", "min_float", 0.85, "max_float", 1.25);
         node(g, "scale", "core.combine_xyz", "x", 1.0, "y", out("stretch", "float"), "z", 1.0);
-        // o quarteirao central (perto da origem) e sempre um parque; os demais sorteiam
         Ref[] block = position(g, "blk");
         Ref central = and(g, "central", cmp(g, "nearX", "lt", fmath(g, "absBx", "abs", block[0], 0.0), 1.0),
                 cmp(g, "nearZ", "lt", fmath(g, "absBz", "abs", block[2], 0.0), 1.0));
         sub(g, "centralPark", "park", "size", 28.0, "density", 0.03);
         node(g, "centralSpot", "core.instance_on_points", "points", out("tonedPoints", "geometry"), "instance",
                 out("centralPark", "geometry"), "selection", central);
-        node(g, "lots", "core.instance_on_points", "points", out("tonedPoints", "geometry"), "instance", choices,
-                "selection", not(g, "notCentral", central), "pick_instance", true, "instance_index", out("pick", "int"), "rotation", out("turn", "vector"),
-                "scale", out("scale", "vector"));
+        node(g, "lots", "core.instance_on_points", "points", out("tonedPoints", "geometry"), "instance", in("choices"),
+                "selection", not(g, "notCentral", central), "pick_instance", true, "instance_index", out("pick", "int"),
+                "rotation", out("turn", "vector"), "scale", out("scale", "vector"));
+        return finish(g, join(g, "all", out("lots", "instances"), out("centralSpot", "instances")));
+    }
 
-        // mobiliario (poste, hidrante, lixeira) nos quatro cantos de cada quarteirao
+    /** Mobiliario (poste, hidrante, lixeira) nos quatro cantos de cada quarteirao. */
+    private static GraphAsset cityCornerLampsAsset() {
+        GraphBuilder g = asset("city_corner_lamps");
+        g.input(integer("blocks", 5)).input(num("size", 200)).input(num("block_size", 30));
+        sub(g, "blockPoints", "block_points", "blocks", in("blocks"), "size", in("size"), "mode", "faces");
         sub(g, "streetLamp", "street_kit");
-        node(g, "cornerGrid", "core.create_grid", "size_x", math(g, "cornerSpan", "subtract", in("block_size"), 2.4),
+        sub(g, "cornerPoints", "grid_points", "size_x", math(g, "cornerSpan", "subtract", in("block_size"), 2.4),
                 "size_z", out("cornerSpan", "result"), "vertices_x", 2, "vertices_z", 2);
-        node(g, "cornerPoints", "core.mesh_to_points", "geometry", out("cornerGrid", "mesh"));
         node(g, "cornerLamps", "core.instance_on_points", "points", out("cornerPoints", "points"), "instance", out("streetLamp", "geometry"));
         node(g, "lampCluster", "core.geometry_to_instance", "geometry", out("cornerLamps", "instances"));
         node(g, "lamps", "core.instance_on_points", "points", out("blockPoints", "points"), "instance", out("lampCluster", "instances"));
+        return finish(g, out("lamps", "instances"));
+    }
 
-        // arvores de rua no meio de cada lado do quarteirao (entre os postes)
+    /** Arvores de rua no meio de cada lado do quarteirao (entre os postes). */
+    private static GraphAsset cityStreetTreesAsset() {
+        GraphBuilder g = asset("city_street_trees");
+        g.input(integer("blocks", 5)).input(num("size", 200)).input(num("block_size", 30));
+        sub(g, "blockPoints", "block_points", "blocks", in("blocks"), "size", in("size"), "mode", "faces");
         sub(g, "sidewalkTree", "street_tree");
-        node(g, "edgeGrid", "core.create_grid", "size_x", out("cornerSpan", "result"), "size_z", out("cornerSpan", "result"), "vertices_x", 3, "vertices_z", 3);
-        node(g, "edgePoints", "core.mesh_to_points", "geometry", out("edgeGrid", "mesh"));
+        Ref span = math(g, "cornerSpan", "subtract", in("block_size"), 2.4);
+        sub(g, "edgePoints", "grid_points", "size_x", span, "size_z", span, "vertices_x", 3, "vertices_z", 3);
         Ref[] edge = position(g, "edge");
         Ref onEdgeX = cmp(g, "edgeNearX", "lt", fmath(g, "edgeAbsX", "abs", edge[0], 0.0), 0.1);
         Ref onEdgeZ = cmp(g, "edgeNearZ", "lt", fmath(g, "edgeAbsZ", "abs", edge[2], 0.0), 0.1);
@@ -1559,22 +1623,425 @@ final class CityGraphs {
                 "selection", out("edgeXor", "result"), "rotation", out("edgeSpin", "vector"), "scale", out("edgeScale", "vector"));
         node(g, "edgeTreeCluster", "core.geometry_to_instance", "geometry", out("edgeTrees", "instances"));
         node(g, "treeRows", "core.instance_on_points", "points", out("blockPoints", "points"), "instance", out("edgeTreeCluster", "instances"));
-        Ref treesUp = translate(g, "treesUp", out("treeRows", "instances"), new Vec3(0, 0.09, 0));
+        return finish(g, translate(g, "treesUp", out("treeRows", "instances"), new Vec3(0, 0.09, 0)));
+    }
 
-        // semaforos nos cantos de cada cruzamento (os vertices da grade de quarteiroes)
+    /** Semaforos nos quatro cantos de cada cruzamento (os vertices da grade de quarteiroes). */
+    private static GraphAsset citySignalsAsset() {
+        GraphBuilder g = asset("city_signals");
+        g.input(integer("blocks", 5)).input(num("size", 200));
         sub(g, "trafficSignal", "signal");
-        node(g, "signalGrid", "core.create_grid", "size_x", 12.6, "size_z", 12.6, "vertices_x", 2, "vertices_z", 2);
-        node(g, "signalPoints", "core.mesh_to_points", "geometry", out("signalGrid", "mesh"));
+        sub(g, "signalPoints", "grid_points", "size_x", 12.6, "size_z", 12.6, "vertices_x", 2, "vertices_z", 2);
         node(g, "signalCorners", "core.instance_on_points", "points", out("signalPoints", "points"), "instance", out("trafficSignal", "geometry"));
         node(g, "signalCluster", "core.geometry_to_instance", "geometry", out("signalCorners", "instances"));
-        node(g, "crossings", "core.mesh_to_points", "geometry", out("blockGrid", "mesh"));
+        sub(g, "crossings", "block_points", "blocks", in("blocks"), "size", in("size"), "mode", "vertices");
         node(g, "signals", "core.instance_on_points", "points", out("crossings", "points"), "instance", out("signalCluster", "instances"));
-        Ref signalsUp = translate(g, "signalsUp", out("signals", "instances"), new Vec3(0, 0.09, 0));
+        return finish(g, translate(g, "signalsUp", out("signals", "instances"), new Vec3(0, 0.09, 0)));
+    }
 
-        join(g, "world", out("ground", "geometry"), out("sidewalks", "geometry"), out("roads", "geometry"), out("lots", "instances"),
-                out("centralSpot", "instances"), out("lamps", "instances"), treesUp, signalsUp);
-        node(g, "flat", "core.realize_instances", "geometry", out("world", "geometry"));
-        output(g, "geometry", PortType.GEOMETRY, out("flat", "geometry"));
+    // ======================================================================================================
+    // house: a casa decomposta em subgrafos pequenos (cada um cabe numa tela do editor e tem poucos
+    // parametros). As pecas genericas (box_part, cylinder_part, fence_rail, ...) podem ser reutilizadas.
+    // Coordenadas locais: cada subgrafo monta suas pecas com numeros fixos e posiciona o conjunto uma vez so.
+    // ======================================================================================================
+
+    private static NodeInputDefinition vec3In(String name, Vec3 def) {
+        return NodeInputDefinition.of(name, PortType.VEC3).withDefault(def);
+    }
+
+    /** Chamada do subgrafo {@code box_part} (caixa + posicao + material); {@code size}/{@code at} aceitam Ref ou Vec3. */
+    private static Ref bp(GraphBuilder g, String id, Object size, Object at, String material, double bevel) {
+        sub(g, id, "box_part", "size", size, "position", at, "material", material, "bevel", bevel);
+        return out(id, "geometry");
+    }
+
+    /** Chamada do subgrafo {@code cylinder_part} (cilindro de eixo Y com base em y = 0). */
+    private static Ref cp(GraphBuilder g, String id, double radius, double height, int segments, String material, Object at) {
+        sub(g, id, "cylinder_part", "radius", radius, "height", height, "segments", segments, "position", at, "material", material);
+        return out(id, "geometry");
+    }
+
+    /** Une instancias/geometria e devolve como GEOMETRY (saida publica de um subgrafo). */
+    private static GraphAsset finish(GraphBuilder g, Ref result) {
+        output(g, "geometry", PortType.GEOMETRY, result);
         return g.build();
+    }
+
+    /** Caixa centrada em {@code position}, com material; so e suavizada (normais misturadas) quando {@code bevel} &gt; 0. */
+    private static GraphAsset boxPartAsset() {
+        GraphBuilder g = asset("box_part");
+        g.input(vec3In("size", new Vec3(1, 1, 1))).input(vec3In("position", new Vec3(0, 0, 0)))
+                .input(material("material", "wall")).input(num("bevel", 0.0));
+        node(g, "box", "core.create_box", "size", in("size"), "bevel", in("bevel"), "bevel_segments", 1);
+        node(g, "smooth", "core.set_attribute", "geometry", out("box", "mesh"), "name", "smooth", "domain", "face", "type", "bool",
+                "flag", cmp(g, "rounded", "gt", in("bevel"), 0.0));
+        Ref at = translate(g, "at", out("smooth", "geometry"), in("position"));
+        node(g, "mat", "core.set_material", "geometry", at, "material", in("material"));
+        return finish(g, out("mat", "geometry"));
+    }
+
+    /** Cilindro de eixo Y com a base em {@code position} (create_cylinder e centrado: sobe metade da altura), lateral suave. */
+    private static GraphAsset cylinderPartAsset() {
+        GraphBuilder g = asset("cylinder_part");
+        g.input(num("radius", 0.5)).input(num("height", 1.0)).input(integer("segments", 8))
+                .input(vec3In("position", new Vec3(0, 0, 0))).input(material("material", "wall"));
+        node(g, "cyl", "core.create_cylinder", "radius", in("radius"), "height", in("height"), "segments", in("segments"));
+        node(g, "half", "core.combine_vec3_transform", "y", in("height"), "scale", new Vec3(1, 0.5, 1));
+        Ref raised = translate(g, "up", out("cyl", "mesh"), out("half", "vector"));
+        node(g, "mat", "core.set_material", "geometry", raised, "material", in("material"));
+        return finish(g, translate(g, "at", out("mat", "geometry"), in("position")));
+    }
+
+    /** Coluna (base, fuste e capitel), com a base em {@code position}. */
+    private static GraphAsset houseColumnAsset() {
+        GraphBuilder g = asset("house_column");
+        g.input(vec3In("position", new Vec3(0, 0, 0)));
+        Ref base = cp(g, "base", 0.17, 0.2, 8, "trim", new Vec3(0, 0, 0));
+        Ref shaft = cp(g, "shaft", 0.11, 2.2, 8, "trim", new Vec3(0, 0.2, 0));
+        Ref capital = cp(g, "capital", 0.17, 0.2, 8, "trim", new Vec3(0, 2.4, 0));
+        return finish(g, translate(g, "at", join(g, "column", base, shaft, capital), in("position")));
+    }
+
+    /** Janela redonda do oitao (moldura, vidro e travessa), deitada para olhar em +Z. */
+    private static GraphAsset houseGableWindowAsset() {
+        GraphBuilder g = asset("house_gable_window");
+        Ref frame = cp(g, "frame", 0.58, 0.06, 14, "trim", new Vec3(0, 0, 0));
+        Ref glass = cp(g, "glass", 0.42, 0.06, 14, "window_dark", new Vec3(0, 0.03, 0));
+        Ref bar = bp(g, "bar", new Vec3(0.8, 0.05, 0.1), new Vec3(0, 0.06, 0), "trim", 0.0);
+        return finish(g, rotate(g, "turn", join(g, "all", frame, glass, bar), new Vec3(90, 0, 0)));
+    }
+
+    /** Casco do telhado de 2 aguas: caixa cujos vertices de cima vao ao eixo; as aguas recebem o material "roof". */
+    private static GraphAsset houseRoofShellAsset() {
+        GraphBuilder g = asset("house_roof_shell");
+        g.input(num("roof_w", 9.8)).input(num("roof_d", 6.8)).input(num("roof_h", 4.9)).input(num("h", 5.6));
+        Ref roofW = in("roof_w"), roofD = in("roof_d"), roofH = in("roof_h"), h = in("h");
+        node(g, "roofBox", "core.create_box", "size", vec(g, "roofSize", roofW, roofH, roofD));
+        Ref[] p = position(g, "r");
+        Ref upper = cmp(g, "upper", "gt", p[1], 0.0);
+        node(g, "pull", "core.switch_float", "condition", upper, "if_true", fmath(g, "negX", "negate", p[0], 0.0), "if_false", 0.0);
+        node(g, "pullVec", "core.combine_xyz", "x", out("pull", "result"));
+        node(g, "ridge", "core.set_position", "geometry", out("roofBox", "mesh"), "offset", out("pullVec", "vector"));
+        node(g, "clean", "core.merge_by_distance", "geometry", out("ridge", "geometry"), "distance", 0.01);
+        Ref roofUp = translate(g, "roofUp", out("clean", "geometry"),
+                vec(g, "roofAt", 0.0, math(g, "roofY", "add", h, math(g, "halfRoof", "multiply", roofH, 0.5)), 0.0));
+        Ref[] n = normal(g, "r");
+        node(g, "roof", "core.set_material", "geometry", roofUp, "selection", cmp(g, "slope", "gt", n[1], 0.3), "material", "roof");
+        return finish(g, out("roof", "geometry"));
+    }
+
+    /** Telhas: uma grade por agua, cada celula com inset + extrude de altura sorteada em [tile_min, tile_max]. */
+    private static GraphAsset houseRoofTilesAsset() {
+        GraphBuilder g = asset("house_roof_tiles");
+        g.input(num("roof_w", 9.8)).input(num("roof_d", 6.8)).input(num("roof_h", 4.9)).input(num("h", 5.6))
+                .input(num("tile_min", 0.03)).input(num("tile_max", 0.085));
+        Ref roofW = in("roof_w"), roofD = in("roof_d"), roofH = in("roof_h"), h = in("h");
+        Ref slopeLen = math(g, "slopeLen", "multiply", roofW, 0.70711);
+        sub(g, "tileRows", "step_count", "length", slopeLen, "step", 0.42);
+        sub(g, "tileCols", "step_count", "length", roofD, "step", 0.5);
+        node(g, "tileGrid", "core.create_grid", "size_x", slopeLen, "size_z", roofD,
+                "vertices_x", out("tileRows", "result"), "vertices_z", out("tileCols", "result"));
+        node(g, "tileFrame", "core.inset_faces", "geometry", out("tileGrid", "mesh"), "amount", 0.03, "inner_attribute", "tile_inner");
+        node(g, "tileHeight", "core.random_value", "min_float", in("tile_min"), "max_float", in("tile_max"));
+        node(g, "tileRaise", "core.extrude", "geometry", out("tileFrame", "geometry"), "selection", flag(g, "tileInner", "tile_inner"),
+                "distance", out("tileHeight", "float"));
+        node(g, "tilePaint", "core.set_material", "geometry", out("tileRaise", "geometry"), "material", "tile");
+        Ref slopeMidY = math(g, "slopeMidY", "add", h, math(g, "slopeMidHalf", "multiply", roofH, 0.5));
+        Ref slopeX = math(g, "slopeX", "multiply", roofW, 0.25);
+        Ref tilesRight = place(g, "tilesRightAt", out("tilePaint", "geometry"), vec(g, "tilesRightPos", math(g, "tilesRightX", "add", slopeX, 0.014), math(g, "tilesRightY", "add", slopeMidY, 0.014), 0.0), new Vec3(0, 0, -45));
+        return finish(g, mirror(g, "tiles", tilesRight, "x"));
+    }
+
+    /** Cumeeira, tabeiras nos oitoes e janelas redondas dos oitoes. */
+    private static GraphAsset houseRoofTrimAsset() {
+        GraphBuilder g = asset("house_roof_trim");
+        g.input(num("roof_w", 9.8)).input(num("roof_d", 6.8)).input(num("roof_h", 4.9)).input(num("h", 5.6));
+        Ref roofW = in("roof_w"), roofD = in("roof_d"), roofH = in("roof_h"), h = in("h");
+        Ref slopeLen = math(g, "slopeLen", "multiply", roofW, 0.70711);
+        Ref slopeMidY = math(g, "slopeMidY", "add", h, math(g, "slopeMidHalf", "multiply", roofH, 0.5));
+        Ref slopeX = math(g, "slopeX", "multiply", roofW, 0.25);
+        Ref ridgeY = math(g, "ridgeY", "add", h, roofH);
+        Ref ridgeCap = place(g, "ridgeCapAt", bp(g, "ridgeCap", vec(g, "ridgeSize", 0.36, 0.36, math(g, "ridgeLen", "add", roofD, 0.2)), new Vec3(0, 0, 0), "trim", 0.0), vec(g, "ridgeCapPos", 0.0, ridgeY, 0.0), new Vec3(0, 0, 45));
+        Ref board = bp(g, "board", vec(g, "boardSize", math(g, "boardLen", "add", slopeLen, 0.25), 0.1, 0.1), new Vec3(0, 0, 0), "trim", 0.0);
+        Ref boardR = rotate(g, "boardRTurn", board, new Vec3(0, 0, -45));
+        Ref boardOffset = math(g, "boardOffset", "add", slopeX, 0.1);
+        Ref boardZ = math(g, "boardZ", "multiply", roofD, 0.5);
+        Ref boardRF = translate(g, "boardRF", boardR, vec(g, "boardRFAt", boardOffset, slopeMidY, boardZ));
+        sub(g, "gableWindow", "house_gable_window");
+        Ref gableY = math(g, "gableY", "add", h, math(g, "gableRise", "multiply", roofH, 0.38));
+        Ref gableFront = translate(g, "gableFrontAt", out("gableWindow", "geometry"),
+                vec(g, "gableFrontPos", 0.0, gableY, math(g, "gableFrontZ", "add", boardZ, 0.02)));
+        // tabeira da direita e janela da frente; o outro lado da agua e os fundos saem dos espelhos em X e em Z
+        Ref frontSide = mirror(g, "boardsLR", join(g, "frontRight", boardRF), "x");
+        Ref front = join(g, "front", frontSide, gableFront);
+        return finish(g, join(g, "trim", ridgeCap, mirror(g, "frontBack", front, "z")));
+    }
+
+    /** Uma lucarna por agua, a 30% da largura do telhado. */
+    private static GraphAsset houseDormersAsset() {
+        GraphBuilder g = asset("house_dormers");
+        g.input(num("roof_w", 9.8)).input(num("roof_d", 6.8)).input(num("h", 5.6));
+        Ref roofW = in("roof_w"), roofD = in("roof_d"), h = in("h");
+        sub(g, "dormerRight", "dormer");
+        Ref dormerX = math(g, "dormerX", "multiply", roofW, 0.3);
+        Ref dormerY = math(g, "dormerY", "add", h, math(g, "dormerDrop", "subtract", math(g, "dormerHalf", "multiply", roofW, 0.5), dormerX));
+        Ref dormerZ = math(g, "dormerZ", "multiply", roofD, 0.2);
+        Ref dormerRight = translate(g, "dormerRightAt", out("dormerRight", "geometry"), vec(g, "dormerRightPos", dormerX, dormerY, dormerZ));
+        return finish(g, join(g, "dormers", dormerRight, rotate(g, "dormerLeftTurn", dormerRight, new Vec3(0, 180, 0))));
+    }
+
+    /** Chamine montada na origem (corpo, faixa, tampa e dois potes) e posicionada uma vez no telhado. */
+    private static GraphAsset houseChimneyAsset() {
+        GraphBuilder g = asset("house_chimney");
+        g.input(num("w", 9.0)).input(num("d", 6.0)).input(num("h", 5.6)).input(num("roof_h", 4.9));
+        Ref body = bp(g, "body", new Vec3(0.8, 2.8, 0.8), new Vec3(0, 0, 0), "brick", 0.1);
+        Ref band = bp(g, "band", new Vec3(0.92, 0.12, 0.92), new Vec3(0, 0.9, 0), "trim", 0.0);
+        Ref cap = bp(g, "cap", new Vec3(1.05, 0.18, 1.05), new Vec3(0, 1.4, 0), "trim", 0.0);
+        Ref potA = cp(g, "potA", 0.15, 0.45, 8, "brick", new Vec3(-0.2, 1.49, 0));
+        Ref potB = cp(g, "potB", 0.15, 0.45, 8, "brick", new Vec3(0.2, 1.49, 0));
+        Ref x = math(g, "x", "multiply", in("w"), 0.22);
+        Ref z = math(g, "z", "multiply", in("d"), -0.2);
+        Ref y = math(g, "y", "add", in("h"), math(g, "rise", "multiply", in("roof_h"), 0.8));
+        return finish(g, translate(g, "placed", join(g, "all", body, band, cap, potA, potB), vec(g, "pos", x, y, z)));
+    }
+
+    /** Porta com bandeira, requadro, verga, macaneta e luminaria; {@code front_z} = z da parede da frente. */
+    private static GraphAsset houseDoorAsset() {
+        GraphBuilder g = asset("house_door");
+        g.input(num("front_z", 3.0));
+        Ref door = bp(g, "door", new Vec3(1.2, 2.2, 0.15), new Vec3(0, 1.1, 0.05), "door", 0.0);
+        Ref light = bp(g, "doorLight", new Vec3(0.7, 0.8, 0.04), new Vec3(0, 1.55, 0.14), "window_dark", 0.0);
+        Ref knob = bp(g, "doorKnob", new Vec3(0.09, 0.09, 0.1), new Vec3(0.42, 1.0, 0.17), "lamp", 0.0);
+        Ref frame = bp(g, "frame", new Vec3(1.7, 2.45, 0.1), new Vec3(0, 1.225, 0.02), "trim", 0.0);
+        Ref lintel = bp(g, "lintel", new Vec3(1.95, 0.2, 0.26), new Vec3(0, 2.55, 0.1), "trim", 0.0);
+        Ref lamp = bp(g, "wallLamp", new Vec3(0.18, 0.3, 0.18), new Vec3(-1.2, 1.9, 0.1), "lamp", 0.0);
+        return finish(g, translate(g, "placed", join(g, "all", door, light, knob, frame, lintel, lamp), vec(g, "at", 0.0, 0.0, in("front_z"))));
+    }
+
+    /** Balaustrada: 13 balaustres numa linha, com um vao central livre (|x| > 0.85 fica fechado). */
+    private static GraphAsset houseBalustradeAsset() {
+        GraphBuilder g = asset("house_balustrade");
+        Ref pts = linePoints(g, "pts", new Vec3(-1.5, 0.25, 1.6), new Vec3(1.5, 0.25, 1.6), 13);
+        Ref[] bp = position(g, "bal");
+        Ref open = cmp(g, "open", "gt", fmath(g, "abs", "abs", bp[0], 0.0), 0.85);
+        Ref baluster = bp(g, "baluster", new Vec3(0.05, 0.75, 0.05), new Vec3(0, 0.375, 0), "trim", 0.0);
+        node(g, "balusters", "core.instance_on_points", "points", pts, "instance", baluster, "selection", open);
+        return finish(g, join(g, "out", out("balusters", "instances")));
+    }
+
+    /** Varanda: laje, degrau, colunas, balaustrada, corrimaos e telhadinho. */
+    private static GraphAsset housePorchAsset() {
+        GraphBuilder g = asset("house_porch");
+        g.input(num("front_z", 3.0));
+        Ref slab = bp(g, "porch", new Vec3(3.8, 0.25, 1.8), new Vec3(0, 0.125, 0.9), "trim", 0.1);
+        Ref step = bp(g, "step", new Vec3(3.2, 0.14, 0.5), new Vec3(0, 0.07, 2.05), "sidewalk", 0.0);
+        sub(g, "colR", "house_column", "position", new Vec3(1.6, 0.25, 1.6));
+        sub(g, "balustrade", "house_balustrade");
+        Ref railR = bp(g, "handrailR", new Vec3(0.65, 0.07, 0.09), new Vec3(1.275, 1.05, 1.6), "trim", 0.0);
+        Ref sidePair = mirror(g, "sidePair", join(g, "rightSide", out("colR", "geometry"), railR), "x");
+        Ref roof = bp(g, "roof", new Vec3(4.2, 0.18, 2.2), new Vec3(0, 2.95, 0.95), "roof", 0.0);
+        Ref fascia = bp(g, "fascia", new Vec3(4.3, 0.2, 0.08), new Vec3(0, 2.88, 2.07), "trim", 0.0);
+        Ref ceiling = bp(g, "ceiling", new Vec3(3.9, 0.05, 1.9), new Vec3(0, 2.82, 0.9), "trim", 0.0);
+        Ref all = join(g, "all", slab, step, sidePair, out("balustrade", "geometry"), roof, fascia, ceiling);
+        return finish(g, translate(g, "placed", all, vec(g, "at", 0.0, 0.0, in("front_z"))));
+    }
+
+    /** Caminho de 4 lajotas da varanda ate o portao. */
+    private static GraphAsset houseWalkwayAsset() {
+        GraphBuilder g = asset("house_walkway");
+        g.input(num("front_z", 3.0));
+        Ref pts = linePoints(g, "pts", new Vec3(0, 0.05, 2.7), new Vec3(0, 0.05, 3.7), 4);
+        Ref stone = bp(g, "flagstone", new Vec3(1.1, 0.07, 0.5), new Vec3(0, 0.035, 0), "sidewalk", 0.0);
+        node(g, "flagstones", "core.instance_on_points", "points", pts, "instance", stone);
+        return finish(g, translate(g, "placed", out("flagstones", "instances"), vec(g, "at", 0.0, 0.0, in("front_z"))));
+    }
+
+    /** Quintal: gramado com mureta de pedra (o anel do inset sobe). */
+    private static GraphAsset houseYardAsset() {
+        GraphBuilder g = asset("house_yard");
+        g.input(num("yard_w", 13.0)).input(num("yard_d", 11.0));
+        node(g, "yard", "core.create_grid", "size_x", in("yard_w"), "size_z", in("yard_d"));
+        Ref yardUp = translate(g, "yardUp", out("yard", "mesh"), new Vec3(0, 0.05, 1.0));
+        node(g, "yardFrame", "core.inset_faces", "geometry", yardUp, "amount", 0.18, "inner_attribute", "yard_inner");
+        node(g, "curbUp", "core.extrude", "geometry", out("yardFrame", "geometry"),
+                "selection", not(g, "notYardInner", flag(g, "yardInner", "yard_inner")), "offset", new Vec3(0, 0.2, 0));
+        Ref[] yp = position(g, "y");
+        node(g, "curbPaint", "core.set_material", "geometry", out("curbUp", "geometry"), "selection", cmp(g, "curbHigh", "gt", yp[1], 0.08),
+                "material", "stone");
+        node(g, "lawnPaint", "core.set_material", "geometry", out("curbPaint", "geometry"), "selection", cmp(g, "lawnLow", "lt", yp[1], 0.08),
+                "material", "grass");
+        return finish(g, out("lawnPaint", "geometry"));
+    }
+
+    /** Travessa da cerca: duas barras (y = 0.3 e 0.75) ao longo de X, giradas em {@code yaw} e movidas para (x, z). */
+    private static GraphAsset fenceRailAsset() {
+        GraphBuilder g = asset("fence_rail");
+        g.input(num("length", 4.0)).input(num("yaw", 0.0)).input(num("x", 0.0)).input(num("z", 0.0));
+        Ref low = bp(g, "low", vec(g, "size", in("length"), 0.05, 0.05), new Vec3(0, 0.3, 0), "fence", 0.0);
+        Ref high = translate(g, "high", low, new Vec3(0, 0.45, 0));
+        return finish(g, place(g, "placed", join(g, "both", low, high), vec(g, "at", in("x"), 0.0, in("z")), vec(g, "yawVec", 0.0, in("yaw"), 0.0)));
+    }
+
+    /** Ripas no perimetro da cerca (menos o vao do portao), uma instancia por ponto de uma grade. */
+    private static GraphAsset fencePicketsAsset() {
+        GraphBuilder g = asset("fence_pickets");
+        g.input(num("fence_w", 12.7)).input(num("fence_d", 10.7));
+        Ref fenceW = in("fence_w"), fenceD = in("fence_d");
+        sub(g, "picketCols", "step_count", "length", fenceW, "step", 0.45);
+        sub(g, "picketRows", "step_count", "length", fenceD, "step", 0.45);
+        sub(g, "picketPts", "grid_points", "size_x", fenceW, "size_z", fenceD,
+                "vertices_x", out("picketCols", "result"), "vertices_z", out("picketRows", "result"));
+        Ref[] fp = position(g, "fence");
+        Ref halfFenceW = math(g, "halfFenceW", "multiply", fenceW, 0.5);
+        Ref halfFenceD = math(g, "halfFenceD", "multiply", fenceD, 0.5);
+        Ref onSide = cmp(g, "onSide", "gt", fmath(g, "fenceAbsX", "abs", fp[0], 0.0), math(g, "sideLimit", "subtract", halfFenceW, 0.05));
+        Ref onEnd = cmp(g, "onEnd", "gt", fmath(g, "fenceAbsZ", "abs", fp[2], 0.0), math(g, "endLimit", "subtract", halfFenceD, 0.05));
+        Ref inGate = and(g, "inGate", cmp(g, "gateFront", "gt", fp[2], math(g, "gateLimit", "subtract", halfFenceD, 0.05)),
+                cmp(g, "gateNear", "lt", fmath(g, "gateAbsX", "abs", fp[0], 0.0), 0.95));
+        node(g, "perimeter", "core.boolean_math", "operation", "or", "a", onSide, "b", onEnd);
+        Ref picketHere = and(g, "picketHere", out("perimeter", "result"), not(g, "notGate", inGate));
+        Ref picket = bp(g, "picket", new Vec3(0.07, 0.95, 0.05), new Vec3(0, 0.475, 0), "fence", 0.0);
+        Ref tip = bp(g, "picketTip", new Vec3(0.1, 0.05, 0.08), new Vec3(0, 0.97, 0), "fence", 0.0);
+        node(g, "pickets", "core.instance_on_points", "points", out("picketPts", "points"), "instance", join(g, "picketAll", picket, tip),
+                "selection", picketHere);
+        return finish(g, join(g, "out", out("pickets", "instances")));
+    }
+
+    /** Cinco travessas: fundo, lados e as duas metades da frente (separadas pelo vao do portao). */
+    private static GraphAsset fenceRailsAsset() {
+        GraphBuilder g = asset("fence_rails");
+        g.input(num("fence_w", 12.7)).input(num("fence_d", 10.7));
+        Ref fenceW = in("fence_w"), fenceD = in("fence_d");
+        Ref halfW = math(g, "halfFenceW", "multiply", fenceW, 0.5);
+        Ref halfD = math(g, "halfFenceD", "multiply", fenceD, 0.5);
+        Ref frontLen = math(g, "frontLen", "subtract", halfW, 0.95);
+        Ref frontMid = math(g, "frontMid", "multiply", math(g, "frontSum", "add", halfW, 0.95), 0.5);
+        sub(g, "back", "fence_rail", "length", fenceW, "yaw", 0.0, "x", 0.0, "z", math(g, "backZ", "multiply", halfD, -1.0));
+        sub(g, "right", "fence_rail", "length", fenceD, "yaw", 90.0, "x", halfW, "z", 0.0);
+        sub(g, "frontR", "fence_rail", "length", frontLen, "yaw", 0.0, "x", frontMid, "z", halfD);
+        // lado esquerdo e metade esquerda da frente: espelho em X (o fundo e simetrico, entra como esta)
+        Ref sides = mirror(g, "sides", join(g, "rightSide", out("right", "geometry"), out("frontR", "geometry")), "x");
+        return finish(g, join(g, "rails", out("back", "geometry"), sides));
+    }
+
+    /** Postes de canto e os dois postes do portao. */
+    private static GraphAsset fencePostsAsset() {
+        GraphBuilder g = asset("fence_posts");
+        g.input(num("fence_w", 12.7)).input(num("fence_d", 10.7));
+        sub(g, "cornerPts", "grid_points", "size_x", in("fence_w"), "size_z", in("fence_d"), "vertices_x", 2, "vertices_z", 2);
+        Ref post = join(g, "postAll", bp(g, "post", new Vec3(0.16, 1.25, 0.16), new Vec3(0, 0.625, 0), "fence", 0.0),
+                bp(g, "postCap", new Vec3(0.22, 0.06, 0.22), new Vec3(0, 1.28, 0), "fence", 0.0));
+        node(g, "postSet", "core.instance_on_points", "points", out("cornerPts", "points"), "instance", post);
+        Ref halfD = math(g, "halfFenceD", "multiply", in("fence_d"), 0.5);
+        Ref gates = mirror(g, "gatePosts", translate(g, "gatePostR", post, vec(g, "gatePostRPos", 1.0, 0.0, halfD)), "x");
+        return finish(g, join(g, "posts", out("postSet", "instances"), gates));
+    }
+
+    /** Cerca de ripas: ripas + travessas + postes, assentada no quintal. */
+    private static GraphAsset houseFenceAsset() {
+        GraphBuilder g = asset("house_fence");
+        g.input(num("fence_w", 12.7)).input(num("fence_d", 10.7));
+        sub(g, "pickets", "fence_pickets", "fence_w", in("fence_w"), "fence_d", in("fence_d"));
+        sub(g, "rails", "fence_rails", "fence_w", in("fence_w"), "fence_d", in("fence_d"));
+        sub(g, "posts", "fence_posts", "fence_w", in("fence_w"), "fence_d", in("fence_d"));
+        Ref all = join(g, "fence", out("pickets", "geometry"), out("rails", "geometry"), out("posts", "geometry"));
+        return finish(g, translate(g, "placed", all, new Vec3(0, 0.25, 1.0)));
+    }
+
+    /** Sebe com canteiro e duas flores (uma unidade, centrada no ponto). */
+    private static GraphAsset hedgeUnitAsset() {
+        GraphBuilder g = asset("hedge_unit");
+        Ref hedge = bp(g, "hedge", new Vec3(1.3, 0.8, 0.9), new Vec3(0, 0.4, 0), "leaves", 0.28);
+        Ref bed = bp(g, "bed", new Vec3(1.1, 0.14, 0.6), new Vec3(0, 0.07, 0.95), "trunk", 0.05);
+        Ref bloomA = bp(g, "bloomA", new Vec3(0.3, 0.2, 0.3), new Vec3(-0.3, 0.2, 0.95), "flowers", 0.12);
+        Ref bloomB = bp(g, "bloomB", new Vec3(0.3, 0.26, 0.3), new Vec3(0.3, 0.2, 0.95), "flowers", 0.12);
+        return finish(g, join(g, "unit", hedge, bed, bloomA, bloomB));
+    }
+
+    /** Fileira de 7 sebes na frente da casa, com o vao central livre para o caminho. */
+    private static GraphAsset houseHedgesAsset() {
+        GraphBuilder g = asset("house_hedges");
+        g.input(num("w", 9.0)).input(num("front_z", 3.0));
+        Ref half = math(g, "hedgeHalf", "add", math(g, "hedgeW2", "multiply", in("w"), 0.5), 1.2);
+        Ref pts = linePoints(g, "pts", vec(g, "hedgeA", math(g, "hedgeNeg", "multiply", half, -1.0), 0.0, 0.8),
+                vec(g, "hedgeB", half, 0.0, 0.8), 7);
+        Ref[] hp = position(g, "hedge");
+        Ref open = cmp(g, "hedgeOpen", "gt", fmath(g, "hedgeAbs", "abs", hp[0], 0.0), 2.4);
+        sub(g, "unit", "hedge_unit");
+        node(g, "hedges", "core.instance_on_points", "points", pts, "instance", out("unit", "geometry"), "selection", open);
+        return finish(g, translate(g, "placed", out("hedges", "instances"), vec(g, "at", 0.0, 0.0, in("front_z"))));
+    }
+
+    /** Caixa de correio perto do portao. */
+    private static GraphAsset houseMailboxAsset() {
+        GraphBuilder g = asset("house_mailbox");
+        g.input(num("front_z", 3.0));
+        Ref post = bp(g, "mailPost", new Vec3(0.1, 1.1, 0.1), new Vec3(1.5, 0.55, 3.15), "trunk", 0.0);
+        Ref box = bp(g, "mailBox", new Vec3(0.3, 0.25, 0.5), new Vec3(1.5, 1.2, 3.15), "metal", 0.0);
+        return finish(g, translate(g, "placed", join(g, "all", post, box), vec(g, "at", 0.0, 0.0, in("front_z"))));
+    }
+
+    /** Arvores no fundo do quintal: {@code count} pontos sorteados, cada um pinheiro ou carvalho, com giro aleatorio. */
+    private static GraphAsset houseBackTreesAsset() {
+        GraphBuilder g = asset("house_back_trees");
+        g.input(num("w", 9.0)).input(num("front_z", 3.0)).input(integer("count", 2));
+        node(g, "backYard", "core.create_grid", "size_x", math(g, "backW", "add", in("w"), 1.0), "size_z", 1.0);
+        Ref backUp = translate(g, "backUp", out("backYard", "mesh"),
+                vec(g, "backAt", 0.0, 0.05, math(g, "backZ", "multiply", in("front_z"), -1.0)));
+        node(g, "backScatter", "core.distribute_points", "geometry", backUp, "mode", "count", "count", in("count"));
+        sub(g, "shrubPine", "tree");
+        sub(g, "shrubOak", "broadleaf", "radius", 1.9, "squash", 0.9, "trunk", 1.8);
+        node(g, "shrubPineI", "core.geometry_to_instance", "geometry", out("shrubPine", "geometry"));
+        node(g, "shrubOakI", "core.geometry_to_instance", "geometry", out("shrubOak", "geometry"));
+        Ref kinds = join(g, "shrubKinds", out("shrubPineI", "instances"), out("shrubOakI", "instances"));
+        node(g, "shrubPick", "core.random_value", "min_int", 0, "max_int", 1);
+        node(g, "shrubSpin", "core.random_value", "min_vector", new Vec3(0, 0, 0), "max_vector", new Vec3(0, 360, 0));
+        node(g, "shrubs", "core.instance_on_points", "points", out("backScatter", "points"), "instance", kinds, "pick_instance", true,
+                "instance_index", out("shrubPick", "int"), "rotation", out("shrubSpin", "vector"), "scale", new Vec3(0.5, 0.5, 0.5));
+        return finish(g, join(g, "out", out("shrubs", "instances")));
+    }
+
+    /**
+     * Casa completa composta so de subgrafos: calcula as medidas derivadas do corpo (telhado, quintal, cerca) e liga uma
+     * chamada por parte (paredes com janelas, telhado, telhas, cumeeira e tabeiras, lucarnas, chamine, porta, varanda,
+     * caminho, quintal, cerca, sebes, caixa de correio e arvores do fundo), com tom de cor proprio.
+     */
+    private static GraphAsset houseAsset() {
+        GraphBuilder g = asset("house");
+        g.input(integer("cols_x", 2)).input(integer("cols_z", 2)).input(num("chance", 0.6));
+        sub(g, "body", "tower_body", "cols_x", in("cols_x"), "cols_z", in("cols_z"), "floors", 2, "cell", 3.0,
+                "floor_h", 2.8, "chance", in("chance"), "ground_zone", 0.0, "margin", 0.55, "balconies", 0.0,
+                "cottage", true, "pilasters", false, "plinth", 0.5);
+        Ref w = out("body", "width"), d = out("body", "depth"), h = out("body", "height");
+        Ref front = math(g, "frontZ", "multiply", d, 0.5);
+        Ref roofW = math(g, "roofW", "add", w, 0.8);
+        Ref roofD = math(g, "roofD", "add", d, 0.8);
+        Ref roofH = math(g, "roofH", "multiply", roofW, 0.5);
+        Ref yardW = math(g, "yardW", "add", w, 4.0);
+        Ref yardD = math(g, "yardD", "add", d, 5.0);
+        Ref fenceW = math(g, "fenceW", "subtract", yardW, 0.3);
+        Ref fenceD = math(g, "fenceD", "subtract", yardD, 0.3);
+        sub(g, "roofShell", "house_roof_shell", "roof_w", roofW, "roof_d", roofD, "roof_h", roofH, "h", h);
+        sub(g, "roofTiles", "house_roof_tiles", "roof_w", roofW, "roof_d", roofD, "roof_h", roofH, "h", h);
+        sub(g, "roofTrim", "house_roof_trim", "roof_w", roofW, "roof_d", roofD, "roof_h", roofH, "h", h);
+        sub(g, "dormers", "house_dormers", "roof_w", roofW, "roof_d", roofD, "h", h);
+        sub(g, "chimney", "house_chimney", "w", w, "d", d, "h", h, "roof_h", roofH);
+        sub(g, "door", "house_door", "front_z", front);
+        sub(g, "porch", "house_porch", "front_z", front);
+        sub(g, "walkway", "house_walkway", "front_z", front);
+        sub(g, "yard", "house_yard", "yard_w", yardW, "yard_d", yardD);
+        sub(g, "fence", "house_fence", "fence_w", fenceW, "fence_d", fenceD);
+        sub(g, "hedges", "house_hedges", "w", w, "front_z", front);
+        sub(g, "mailbox", "house_mailbox", "front_z", front);
+        sub(g, "backTrees", "house_back_trees", "w", w, "front_z", front);
+        Ref built = join(g, "built", out("body", "geometry"), out("roofShell", "geometry"), out("roofTiles", "geometry"),
+                out("roofTrim", "geometry"), out("dormers", "geometry"), out("chimney", "geometry"), out("door", "geometry"),
+                out("porch", "geometry"), out("walkway", "geometry"), out("yard", "geometry"), out("fence", "geometry"),
+                out("hedges", "geometry"), out("mailbox", "geometry"), out("backTrees", "geometry"));
+        // tom de cor proprio da casa (id constante = o mesmo valor para todos os vertices)
+        node(g, "toneRnd", "core.random_value", "id", 0);
+        node(g, "tinted", "core.set_attribute", "geometry", built, "name", "tone", "domain", "point", "type", "float",
+                "value", out("toneRnd", "float"));
+        return finish(g, out("tinted", "geometry"));
     }
 }
