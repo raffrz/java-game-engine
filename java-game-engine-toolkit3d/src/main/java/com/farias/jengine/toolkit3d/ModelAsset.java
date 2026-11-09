@@ -64,6 +64,17 @@ public final class ModelAsset {
      * materiais ({@link LitMaterial}, um por parte), transformação e pose.
      */
     public SkinnedModel instance() {
+        return instance(materials);
+    }
+
+    /**
+     * Idem, com os materiais de {@code materials} (um shader próprio do jogo,
+     * por exemplo): um por parte, criado com a cor base daquela parte. O
+     * material é escolhido aqui, e não no {@link Models#loadGltf}, porque o
+     * asset é compartilhado: o mesmo arquivo pode ter instâncias com visuais
+     * diferentes.
+     */
+    public SkinnedModel instance(SkinnedMaterials materials) {
         List<SkinnedModel.Part> parts = new ArrayList<>(meshes.size());
         for (int i = 0; i < meshes.size(); i++) {
             parts.add(new SkinnedModel.Part(meshes.get(i), materials.createSkinned(textures.get(i))));

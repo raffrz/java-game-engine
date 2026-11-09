@@ -65,7 +65,7 @@ natives. Artefato e diretório são `java-game-engine-<módulo>`; o pacote é `c
 | `java-game-engine-assets` | `Assets` (resolução raiz → classpath, cache de texturas), `AssetsModule`, `TextureLoader` (STB, interno) | core, renderer |
 | `java-game-engine-toolkit2d` | `Toolkit2D` (fábrica de `Canvas` e `Ui`), `SpriteSheet`, `BitmapFont`, `SpriteRenderer`, `Toolkit2DModule` | core, renderer, assets |
 | `java-game-engine-animation` | Animação esquelética pura: `Skeleton`, `Pose`, `Track`, `Interpolation`, `AnimationClip`, `Poses`, `Animator`; IK em `animation.ik` (`TwoBoneIk`, `FabrikIk`, `LookAtIk`). Sem `Module`: só tipos de valor | JOML |
-| `java-game-engine-toolkit3d` | `Shapes`, `ShapeData`, `LitMaterials`, `LitMaterial`, `Models` (OBJ e glTF), `ModelAsset`, `TexturedModel`, `SkinnedModel`, `Shadows`, `ShadowMap`, `DirectionalLight`, `Camera`, `IsometricCamera`, `Projections`, `Ray`, `Picking`, `Shaders`, `Toolkit3DModule` | core, renderer, assets, animation |
+| `java-game-engine-toolkit3d` | `Shapes`, `ShapeData`, `LitMaterials`, `LitMaterial`, `SkinnedMaterials`, `Models` (OBJ e glTF), `ModelAsset`, `TexturedModel`, `SkinnedModel`, `Shadows`, `ShadowMap`, `DirectionalLight`, `Camera`, `IsometricCamera`, `Projections`, `Ray`, `Picking`, `Shaders`, `Toolkit3DModule` | core, renderer, assets, animation |
 | `java-game-engine-demos` | 7 exemplos + `Launcher` | todos os anteriores (+ natives, em runtime) |
 
 `toolkit2d` e `toolkit3d` não dependem um do outro; nenhum módulo da biblioteca depende de
@@ -230,6 +230,10 @@ Registrar o mesmo tipo duas vezes lança exceção (`EngineContext.registerServi
   sua pose mesmo compartilhando material).
 - `Shaders.SKINNED_VERTEX` e `SHADOW_DEPTH_SKINNED_VERTEX` (até `Shaders.MAX_JOINTS = 128`);
   `LitMaterials.createSkinned`; `ShadowMap.casters(SkinnedModel)`.
+- Material customizado: `SkinnedMaterials` (`createSkinned(Texture baseColor)`), implementada por
+  `LitMaterials` (o padrão) e por um jogo com shader próprio; `ModelAsset.instance(SkinnedMaterials)`
+  cria cada parte com a cor base dela. A escolha é na instância, não no `loadGltf`, porque o asset é
+  compartilhado (o mesmo arquivo pode ter visuais diferentes).
 - `SkinnedModel`: partes (mesh com skin + material) e esqueleto, TRS como `TexturedModel`;
   `commands()` copia matriz e palette.
 - **glTF** (`Models.loadGltf` → `ModelAsset`): loader próprio (`Json`, `GltfReader`, `GltfData`,

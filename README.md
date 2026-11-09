@@ -100,7 +100,7 @@ VSync is on by default; `window.setVSync(false)` uncaps the frame rate.
 
 ```java
 ModelAsset fox = context.require(Models.class).loadGltf("models/fox.glb");
-SkinnedModel model = fox.instance();
+SkinnedModel model = fox.instance();          // or fox.instance(myMaterials): your own SkinnedMaterials (custom shader)
 Animator animator = new Animator(fox.skeleton()).play(fox.clip("Walk"), true);
 Pose pose = new Pose(fox.skeleton());
 TwoBoneIk legIk = new TwoBoneIk();
