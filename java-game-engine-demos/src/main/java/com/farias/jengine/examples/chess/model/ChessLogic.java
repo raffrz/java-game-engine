@@ -9,9 +9,10 @@ import java.util.Optional;
  * As regras da partida: recebe o que o jogador fez ({@link PlayerInput}) e o
  * tempo passado, e atualiza o {@link ChessState}. O padrão de movimento de cada
  * peça fica nela mesma ({@link ChessPiece#getValidMoves}); aqui fica o que
- * depende do jogo inteiro: de quem é a vez, o que um clique faz, validar e aplicar o lance, o
- * que destacar e as animações das peças. Não sabe de renderização, janela nem
- * engine.
+ * depende do jogo inteiro: de quem é a vez, o que um clique faz, validar e
+ * aplicar o lance (que não pode deixar o próprio rei em xeque), xeque,
+ * xeque-mate e afogamento, o que destacar e as animações das peças. Não sabe
+ * de renderização, janela nem engine.
  *
  * <p>
  * As animações não bloqueiam o jogo: um lance é aplicado na hora, e a pose da
@@ -41,7 +42,7 @@ public final class ChessLogic {
      */
     public void update(ChessState state, PlayerInput input, float deltaTime) {
         state.pointedTile = input.pointedTile();
-        if (input.clicked()) {
+        if (input.clicked() && !state.status.isOver()) {
             click(state);
         }
         state.highlightedTiles = highlightedTiles(state);
@@ -50,7 +51,8 @@ public final class ChessLogic {
 
     /**
      * Com uma peça selecionada, primeiro tenta movê-la para a casa apontada
-     * (andar ou capturar); se moveu, passa a vez. Se não é um movimento
+     * (andar ou capturar); se moveu, passa a vez e vê se o adversário ficou em
+     * xeque, xeque-mate ou afogado. Se não é um movimento
      * válido, seleciona a peça apontada quando ela é de quem tem a vez: troca
      * a seleção, ou a desfaz quando é a mesma peça, do adversário ou nenhuma.
      */
@@ -58,6 +60,7 @@ public final class ChessLogic {
         if (state.selectedPiece != null && move(state, state.selectedPiece, state.pointedTile)) {
             state.selectedPiece = null;
             state.turn = state.turn.opponent();
+            state.status = status(state.board, state.turn);
             return;
         }
         ChessPiece pointed = state.pointedPiece().orElse(null);
@@ -67,7 +70,8 @@ public final class ChessLogic {
 
     /**
      * Move {@code piece} para {@code target}, capturando a peça que estiver
-     * lá, e registra o lance. Não faz nada se não é um movimento válido.
+     * lá, e registra o lance. Não faz nada se não é um lance legal (ver
+     * {@link #legalPath}).
      *
      * @return se a peça foi movida
      */
@@ -75,7 +79,7 @@ public final class ChessLogic {
         if (target == null) {
             return false;
         }
-        List<BoardTile> path = piece.getPathToTarget(state.board, target);
+        List<BoardTile> path = legalPath(state.board, piece, target);
         if (path.isEmpty()) {
             return false;
         }
@@ -90,7 +94,7 @@ public final class ChessLogic {
         if (state.selectedPiece == null || state.pointedTile == null) {
             return List.of();
         }
-        List<BoardTile> path = state.selectedPiece.getPathToTarget(state.board, state.pointedTile);
+        List<BoardTile> path = legalPath(state.board, state.selectedPiece, state.pointedTile);
         if (path.isEmpty()) {
             return List.of();
         }
@@ -98,6 +102,64 @@ public final class ChessLogic {
         tiles.add(state.selectedPiece.tile());
         tiles.addAll(path);
         return tiles;
+    }
+
+    // ---- xeque ----
+
+    /**
+     * O caminho de {@code piece} até {@code target} (ver
+     * {@link ChessPiece#getPathToTarget}), ou vazio se o movimento não vale:
+     * fora do padrão da peça ou deixando o próprio rei em xeque.
+     */
+    private static List<BoardTile> legalPath(ChessBoard board, ChessPiece piece, BoardTile target) {
+        List<BoardTile> path = piece.getPathToTarget(board, target);
+        if (path.isEmpty() || leavesKingInCheck(board, piece, target)) {
+            return List.of();
+        }
+        return path;
+    }
+
+    private static boolean leavesKingInCheck(ChessBoard board, ChessPiece piece, BoardTile target) {
+        return board.testMove(piece, target, after -> isInCheck(after, piece.side()));
+    }
+
+    /** Como a partida fica para {@code side}, que tem a vez. */
+    private static GameStatus status(ChessBoard board, Side side) {
+        boolean check = isInCheck(board, side);
+        if (hasLegalMove(board, side)) {
+            return check ? GameStatus.CHECK : GameStatus.PLAYING;
+        }
+        return check ? GameStatus.CHECKMATE : GameStatus.STALEMATE;
+    }
+
+    /**
+     * Se o rei de {@code side} está atacado: alguma peça adversária tem a casa
+     * dele entre os movimentos (o peão só conta a diagonal, que é onde ele
+     * captura).
+     */
+    private static boolean isInCheck(ChessBoard board, Side side) {
+        Optional<BoardTile> king = board.pieces().stream()
+                .filter(piece -> piece.side() == side && piece.type() == PieceType.KING)
+                .map(ChessPiece::tile)
+                .findFirst();
+        return king.isPresent() && board.pieces().stream()
+                .filter(piece -> piece.side() != side)
+                .anyMatch(piece -> piece.getValidMoves(board).contains(king.get()));
+    }
+
+    private static boolean hasLegalMove(ChessBoard board, Side side) {
+        // cópia: testar um lance tira e devolve peças da lista do tabuleiro
+        for (ChessPiece piece : List.copyOf(board.pieces())) {
+            if (piece.side() != side) {
+                continue;
+            }
+            for (BoardTile target : piece.getValidMoves(board)) {
+                if (!leavesKingInCheck(board, piece, target)) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
     // ---- animações ----

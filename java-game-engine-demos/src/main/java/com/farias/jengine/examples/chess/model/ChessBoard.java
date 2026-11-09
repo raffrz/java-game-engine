@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
+import java.util.function.Predicate;
 
 /**
  * O tabuleiro 8x8, as peças sobre ele e as já capturadas, com x e z de 0 a 7.
@@ -48,6 +49,26 @@ public final class ChessBoard {
         captured.ifPresent(this::capturePiece);
         piece.moveTo(target);
         return captured;
+    }
+
+    /**
+     * Responde {@code question} sobre o tabuleiro com {@code piece} em
+     * {@code target} (tirando a peça que estiver lá) e desfaz o movimento:
+     * para as regras testarem um lance sem jogá-lo. Nada é registrado como
+     * capturado.
+     */
+    boolean testMove(ChessPiece piece, BoardTile target, Predicate<ChessBoard> question) {
+        BoardTile from = piece.tile();
+        Optional<ChessPiece> captured = pieceAt(target);
+        int capturedIndex = captured.map(pieces::indexOf).orElse(-1);
+        captured.ifPresent(pieces::remove);
+        piece.moveTo(target);
+        try {
+            return question.test(this);
+        } finally {
+            piece.moveTo(from);
+            captured.ifPresent(capturedPiece -> pieces.add(capturedIndex, capturedPiece));
+        }
     }
 
     /** As peças de {@code side} capturadas até agora, na ordem da captura. */

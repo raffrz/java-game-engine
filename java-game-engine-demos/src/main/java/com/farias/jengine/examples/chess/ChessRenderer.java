@@ -167,13 +167,23 @@ final class ChessRenderer {
         scene.pieces().values().forEach(model -> pass.submit(model.command()));
     }
 
-    /** De quem é a vez e, abaixo, os controles. */
+    /** De quem é a vez (com xeque ou fim de partida) e, abaixo, os controles. */
     private void drawUi(ChessState state) {
         int centerX = uiWidth / 2;
         ui.begin();
-        String turn = state.turn() == Side.WHITE ? "VEZ DAS BRANCAS" : "VEZ DAS PRETAS";
-        ui.textCentered(ui.defaultFont(), turn, centerX, 20, TURN_FONT_SIZE);
+        ui.textCentered(ui.defaultFont(), statusText(state), centerX, 20, TURN_FONT_SIZE);
         ui.textCentered(ui.defaultFont(), "SETAS = MOVER | RODA = ZOOM | BOTAO DO MEIO = GIRAR | CLIQUE = JOGAR",
                 centerX, 44, HINT_FONT_SIZE);
+    }
+
+    private static String statusText(ChessState state) {
+        String side = state.turn() == Side.WHITE ? "BRANCAS" : "PRETAS";
+        String winner = state.turn() == Side.WHITE ? "PRETAS" : "BRANCAS";
+        return switch (state.status()) {
+            case PLAYING -> "VEZ DAS " + side;
+            case CHECK -> "XEQUE - VEZ DAS " + side;
+            case CHECKMATE -> "XEQUE-MATE - " + winner + " VENCEM";
+            case STALEMATE -> "AFOGAMENTO - EMPATE";
+        };
     }
 }
