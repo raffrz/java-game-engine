@@ -60,6 +60,9 @@ final class CityPalettes {
         COLORS.put("light_green", new int[] {0x35E07A});
         COLORS.put("hydrant", new int[] {0xC62828});
         COLORS.put("bin", new int[] {0x3E5C4A});
+        COLORS.put("concrete", new int[] {0xC9C5BA});
+        COLORS.put("joint", new int[] {0x85827A});
+        COLORS.put("gravel", new int[] {0x8E8576});
     }
 
     private CityPalettes() {

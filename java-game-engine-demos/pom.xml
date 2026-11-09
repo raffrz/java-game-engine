@@ -14,9 +14,9 @@
 	<name>Java Game Engine :: Demos</name>
 
 	<properties>
-		<!-- A biblioteca procedural-geometry exige Java 21 (o resto da engine segue em 17). -->
+		<!-- As bibliotecas procedural-geometry/procedural-architecture exigem Java 21 (o resto da engine segue em 17). -->
 		<maven.compiler.release>21</maven.compiler.release>
-		<procgeo.version>0.1.0-SNAPSHOT</procgeo.version>
+		<procarch.version>0.1.0-SNAPSHOT</procarch.version>
 		<!-- Troque com -Dexec.mainClass=com.farias.jengine.examples.SnakeGame -->
 		<exec.mainClass>com.farias.jengine.examples.Launcher</exec.mainClass>
 	</properties>
@@ -53,13 +53,14 @@
 		</dependency>
 
 		<!--
-			Geometria procedural (projeto procedural-geometry). Instale antes com
-			`./gradlew-local.sh publishToMavenLocal` naquele repositorio.
+			Assets urbanos procedurais (projeto procedural-architecture, que traz a
+			procedural-geometry). Instale antes com `./gradlew-local.sh publishToMavenLocal`
+			nos dois repositorios (primeiro procedural-geometry, depois procedural-architecture).
 		-->
 		<dependency>
-			<groupId>com.farias.procgeo</groupId>
-			<artifactId>geometry-nodes</artifactId>
-			<version>${procgeo.version}</version>
+			<groupId>com.farias.procarch</groupId>
+			<artifactId>procedural-architecture</artifactId>
+			<version>${procarch.version}</version>
 		</dependency>
 
 		<!-- Natives da plataforma de quem builda (ver profiles no pom raiz). -->

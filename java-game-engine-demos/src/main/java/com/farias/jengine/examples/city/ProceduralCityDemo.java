@@ -37,28 +37,22 @@ import com.farias.jengine.toolkit3d.ShadowMap;
 import com.farias.jengine.toolkit3d.Shadows;
 import com.farias.jengine.toolkit3d.Toolkit3DModule;
 import com.farias.procgeo.core.geometry.GeometrySet;
-import com.farias.procgeo.graph.GenerationOptions;
-import com.farias.procgeo.graph.GraphExecutor;
-import com.farias.procgeo.graph.GraphInputs;
-import com.farias.procgeo.graph.GraphLibrary;
-import com.farias.procgeo.nodes.StandardNodes;
 
 /**
  * Cidade procedural: ruas e predios variados (torres, galpoes, predios cilindricos,
- * casas com telhado de telhas, parques com arvores), todos com muito detalhe (janelas com requadro, sacadas, meio-fio, sinalizacao) gerados em tempo de execucao por grafos da
- * biblioteca procedural-geometry (ver {@link CityGraphs}). O demo so executa o grafo
- * "city" com uma seed, converte a malha resultante em meshes do renderer (um por
- * material, ver {@link CityMeshes}) e desenha com sombras.
+ * casas com telhado de telhas, parques com arvores), todos com muito detalhe (janelas com requadro, sacadas, meio-fio, sinalizacao) gerados em tempo de execucao pela
+ * API de alto nivel da biblioteca procedural-architecture. Ha varios tipos de cidade (ver {@link CityStyles}): a cidade
+ * pronta ({@code Cities.grid()}) e outras montadas na demo com predios, casas, parques, ruas e mobiliario da API. O demo
+ * converte a malha resultante em meshes do renderer (um por material, ver {@link CityMeshes}) e desenha com sombras.
  *
  * <p>
  * Camera de perspectiva em orbita. Controles: setas/WASD movem no chao, roda = zoom, arrastar (botao esquerdo ou
- * do meio) orbita, Q/E giram, R gera outra cidade (nova seed), Esc sai.
+ * do meio) orbita, Q/E giram, 1-5 escolhem o tipo de cidade, R gera outra cidade (nova seed), Esc sai.
  */
 public final class ProceduralCityDemo {
 
     private static final int WINDOW_WIDTH = 1280;
     private static final int WINDOW_HEIGHT = 800;
-    private static final int BLOCKS = 5;
     private static final long FIRST_SEED = 2026L;
 
     private static final float PAN_SPEED = 0.8f;
@@ -83,14 +77,15 @@ public final class ProceduralCityDemo {
             .cullFace(false)
             .blend(false);
 
-    private final GraphLibrary graphs = CityGraphs.library();
-    private final GraphExecutor executor = new GraphExecutor(StandardNodes.newRegistry(), graphs);
+    private static final Key[] STYLE_KEYS = {Key.NUM_1, Key.NUM_2, Key.NUM_3, Key.NUM_4, Key.NUM_5};
+
     private final Map<String, Texture> textures = new LinkedHashMap<>();
     private final Map<String, Material> materials = new LinkedHashMap<>();
     private final List<RenderCommand> commands = new ArrayList<>();
     private final List<Mesh> meshes = new ArrayList<>();
 
     private long seed = FIRST_SEED;
+    private CityStyles style = CityStyles.GRID;
     private String stats = "";
     private double lastMouseX;
     private double lastMouseY;
@@ -139,19 +134,22 @@ public final class ProceduralCityDemo {
                 seed++;
                 generate();
             }
+            for (int i = 0; i < STYLE_KEYS.length && i < CityStyles.values().length; i++) {
+                if (input.isKeyPressed(STYLE_KEYS[i]) && style != CityStyles.values()[i]) {
+                    style = CityStyles.values()[i];
+                    generate();
+                }
+            }
             moveCamera(timer.deltaTime());
             render();
         }
     }
 
-    // ---- geracao: o grafo roda aqui, o resto do demo so desenha o resultado ----
+    // ---- geracao: a lib gera a cidade, o resto do demo so desenha o resultado ----
 
     private void generate() {
         long start = System.nanoTime();
-        GeometrySet city = executor.execute(
-                graphs.load("city"),
-                GraphInputs.builder().set("blocks", BLOCKS).build(),
-                GenerationOptions.withSeed(seed)).geometry("geometry");
+        GeometrySet city = style.build(seed);
         long generated = System.nanoTime();
 
         Map<String, MeshData> byMaterial = CityMeshes.byMaterial(city, CityPalettes.sizes());
@@ -168,7 +166,8 @@ public final class ProceduralCityDemo {
         }
         long done = System.nanoTime();
 
-        stats = "seed " + seed + " | " + triangles + " triangulos | grafo " + (generated - start) / 1_000_000 + " ms";
+        stats = (style.ordinal() + 1) + ". " + style.label() + " | seed " + seed + " | " + triangles + " triangulos | lib "
+                + (generated - start) / 1_000_000 + " ms";
         System.out.println("[city] " + stats + " | meshes " + (done - generated) / 1_000_000 + " ms");
     }
 
@@ -236,7 +235,7 @@ public final class ProceduralCityDemo {
         int centerX = window.getWidth() / 2;
         ui.begin();
         ui.textCentered(ui.defaultFont(), "CIDADE PROCEDURAL - " + stats.toUpperCase(), centerX, 18, 12);
-        ui.textCentered(ui.defaultFont(), "SETAS/WASD = MOVER | RODA = ZOOM | ARRASTAR = ORBITAR | Q/E = GIRAR | R = NOVA CIDADE",
+        ui.textCentered(ui.defaultFont(), "SETAS/WASD = MOVER | RODA = ZOOM | ARRASTAR = ORBITAR | Q/E = GIRAR | 1-5 = TIPO DE CIDADE | R = NOVA CIDADE",
                 centerX, 38, 10);
         renderer.endFrame();
     }
