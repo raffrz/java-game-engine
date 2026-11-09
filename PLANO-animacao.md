@@ -1,6 +1,6 @@
 # Plano: animação esquelética 3D e IK
 
-Status: v1, especificação. **Commits 1 (módulo `animation` + JUnit), 2 (`renderer` com skin), 3 (`toolkit3d`: shaders, materiais, sombra e `SkinnedModel`) e 4 (loader glTF) implementados**; os demais pendentes.
+Status: v1, especificação. **Commits 1 (módulo `animation` + JUnit), 2 (`renderer` com skin), 3 (`toolkit3d`: shaders, materiais, sombra e `SkinnedModel`), 4 (loader glTF) e 5 (IK) implementados**; os demais pendentes.
 Base: branch `feature/procedural-city` (módulos `core`, `renderer`, `assets`, `platform-glfw`,
 `toolkit2d`, `toolkit3d`, `demos`).
 
@@ -210,23 +210,31 @@ e a resolvida.
 
 ```java
 public final class TwoBoneIk {
-    public static void solve(Pose pose, int root, int mid, int end,
-                             Vector3f target, Vector3f pole, float weight);
+    public void solve(Pose pose, int root, int mid, int end,
+                      Vector3fc target, Vector3fc pole, float weight);   // pole null = mantém o lado
 }
 public final class FabrikIk {
-    public static int solve(Pose pose, int[] chain, Vector3f target,
-                            int maxIterations, float tolerance, float weight); // devolve iterações usadas
+    public int solve(Pose pose, int[] chain, Vector3fc target,
+                     int maxIterations, float tolerance, float weight); // devolve iterações usadas
 }
 public final class LookAtIk {
-    public static void solve(Pose pose, int joint, Vector3f localForward,
-                             Vector3f target, float maxAngleRadians, float weight);
+    public void solve(Pose pose, int joint, Vector3fc localForward,
+                      Vector3fc target, float maxAngleRadians, float weight);
 }
 ```
 
-- **Two-bone**: comprimentos `a = |mid-root|`, `b = |end-mid|`, `c = clamp(|target-root|,
-  ε, a+b-ε)`. Ângulos pela lei dos cossenos; plano de flexão definido por `root`, `target` e
-  `pole`. Alvo fora de alcance → braço esticado na direção do alvo. Alvo sobre a raiz → não
-  mexe (evita NaN).
+Os solvers são **instâncias reutilizáveis** (`new TwoBoneIk()` uma vez, `solve` a cada frame), e
+não métodos `static`: cada um guarda o próprio scratch, para cumprir "sem alocação por frame".
+Não são thread-safe. Uma classe interna (`IkJoints`) concentra a conversão de uma rotação no
+espaço do modelo para a rotação local (`local * (mundo⁻¹ * delta * mundo)`).
+
+- **Two-bone**: comprimentos `a = |mid-root|`, `b = |end-mid|`, alcance limitado a
+  `[|a-b|, a+b]`. Em três passos: (1) dobra raiz e meio no plano atual para o triângulo ter os
+  ângulos da lei dos cossenos; (2) gira a raiz para a ponta apontar para o alvo; (3) gira em
+  torno do eixo raiz-alvo para o meio ficar do lado do `pole`. Com o braço reto, o plano vem
+  do pole. Alvo fora de alcance → braço esticado na direção do alvo. Alvo sobre a raiz → não
+  mexe (evita NaN). `root`, `mid` e `end` precisam ser ancestrais em cadeia (não
+  necessariamente pai direto).
 - **FABRIK**: `chain` = juntas da raiz à ponta, cada uma filha da anterior (validado).
   Iteração forward/backward nas posições até `|ponta - alvo| < tolerance` ou `maxIterations`.
   Depois converte em rotações: para cada osso, `rotationTo(direçãoAntiga, direçãoNova)`
