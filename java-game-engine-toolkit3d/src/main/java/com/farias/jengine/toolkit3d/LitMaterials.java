@@ -12,6 +12,7 @@ import com.farias.jengine.renderer.Texture;
 public final class LitMaterials {
     private final Renderer renderer;
     private Shader shader;
+    private Shader skinnedShader;
 
     LitMaterials(Renderer renderer) {
         this.renderer = renderer;
@@ -27,5 +28,17 @@ public final class LitMaterials {
             shader = renderer.createShader(Shaders.STANDARD_VERTEX, Shaders.STANDARD_FRAGMENT);
         }
         return new LitMaterial(shader, texture);
+    }
+
+    /**
+     * Idem, para malhas com skin ({@link SkinnedModel}): mesma iluminação e
+     * os mesmos refinamentos, com a malha deformada pelo esqueleto. Não serve
+     * para malha sem skin (todos os vértices iriam para a origem).
+     */
+    public LitMaterial createSkinned(Texture texture) {
+        if (skinnedShader == null) {
+            skinnedShader = renderer.createShader(Shaders.SKINNED_VERTEX, Shaders.STANDARD_FRAGMENT);
+        }
+        return new LitMaterial(skinnedShader, texture);
     }
 }

@@ -1,6 +1,6 @@
 # Plano: animação esquelética 3D e IK
 
-Status: v1, especificação. **Commits 1 (módulo `animation` + JUnit) e 2 (`renderer` com skin) implementados**; os demais pendentes.
+Status: v1, especificação. **Commits 1 (módulo `animation` + JUnit), 2 (`renderer` com skin) e 3 (`toolkit3d`: shaders, materiais, sombra e `SkinnedModel`) implementados**; os demais pendentes.
 Base: branch `feature/procedural-city` (módulos `core`, `renderer`, `assets`, `platform-glfw`,
 `toolkit2d`, `toolkit3d`, `demos`).
 
@@ -283,9 +283,11 @@ ausente só sai uma vez por nome, shaders sem skin não são afetados (o uniform
 
 ### 6.4 Limite de juntas
 
-`MAX_JOINTS = 128` (128 `mat4` = 2048 componentes; GL 3.3 garante 1024, mas macOS/desktop
-reais dão 4096+). O `toolkit3d` rejeita na carga um skin com mais juntas, com mensagem clara.
-Palette em UBO ou textura fica para o futuro.
+`Shaders.MAX_JOINTS = 128` (no `toolkit3d`, que é dono dos shaders; o renderer não conhece
+ossos). São 2048 componentes de uniform: GL 3.3 garante 1024, mas macOS/desktop reais dão
+4096+. O construtor de `SkinnedModel` recusa esqueleto maior, com mensagem clara. Não há
+consulta a `GL_MAX_VERTEX_UNIFORM_COMPONENTS` (o toolkit não chama GL): numa GPU sem o limite,
+o link do shader skinned falha com o log do driver. Palette em UBO ou textura fica para o futuro.
 
 ## 7. Especificação: `toolkit3d`
 
@@ -311,21 +313,27 @@ vec3 localNormal = mat3(skin) * normals;     // ok para skin sem escala não uni
 
 - `LitMaterials.createSkinned(Texture)` → `LitMaterial` sobre o shader skinned (lazy,
   compartilhado). Toda a API de `LitMaterial` (luz, glossy, receiving, tint, emission) vale.
-- `Shadows`: segundo caster material, skinned. `ShadowMap.caster(SkinnedModel)` escolhe o
-  certo e passa o palette.
+- `Shadows`: segundo caster material, skinned, criado junto do primeiro.
+  `ShadowMap.casters(SkinnedModel)` devolve `List<RenderCommand>` (uma por parte), com a
+  matriz de modelo e uma cópia do palette.
 
 ### 7.3 `SkinnedModel`
 
 ```java
 public final class SkinnedModel {
+    public record Part(Mesh mesh, Material material) {}
+    public SkinnedModel(List<Part> parts, Skeleton skeleton);   // construtor público, como TexturedModel
+    public SkinnedModel(Mesh mesh, Material material, Skeleton skeleton);
     public Vector3f getPosition(); public Vector3f getRotation(); public Vector3f getScale();
     public Matrix4f getModelMatrix();                    // mesma convenção T*R*S de TexturedModel
     public Skeleton skeleton();
-    public LitMaterial lit();
+    public List<Part> parts();
+    public LitMaterial lit(int part);
     public void update(Pose pose);                       // recalcula o palette
-    public List<RenderCommand> commands();               // um por primitive; copiam o palette
+    public List<RenderCommand> commands();               // um por parte; copiam o palette
     public Vector3f toModelSpace(Vector3f world, Vector3f out);
-    public Vector3f jointWorldPosition(int joint, Vector3f out); // para anexar objetos (arma na mão)
+    public Vector3f jointWorldPosition(Pose pose, int joint, Vector3f out); // anexar objetos (arma na mão)
+    public Matrix4f jointWorldMatrix(Pose pose, int joint, Matrix4f out);
 }
 ```
 
@@ -334,6 +342,10 @@ public final class SkinnedModel {
   corrompe o frame.
 - Um modelo glTF pode ter várias primitives (materiais diferentes): uma lista de
   (mesh, material) e o mesmo palette.
+- O construtor recusa parte sem skin (`Mesh.skinned()`) e esqueleto acima de `MAX_JOINTS`.
+- A posição/matriz de junta recebe a `Pose` porque o modelo só guarda o palette, não a pose.
+- Verificado com um teste de fumaça (cilindro de 2 ossos dobrando por clip, com sombra):
+  shaders linkam, a deformação é suave na junta e a sombra acompanha a pose.
 
 ### 7.4 Loader glTF (`com.farias.jengine.toolkit3d.gltf`)
 
