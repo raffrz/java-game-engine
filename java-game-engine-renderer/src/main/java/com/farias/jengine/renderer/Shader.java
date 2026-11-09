@@ -20,6 +20,8 @@ public class Shader implements Disposable {
     // call e caro. Seguro porque o contexto GL e de uma thread so.
     private final FloatBuffer matrix4Buffer = BufferUtils.createFloatBuffer(16);
     private final FloatBuffer matrix3Buffer = BufferUtils.createFloatBuffer(9);
+    // Arrays de mat4 (palette de skinning); cresce sob demanda.
+    private FloatBuffer matrixArrayBuffer;
 
     Shader(String vertexSource, String fragmentSource) {
         // 1. Compile Vertex Shader
@@ -105,6 +107,27 @@ public class Shader implements Disposable {
         GL20.glUniformMatrix3fv(location, false, matrix3Buffer);
     }
     
+    /**
+     * Um array {@code uniform mat4 name[N]}: {@code count} matrizes
+     * column-major, 16 floats cada, a partir do início de {@code data}.
+     */
+    public void setMatrix4fArray(String name, float[] data, int count) {
+        int floats = count * 16;
+        if (count < 0 || data.length < floats) {
+            throw new IllegalArgumentException(
+                    "matrix array '" + name + "' needs " + floats + " floats, got " + data.length);
+        }
+        int location = getUniformLocation(name);
+        if (location == -1 || count == 0)
+            return;
+        if (matrixArrayBuffer == null || matrixArrayBuffer.capacity() < floats) {
+            matrixArrayBuffer = BufferUtils.createFloatBuffer(floats);
+        }
+        matrixArrayBuffer.clear();
+        matrixArrayBuffer.put(data, 0, floats).flip();
+        GL20.glUniformMatrix4fv(location, false, matrixArrayBuffer);
+    }
+
     private int getUniformLocation(String name) {
         Integer location = uniforms.get(name);
         if (location != null) {

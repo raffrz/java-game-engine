@@ -1,6 +1,6 @@
 # Plano: animação esquelética 3D e IK
 
-Status: v1, especificação. **Commit 1 (módulo `animation` + JUnit) implementado**; os demais pendentes.
+Status: v1, especificação. **Commits 1 (módulo `animation` + JUnit) e 2 (`renderer` com skin) implementados**; os demais pendentes.
 Base: branch `feature/procedural-city` (módulos `core`, `renderer`, `assets`, `platform-glfw`,
 `toolkit2d`, `toolkit3d`, `demos`).
 
@@ -61,6 +61,21 @@ Base: branch `feature/procedural-city` (módulos `core`, `renderer`, `assets`, `
 - **Convenções não vazam:** UV, ordem de quaternion (glTF é `x,y,z,w`) e column-major ficam no
   loader. A API usa `Vector3f`/`Quaternionf`/`Matrix4f` do JOML.
 - **Toolkits não dependem entre si:** só o `toolkit3d` depende de `animation`.
+
+### Por que `animation` não tem `Module`
+
+Todo módulo de biblioteca hoje tem um `Module`, mas por consequência, não por regra: todos
+expõem algo que depende de serviço. A regra 3 do `DEVELOPMENT.md` exige módulo só para
+componentes **com dependência** (`Renderer`, `Assets`, ...), e a regra 9.5 manda matemática e
+dados puros virarem tipo de valor ou função `static`, como `Camera`, `IsometricCamera`,
+`DirectionalLight` e `Timer`, que têm construtor público. `Skeleton`, `Pose`, `AnimationClip`,
+`Animator` e os solvers de IK não dependem de serviço, então são criados com `new`.
+
+O que depende de serviço segue o padrão e sai do `Toolkit3DModule`: ler glTF e subir meshes
+(`Models.loadGltf`), material skinned (`LitMaterials.createSkinned`) e caster skinned
+(`Shadows`). Um `AnimationModule` registraria um serviço vazio e faria `animation` depender de
+`core` sem ganho. Se um dia surgir algo com dependência (cache de clips por arquivo, por
+exemplo), ele entra como serviço de um módulo.
 
 ## 4. Grafo de módulos
 

@@ -1,6 +1,7 @@
 package com.farias.jengine.renderer;
 
 import static org.lwjgl.opengl.GL11.GL_FLOAT;
+import static org.lwjgl.opengl.GL11.GL_INT;
 import static org.lwjgl.opengl.GL11.GL_TRIANGLES;
 import static org.lwjgl.opengl.GL11.GL_UNSIGNED_INT;
 import static org.lwjgl.opengl.GL11.glDrawElements;
@@ -16,6 +17,7 @@ import static org.lwjgl.opengl.GL20.glVertexAttribPointer;
 import static org.lwjgl.opengl.GL30.glBindVertexArray;
 import static org.lwjgl.opengl.GL30.glDeleteVertexArrays;
 import static org.lwjgl.opengl.GL30.glGenVertexArrays;
+import static org.lwjgl.opengl.GL30.glVertexAttribIPointer;
 
 import java.nio.FloatBuffer;
 import java.nio.IntBuffer;
@@ -31,6 +33,9 @@ public final class Mesh implements Disposable {
     // Armazenam os IDs adicionais gerados para que possamos deletá-los no dispose()
     private final int textureVbo; 
     private final int normalVbo;
+    // Skin (0 = malha sem skin): atributo 3 = índices de junta, 4 = pesos.
+    private final int jointVbo;
+    private final int weightVbo;
 
     private final int indexCount;
     private final Bounds bounds;
@@ -62,20 +67,42 @@ public final class Mesh implements Disposable {
         glEnableVertexAttribArray(2); // Atributo 2: Normais
         glVertexAttribPointer(2, 3, GL_FLOAT, false, 0, 0);
 
-        // 5. Upload dos Índices (EBO)
+        // 5. Skin, se houver: índices de junta inteiros (ivec4 no shader, por
+        // isso glVertexAttribIPointer) e pesos.
+        if (data.skinned()) {
+            this.jointVbo = glGenBuffers();
+            glBindBuffer(GL_ARRAY_BUFFER, jointVbo);
+            glBufferData(GL_ARRAY_BUFFER, createIntBuffer(data.joints()), GL_STATIC_DRAW);
+            glEnableVertexAttribArray(3);
+            glVertexAttribIPointer(3, MeshData.INFLUENCES_PER_VERTEX, GL_INT, 0, 0);
+
+            this.weightVbo = glGenBuffers();
+            glBindBuffer(GL_ARRAY_BUFFER, weightVbo);
+            glBufferData(GL_ARRAY_BUFFER, createFloatBuffer(data.weights()), GL_STATIC_DRAW);
+            glEnableVertexAttribArray(4);
+            glVertexAttribPointer(4, MeshData.INFLUENCES_PER_VERTEX, GL_FLOAT, false, 0, 0);
+        } else {
+            this.jointVbo = 0;
+            this.weightVbo = 0;
+        }
+
+        // 6. Upload dos Índices (EBO)
         this.ebo = glGenBuffers();
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo);
-        IntBuffer indexBuffer = BufferUtils.createIntBuffer(data.indices().length);
-        indexBuffer.put(data.indices()).flip();
-        glBufferData(GL_ELEMENT_ARRAY_BUFFER, indexBuffer, GL_STATIC_DRAW);
+        glBufferData(GL_ELEMENT_ARRAY_BUFFER, createIntBuffer(data.indices()), GL_STATIC_DRAW);
 
-        // 6. Limpar vinculação
+        // 7. Limpar vinculação
         glBindBuffer(GL_ARRAY_BUFFER, 0);
         glBindVertexArray(0);
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
 
         this.indexCount = data.indices().length;
         this.bounds = Bounds.of(data.vertices());
+    }
+
+    /** Se a malha tem skin (atributos de junta e peso). */
+    public boolean skinned() {
+        return jointVbo != 0;
     }
 
     /** Limites do mesh no espaço local (antes da matriz de modelo); vazios se não houver vértices. */
@@ -104,7 +131,18 @@ public final class Mesh implements Disposable {
         glDeleteBuffers(textureVbo);
         glDeleteBuffers(normalVbo);
         glDeleteBuffers(ebo);
+        if (jointVbo != 0) {
+            glDeleteBuffers(jointVbo);
+            glDeleteBuffers(weightVbo);
+        }
         glDeleteVertexArrays(vao);
+    }
+
+    private IntBuffer createIntBuffer(int[] data) {
+        IntBuffer buffer = BufferUtils.createIntBuffer(data.length);
+        buffer.put(data);
+        buffer.flip();
+        return buffer;
     }
 
     private FloatBuffer createFloatBuffer(float[] data) {
