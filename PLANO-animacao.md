@@ -1,6 +1,6 @@
 # Plano: animação esquelética 3D e IK
 
-Status: v1, especificação. **Commits 1 (módulo `animation` + JUnit), 2 (`renderer` com skin), 3 (`toolkit3d`: shaders, materiais, sombra e `SkinnedModel`), 4 (loader glTF) e 5 (IK) implementados**; os demais pendentes.
+Status: **concluído.** Commits 1 a 6 implementados na branch `feature/skeletal-animation-ik` (módulo `animation` + JUnit, `renderer` com skin, `toolkit3d` com skinning, loader glTF, IK, `AnimationDemo` e docs). O que ficou de fora está em §11 e nas pendências do `DEVELOPMENT.md`.
 Base: branch `feature/procedural-city` (módulos `core`, `renderer`, `assets`, `platform-glfw`,
 `toolkit2d`, `toolkit3d`, `demos`).
 
@@ -409,16 +409,24 @@ Mapeamento glTF → engine:
 - `Assets.texture(String cacheKey, byte[] encoded)`: decodifica de memória com o mesmo
   `TextureLoader` e cacheia pela chave (ex.: `"models/fox.glb#image0"`).
 
-## 8. Demo `AnimationDemo`
+## 8. Demo `AnimationDemo` (pacote `examples.animation`)
 
-- Personagem glTF de licença livre em `resources/models/` (candidatos: Khronos `Fox` ou
-  `CesiumMan`, CC-BY 4.0), com atribuição em `resources/models/ATTRIBUTION.md`.
-- Teclas: `1..n` trocam o clip com crossfade de 0,3 s; `ESPAÇO` pausa; `+/-` mudam a velocidade.
-- IK: alvo controlado pelo mouse (raio da câmera × plano y = const, com `Ray`/`Picking`) com
-  two-bone num membro e look-at na cabeça; uma cadeia procedural (tentáculo com skin gerada em
-  código) seguindo o mesmo alvo com FABRIK. Teclas para ligar/desligar cada solver e mudar o peso.
-- Sombra direcional ligada (caster skinned), HUD com `Ui` (clip, tempo, solvers ativos).
-- Entra no `Launcher`, na tabela de demos do README e em `scripts/run-demos.sh`.
+- Personagem: `resources/models/fox.glb` (Khronos `Fox`: modelo CC0, rig/animações e conversão
+  CC-BY 4.0), com atribuição em `resources/models/ATTRIBUTION.md`. Escala 0,02 (o arquivo está
+  em centímetros).
+- Teclas: `1..3` trocam o clip (Survey, Walk, Run) com crossfade de 0,3 s; `ESPAÇO` pausa;
+  `P`/`L`/`T` ligam e desligam pata, olhar e tentáculo; `Q`/`E` sobem e descem o alvo; setas
+  giram a câmera; roda = zoom. Ficaram de fora a velocidade por tecla e o peso por tecla.
+- IK: o alvo segue o mouse (raio da câmera × plano `y` = altura do alvo, `Picking.ray` +
+  `rayPlaneY`). Two-bone na pata dianteira esquerda (`b_LeftUpperArm_09` → `b_LeftForeArm_010` →
+  `b_LeftHand_011`, cotovelo dobrando para trás); look-at em `b_Head_05` (eixo "frente" da cabeça
+  calculado da pose de repouso, até 70°); tentáculo de 8 ossos gerado em código (`Tentacle`:
+  `Skeleton.ofRestPose` + `MeshData` com skin) com FABRIK, com a pose mantida entre frames.
+- Sombra direcional (casters skinned), HUD com `Ui`.
+- Entra no `Launcher` (opção 7), na tabela de demos do README e em `scripts/run-demos.sh`.
+- Verificado com frames capturados por um harness descartável (alvo no chão: pata e tentáculo
+  tocam o marcador e a cabeça se vira; alvo alto: tentáculo se curva até ele, pata estica). A
+  interação com mouse e teclado não foi exercitada por um humano.
 
 ## 9. Sequência de commits
 
