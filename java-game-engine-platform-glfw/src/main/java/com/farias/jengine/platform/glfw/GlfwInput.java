@@ -13,6 +13,10 @@ import com.farias.jengine.platform.MouseButton;
 /**
  * Teclado e mouse via GLFW, para a janela dada. Guarda a amostra do frame
  * atual e a do anterior; "pressionada"/"solta" sao a diferenca entre as duas.
+ *
+ * <p>A rolagem nao tem estado para consultar no GLFW, so evento: o callback
+ * acumula o que chega em {@code pollEvents()} e {@link #update()} entrega o
+ * acumulado como a rolagem do frame.
  */
 final class GlfwInput implements Input {
     private static final int KEY_FIRST = GLFW_KEY_SPACE;
@@ -29,8 +33,12 @@ final class GlfwInput implements Input {
     private final DoubleBuffer mouseX = BufferUtils.createDoubleBuffer(1);
     private final DoubleBuffer mouseY = BufferUtils.createDoubleBuffer(1);
 
+    private double pendingScrollY;
+    private double scrollY;
+
     GlfwInput(GlfwWindow window) {
         this.handle = window.handle();
+        glfwSetScrollCallback(handle, (w, dx, dy) -> pendingScrollY += dy);
     }
 
     @Override
@@ -71,6 +79,11 @@ final class GlfwInput implements Input {
     }
 
     @Override
+    public double getScrollY() {
+        return scrollY;
+    }
+
+    @Override
     public void update() {
         boolean[] swap = previousKeys;
         previousKeys = keys;
@@ -87,6 +100,9 @@ final class GlfwInput implements Input {
         }
 
         glfwGetCursorPos(handle, mouseX, mouseY);
+
+        scrollY = pendingScrollY;
+        pendingScrollY = 0;
     }
 
     private static int glfwButton(MouseButton button) {

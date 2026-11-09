@@ -6,6 +6,7 @@ import java.util.Map.Entry;
 import java.util.Scanner;
 
 import com.farias.jengine.examples.chess.IsometricChess;
+import com.farias.jengine.examples.city.ProceduralCityDemo;
 
 public class Launcher {
     public static void main(String[] args) {
@@ -17,6 +18,7 @@ public class Launcher {
         demos.put("3 - ModelViewer", ModelViewer::launch);
         demos.put("4 - IsometricChess", IsometricChess::launch);
         demos.put("5 - ShadowCubeDemo", ShadowCubeDemo::launch);
+        demos.put("6 - ProceduralCity", ProceduralCityDemo::launch);
 
         System.out.println("Selecione uma opção:");
         demos.keySet().forEach(System.out::println);

@@ -1,50 +1,71 @@
 package com.farias.jengine.examples.chess;
 
 import java.nio.file.Path;
+import java.util.stream.Stream;
 
-import org.joml.Vector3f;
-
+import com.farias.jengine.examples.chess.model.ChessBoard;
+import com.farias.jengine.examples.chess.model.ChessLogic;
+import com.farias.jengine.examples.chess.model.ChessPiece;
+import com.farias.jengine.examples.chess.model.ChessState;
+import com.farias.jengine.examples.chess.model.PlayerInput;
 import com.farias.jengine.assets.Assets;
 import com.farias.jengine.assets.AssetsModule;
 import com.farias.jengine.core.Engine;
 import com.farias.jengine.core.EngineContext;
 import com.farias.jengine.core.Timer;
-import com.farias.jengine.toolkit3d.DirectionalLight;
 import com.farias.jengine.toolkit3d.Toolkit3DModule;
 import com.farias.jengine.toolkit3d.IsometricCamera;
 import com.farias.jengine.toolkit3d.LitMaterials;
 import com.farias.jengine.toolkit3d.Models;
-import com.farias.jengine.toolkit3d.ShadowMap;
-import com.farias.jengine.toolkit3d.Shapes;
 import com.farias.jengine.toolkit3d.Shadows;
+import com.farias.jengine.toolkit3d.Shapes;
 import com.farias.jengine.platform.Input;
 import com.farias.jengine.platform.Key;
-import com.farias.jengine.platform.MouseButton;
 import com.farias.jengine.platform.Window;
 import com.farias.jengine.platform.glfw.GlfwPlatformModule;
-import com.farias.jengine.renderer.RendererModule;
 import com.farias.jengine.renderer.Renderer;
+import com.farias.jengine.renderer.RendererModule;
 import com.farias.jengine.toolkit2d.Toolkit2D;
 import com.farias.jengine.toolkit2d.Toolkit2DModule;
 
 /**
- * Xadrez isométrico: liga o {@link ChessGame} (regras e estado, sem engine) à
- * apresentação 3D e roda o loop principal.
+ * Xadrez isométrico: monta as peças e roda o loop principal. Cada frame tem
+ * três passos, cada um com um dono:
+ * <ol>
+ * <li><b>input</b>: {@link ChessControls} move a câmera e traduz o mouse num
+ * {@link PlayerInput} (a casa apontada e se clicou);</li>
+ * <li><b>lógica</b>: {@link ChessLogic#update} aplica as regras, avança as
+ * animações e atualiza o {@link ChessState};</li>
+ * <li><b>render</b>: {@link ChessRenderer#render} lê o estado e desenha.</li>
+ * </ol>
  *
  * <h2>Quem faz o quê</h2>
  * <ul>
- * <li>{@link ChessGame}, {@link ChessBoard}, {@link ChessPiece}: estado do
- * jogo.</li>
- * <li>{@link ChessCameraControls}: teclado → câmera.</li>
- * <li>{@link ChessScene} e {@link PieceView}: modelos, animação e picking.</li>
- * <li>{@link ChessRenderer}: passes de sombra, cena e UI.</li>
+ * <li>pacote {@code model}: {@link ChessState} (o jogo num instante, inclusive
+ * a pose animada de cada peça), {@link ChessLogic} (regras e animações),
+ * {@link ChessBoard}, {@link ChessPiece} e as peças em {@code model.pieces}
+ * (o padrão de movimento de cada uma). Não depende da engine.</li>
+ * <li>{@link ChessControls} e {@link ChessCameraControls}: teclado e mouse.</li>
+ * <li>{@link ChessScene}: mapa de sombras e modelos 3D, só dados, criados
+ * por {@link ChessSceneFactory}, que também configura a câmera.</li>
+ * <li>{@link ChessRenderer} e {@link ModelOutline}: posicionam os modelos
+ * conforme o estado, picking e passes de render.</li>
  * </ul>
  *
+ * <p>
+ * As animações são do estado, mas não bloqueiam o jogo: dá para jogar a
+ * próxima peça com a capturada ainda no ar.
+ *
  * <h2>Controles</h2>
- * Setas esquerda/direita movem a câmera na diagonal do tabuleiro, cima/baixo
- * sobem e descem, Z aproxima e Shift+Z afasta. O clique esquerdo seleciona uma
- * peça, que sobe e fica girando; clicar de novo nela, ou fora de qualquer peça,
- * desfaz a seleção. ESC fecha.
+ * Setas esquerda/direita movem a câmera para os lados da tela, cima/baixo
+ * sobem e descem, a roda do mouse aproxima e afasta, e arrastar na horizontal
+ * com o botão do meio gira a câmera em volta do centro do tabuleiro. Passar o
+ * mouse sobre uma peça desenha um contorno branco em volta dela. O clique
+ * esquerdo seleciona a peça, que sobe e fica girando; clicar de novo nela, ou
+ * fora de qualquer peça, desfaz a seleção. Com uma peça selecionada, passar o
+ * mouse sobre um destino válido destaca (tint) o caminho até ele, junto com a
+ * casa de origem, e clicar nele move a peça (capturando a adversária que
+ * estiver lá). ESC fecha.
  *
  * <h2>Picking</h2>
  * {@link IsometricCamera#rayAt} gera o raio da mesma câmera que desenha a
@@ -60,20 +81,12 @@ public class IsometricChess {
     private static final int WINDOW_WIDTH = 960;
     private static final int WINDOW_HEIGHT = 960;
 
-    private static final float CAMERA_OFFSET = 10f;
-    private static final float CAMERA_SIZE = 5f;
-
-    private static final int SHADOW_MAP_SIZE = 2048;
-    private static final Vector3f LIGHT_DIRECTION = new Vector3f(0.25f, 1f, 0.75f);
-    private static final float LIGHT_RADIUS = 7f;
-
     private final Window window;
     private final Input input;
 
-    private final ChessGame game = new ChessGame();
-    private final IsometricCamera camera = new IsometricCamera(CAMERA_OFFSET, CAMERA_SIZE);
-    private final ChessCameraControls cameraControls;
-    private final ChessScene scene;
+    private final ChessState state = new ChessState();
+    private final ChessLogic logic = new ChessLogic();
+    private final ChessControls controls;
     private final ChessRenderer renderer;
 
     public static void main(String[] args) {
@@ -97,51 +110,45 @@ public class IsometricChess {
     }
 
     public IsometricChess(EngineContext context) {
+        requireServices(context);
         window = context.require(Window.class);
         input = context.require(Input.class);
 
-        ShadowMap shadow = context.require(Shadows.class).create(boardLight(), SHADOW_MAP_SIZE);
+        IsometricCamera camera = ChessSceneFactory.camera();
+        ChessScene scene = ChessSceneFactory.create(context, state, camera);
+        renderer = new ChessRenderer(context, scene, camera);
+        controls = new ChessControls(context, camera, renderer);
+    }
 
-        cameraControls = new ChessCameraControls(input, camera);
-        scene = new ChessScene(game,
-                context.require(Assets.class),
-                context.require(Shapes.class),
-                context.require(LitMaterials.class),
-                context.require(Models.class),
-                shadow, camera);
-        renderer = new ChessRenderer(context.require(Renderer.class),
-                context.require(Toolkit2D.class).ui(WINDOW_WIDTH, WINDOW_HEIGHT),
-                window, WINDOW_WIDTH, camera, shadow);
+    /**
+     * Falha cedo, com o nome do serviço, se algum módulo de que as partes do
+     * jogo dependem não foi registrado em launch(). As partes buscam os
+     * serviços com resolve e não fazem essa checagem.
+     */
+    private static void requireServices(EngineContext context) {
+        Stream.of(Assets.class, Shapes.class, LitMaterials.class, Models.class, Shadows.class,
+                Renderer.class, Toolkit2D.class).forEach(context::require);
     }
 
     private void run() {
         Timer timer = new Timer();
         while (!shouldQuit()) {
-            timer.update();
-            window.pollEvents();
-            input.update();
-            float deltaTime = timer.deltaTime();
-
-            cameraControls.update(deltaTime);
-            handleSelection();
-            scene.update(game, deltaTime);
-            renderer.render(scene);
+            float deltaTime = beginFrame(timer);
+            PlayerInput playerInput = controls.read(state, deltaTime);
+            logic.update(state, playerInput, deltaTime);
+            renderer.render(state);
         }
+    }
+
+    /** Avança o relógio e amostra os eventos e o input do frame; devolve o deltaTime. */
+    private float beginFrame(Timer timer) {
+        timer.update();
+        window.pollEvents();
+        input.update();
+        return timer.deltaTime();
     }
 
     private boolean shouldQuit() {
         return window.shouldClose() || input.isKeyPressed(Key.ESCAPE);
-    }
-
-    private void handleSelection() {
-        if (input.isMouseButtonPressed(MouseButton.LEFT)) {
-            game.select(scene.pieceAt(camera.rayAt(input.getMouseX(), input.getMouseY(), window)));
-        }
-    }
-
-    private static DirectionalLight boardLight() {
-        float boardCenter = (ChessBoard.SIZE - 1) / 2f;
-        return DirectionalLight.covering(LIGHT_DIRECTION, new Vector3f(boardCenter, 0f, boardCenter),
-                LIGHT_RADIUS);
     }
 }
