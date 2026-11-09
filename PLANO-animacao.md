@@ -1,6 +1,6 @@
 # Plano: animação esquelética 3D e IK
 
-Status: v1, especificação. Nenhuma linha de código foi alterada.
+Status: v1, especificação. **Commit 1 (módulo `animation` + JUnit) implementado**; os demais pendentes.
 Base: branch `feature/procedural-city` (módulos `core`, `renderer`, `assets`, `platform-glfw`,
 `toolkit2d`, `toolkit3d`, `demos`).
 
@@ -106,6 +106,10 @@ public final class Skeleton {
   índices de `JOINTS_0`.
 - Várias raízes são permitidas (glTF permite).
 - `jointCount() <= MAX_JOINTS` (128, §6.4) é validado no `toolkit3d`, não aqui.
+- `Skeleton.ofRestPose(names, parents, t, r, s)`: fábrica que amarra o esqueleto no próprio
+  repouso (inversa de bind = inversa da matriz de repouso). Para esqueletos montados em código.
+- Os getters de repouso e de bind devolvem as views somente leitura do JOML (`Vector3fc`,
+  `Quaternionfc`, `Matrix4fc`).
 
 ### 5.2 `Pose` (mutável, uma por instância)
 
@@ -123,16 +127,20 @@ public final class Pose {
 }
 ```
 
-- `skinningPalette`: `model[j] * inverseBind[j]`, column-major, 16 floats por junta.
+- `skinningPalette`: recalcula o espaço do modelo e escreve `model[j] * inverseBind[j]`,
+  column-major, `Pose.FLOATS_PER_JOINT` (16) floats por junta.
 - `computeModelSpace` percorre as juntas em ordem (garantida por §5.1), então basta um laço.
 
 ### 5.3 Clips e amostragem
 
 ```java
 public enum Interpolation { STEP, LINEAR, CUBICSPLINE }
-public enum Path { TRANSLATION, ROTATION, SCALE }
 
-public record Track(int joint, Path path, float[] times, float[] values, Interpolation interpolation);
+public record Track(int joint, Track.Path path, float[] times, float[] values, Interpolation interpolation) {
+    public enum Path { TRANSLATION, ROTATION, SCALE }   // aninhado: evita colidir com java.nio.file.Path
+    public float endTime();
+    public void apply(float time, Pose pose);          // amostra e escreve na junta
+}
 
 public final class AnimationClip {
     public AnimationClip(String name, List<Track> tracks); // duração = maior último tempo
