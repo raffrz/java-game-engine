@@ -4,8 +4,11 @@ import static java.lang.Integer.parseInt;
 import static java.lang.Float.parseFloat;
 import java.io.BufferedReader;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.UncheckedIOException;
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -19,20 +22,26 @@ import com.farias.jengine.assets.Assets;
 import com.farias.jengine.renderer.Mesh;
 import com.farias.jengine.renderer.MeshData;
 import com.farias.jengine.renderer.Renderer;
+import com.farias.jengine.renderer.Texture;
+import com.farias.jengine.renderer.TextureData;
 
 /**
- * Carrega modelos Wavefront OBJ via {@link Assets}; os caminhos sao relativos
- * a raiz de assets, como em {@code Assets.texture}. Falhas de leitura/parse
- * viram excecao, nunca um modelo nulo.
+ * Carrega modelos via {@link Assets}: Wavefront OBJ (estáticos) e glTF 2.0
+ * (com esqueleto e animações, ver {@link #loadGltf}). Os caminhos sao
+ * relativos a raiz de assets, como em {@code Assets.texture}. Falhas de
+ * leitura/parse viram excecao, nunca um modelo nulo.
  *
- * <p>Cada arquivo e lido e enviado a GPU uma vez: pedir o mesmo .obj de novo
- * devolve o mesmo {@link Mesh}, entao varios modelos podem compartilha-lo.
+ * <p>Cada arquivo e lido e enviado a GPU uma vez: pedir o mesmo arquivo de
+ * novo devolve o mesmo {@link Mesh} (ou {@link ModelAsset}), entao varios
+ * modelos podem compartilha-lo.
  */
 public final class Models {
     private final Assets assets;
     private final Renderer renderer;
     private final LitMaterials materials;
     private final Map<MeshKey, Mesh> meshes = new HashMap<>();
+    private final Map<String, ModelAsset> gltfAssets = new HashMap<>();
+    private final Map<Integer, Texture> colorTextures = new HashMap<>();
 
     Models(Assets assets, Renderer renderer, LitMaterials materials) {
         this.assets = assets;
@@ -69,9 +78,72 @@ public final class Models {
                 key -> renderer.createMesh(read(key.objPath(), key.flipNormals())));
     }
 
+    /**
+     * Carrega um glTF 2.0 ({@code .gltf} ou {@code .glb}) com esqueleto e
+     * animações; arquivos referenciados ({@code .bin}, imagens) são relativos
+     * ao diretório do modelo. Cada primitive vira uma parte com a textura de
+     * cor base (sem textura, uma textura 1x1 da cor base; o
+     * {@code baseColorFactor} não multiplica uma textura existente). O que
+     * não é suportado e foi ignorado sai como aviso no stderr.
+     *
+     * @throws UnsupportedOperationException para extensões obrigatórias ou
+     *                                       accessors esparsos
+     */
+    public ModelAsset loadGltf(String path) {
+        ModelAsset cached = gltfAssets.get(path);
+        if (cached != null) {
+            return cached;
+        }
+        GltfData data = GltfReader.read(path, readBytes(path), this::readBytes);
+        for (String warning : data.warnings()) {
+            System.err.println("Warning: glTF '" + path + "': " + warning);
+        }
+        List<Mesh> parts = new ArrayList<>();
+        List<Texture> textures = new ArrayList<>();
+        for (GltfData.Primitive primitive : data.primitives()) {
+            parts.add(renderer.createMesh(primitive.mesh()));
+            textures.add(texture(primitive));
+        }
+        ModelAsset asset = new ModelAsset(data.skeleton(), parts, textures, data.clips(), materials);
+        gltfAssets.put(path, asset);
+        return asset;
+    }
+
+    private Texture texture(GltfData.Primitive primitive) {
+        GltfData.Image image = primitive.image();
+        if (image == null) {
+            return colorTexture(primitive.baseColor());
+        }
+        return image.path() != null ? assets.texture(image.path()) : assets.texture(image.key(), image.bytes());
+    }
+
+    /** Textura 1x1 de uma cor RGBA (0..1), cacheada pela cor. */
+    private Texture colorTexture(float[] rgba) {
+        int packed = 0;
+        for (int i = 0; i < 4; i++) {
+            packed = (packed << 8) | Math.round(Math.max(0f, Math.min(1f, rgba[i])) * 255f);
+        }
+        return colorTextures.computeIfAbsent(packed, color -> {
+            ByteBuffer pixel = ByteBuffer.allocateDirect(4).order(ByteOrder.nativeOrder());
+            pixel.put((byte) (color >>> 24)).put((byte) (color >>> 16)).put((byte) (color >>> 8)).put((byte) (int) color)
+                    .flip();
+            return renderer.createTexture(new TextureData(1, 1, pixel));
+        });
+    }
+
+    private byte[] readBytes(String path) {
+        try (InputStream in = assets.open(path)) {
+            return in.readAllBytes();
+        } catch (IOException e) {
+            throw new UncheckedIOException("Failed to read '" + path + "'", e);
+        }
+    }
+
     /** Esvazia o cache. Nao libera GPU: os meshes pertencem ao Renderer. */
     void clear() {
         meshes.clear();
+        gltfAssets.clear();
+        colorTextures.clear();
     }
 
     private MeshData read(String objPath, boolean flipNormals) {

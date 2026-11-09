@@ -47,6 +47,26 @@ public final class Assets {
     }
 
     /**
+     * Decodifica uma imagem já em memória (PNG, JPEG, ...) e a cacheia por
+     * {@code key}, para imagens que não são arquivos (por exemplo, embutidas
+     * num modelo .glb: {@code "models/fox.glb#image0"}). Pedir a mesma chave
+     * de novo devolve a textura do cache sem decodificar {@code encoded}.
+     */
+    public Texture texture(String key, byte[] encoded) {
+        Texture cached = textures.get(key);
+        if (cached != null) {
+            return cached;
+        }
+        try {
+            Texture texture = TextureLoader.load(renderer, encoded, key);
+            textures.put(key, texture);
+            return texture;
+        } catch (IOException e) {
+            throw new UncheckedIOException("Failed to decode texture '" + key + "'", e);
+        }
+    }
+
+    /**
      * Abre o asset para leitura (raiz, depois classpath). Nao cacheia; quem
      * chama fecha o stream.
      */

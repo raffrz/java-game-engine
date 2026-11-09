@@ -21,7 +21,11 @@ final class TextureLoader {
     }
 
     static Texture load(Renderer renderer, InputStream in, String name) throws IOException {
-        byte[] bytes = in.readAllBytes();
+        return load(renderer, in.readAllBytes(), name);
+    }
+
+    /** Decodifica uma imagem já em memória (PNG, JPEG, ...). */
+    static Texture load(Renderer renderer, byte[] bytes, String name) throws IOException {
         // STB so le de buffers diretos.
         ByteBuffer encoded = BufferUtils.createByteBuffer(bytes.length);
         encoded.put(bytes).flip();

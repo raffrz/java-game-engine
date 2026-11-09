@@ -1,6 +1,6 @@
 # Plano: animação esquelética 3D e IK
 
-Status: v1, especificação. **Commits 1 (módulo `animation` + JUnit), 2 (`renderer` com skin) e 3 (`toolkit3d`: shaders, materiais, sombra e `SkinnedModel`) implementados**; os demais pendentes.
+Status: v1, especificação. **Commits 1 (módulo `animation` + JUnit), 2 (`renderer` com skin), 3 (`toolkit3d`: shaders, materiais, sombra e `SkinnedModel`) e 4 (loader glTF) implementados**; os demais pendentes.
 Base: branch `feature/procedural-city` (módulos `core`, `renderer`, `assets`, `platform-glfw`,
 `toolkit2d`, `toolkit3d`, `demos`).
 
@@ -347,36 +347,54 @@ public final class SkinnedModel {
 - Verificado com um teste de fumaça (cilindro de 2 ossos dobrando por clip, com sombra):
   shaders linkam, a deformação é suave na junta e a sombra acompanha a pose.
 
-### 7.4 Loader glTF (`com.farias.jengine.toolkit3d.gltf`)
+### 7.4 Loader glTF (no pacote `com.farias.jengine.toolkit3d`)
 
-Separado em **leitura pura** (testável sem GL) e **upload**:
+As classes internas ficam no próprio pacote do `toolkit3d`, package-private: um subpacote
+`gltf` obrigaria a deixá-las públicas para o `Models` usar (não há `module-info`). Separado em
+**leitura pura** (testável sem GL) e **upload**:
 
 | Classe | Visibilidade | Papel |
 |---|---|---|
-| `Json` | package-private | Parser JSON mínimo (objeto, array, string com escapes, número, bool, null) |
-| `GltfReader` | package-private | `.gltf` (buffers externos via `Assets.open` ou `data:` base64) e `.glb` (header + chunks JSON/BIN) → `GltfData` |
-| `GltfData` | package-private | `List<PrimitiveData(MeshData, ImageRef)>`, `Skeleton`, `List<AnimationClip>` |
-| `ModelAsset` | público | Resultado carregado: meshes na GPU, skeleton, clips por nome; `instance()` cria `SkinnedModel` |
-| `Models.loadGltf(path)` | público | Carga com cache por caminho, como `Models.mesh` |
+| `Json` | package-private | Parser JSON mínimo (objeto, array, string com escapes, número, bool, null), erros com posição |
+| `GltfReader` | package-private | `.gltf` (buffers externos pelo `resolver` ou `data:` base64) e `.glb` (header + chunks JSON/BIN) → `GltfData` |
+| `GltfData` | package-private | `Skeleton`, `List<Primitive(MeshData, Image, baseColor)>`, `List<AnimationClip>`, avisos |
+| `ModelAsset` | público | Resultado carregado: meshes e texturas na GPU, `skeleton()`, `clips()`, `clip(name)`; `instance()` cria um `SkinnedModel` com materiais próprios |
+| `Models.loadGltf(path)` | público | Carga com cache por caminho, como `Models.mesh`; avisos no stderr |
+
+**Decisão de implementação: todo nó necessário vira junta.** O esqueleto não é só a lista
+`skins[].joints`: são as juntas, os nós com malha da cena e todos os ancestrais deles,
+ordenados por profundidade (pai antes do filho). Com isso:
+
+- nós intermediários que não são juntas (o "Armature" do Blender, com escala ou rotação)
+  entram naturalmente, e animações neles funcionam; não há junta raiz sintética;
+- uma malha sem skin é presa rigidamente ao próprio nó (junta com peso 1), com os vértices
+  levados ao espaço de bind desse nó; um arquivo sem skin anima os nós do mesmo jeito;
+- todo modelo glTF é um `SkinnedModel`; não há caminho separado para `TexturedModel`;
+- a inversa de bind vem da skin para as juntas e é a inversa da matriz de repouso para os
+  demais nós; com várias skins, vale a primeira que lista o nó.
+
+O custo é o limite de 128 juntas valer para os nós necessários, não só os ossos (o Fox da
+Khronos tem 26).
 
 Mapeamento glTF → engine:
 
 | glTF | Engine |
 |---|---|
-| `accessors` + `bufferViews` (byteStride, byteOffset, `normalized`) | arrays `float[]`/`int[]`; componentTypes 5120–5126 |
-| `meshes[].primitives[]` (`mode` 4 apenas) | `MeshData` (POSITION, NORMAL, TEXCOORD_0, JOINTS_0, WEIGHTS_0, indices). Sem NORMAL → normais por face. Sem indices → 0..n-1 |
-| `skins[0].joints`, `inverseBindMatrices` | `Skeleton` (reordenado para pai antes do filho; JOINTS_0 remapeado) |
+| `accessors` + `bufferViews` (byteStride, byteOffset, `normalized`) | arrays `float[]`/`int[]`; componentTypes 5120–5126; accessor sem bufferView = zeros |
+| `meshes[].primitives[]` (`mode` 4 apenas) | `MeshData` (POSITION, NORMAL, TEXCOORD_0, JOINTS_0, WEIGHTS_0, indices). Sem NORMAL → normais suaves pelas faces. Sem indices → 0..n-1 |
+| nó com `skin` | posições como no arquivo (a transformação do próprio nó é ignorada, como manda o glTF); `JOINTS_0` remapeado para o esqueleto |
 | `nodes[]` TRS / `matrix` | pose de repouso local (`matrix` decomposta em TRS) |
-| nós ancestrais das juntas que não são juntas | transformação acumulada aplicada nas raízes do skeleton |
-| `animations[].channels/samplers` (`translation`/`rotation`/`scale`) | `Track` + `Interpolation`; canais para nós fora do skin e `weights` (morph) ignorados com aviso |
-| `materials[].pbrMetallicRoughness.baseColorTexture` | `Texture`. URI → `Assets.texture(dir + uri)`; embutida (bufferView/`data:`) → `Assets.texture(cacheKey, bytes)`. Sem textura → textura 1×1 de `baseColorFactor` |
+| `scene` / `scenes[0]` | só os nós da cena padrão (sem cenas: todas as raízes) |
+| `animations[].channels/samplers` (`translation`/`rotation`/`scale`) | `Track` + `Interpolation`; canais `weights` (morph) e de nós fora do modelo ignorados com aviso |
+| `materials[].pbrMetallicRoughness.baseColorTexture` | `Texture`. URI → `Assets.texture(dir + uri)`; embutida (bufferView/`data:`) → `Assets.texture(path + "#image" + i, bytes)`. Sem textura → textura 1×1 de `baseColorFactor` (o fator não multiplica uma textura existente) |
 | UV | **sem** `1 - v` (ver §2) |
-| Pesos | renormalizados para somar 1 |
+| Pesos | renormalizados para somar 1 (soma zero → peso 1 na junta do nó) |
 
-- Mesh sem skin no arquivo: carregado como estático (palette de 1 junta identidade, ou
-  `TexturedModel`; decisão no commit 4, preferindo `TexturedModel`).
-- Fora do suporte (erro claro ou aviso): `KHR_*` extensões obrigatórias (`extensionsRequired`),
-  Draco, sparse accessors, múltiplos skins por arquivo (usa o primeiro, com aviso), morph targets.
+- Fora do suporte: extensões obrigatórias (`extensionsRequired`, ex.: Draco) e sparse
+  accessors dão `UnsupportedOperationException`; morph targets, modos que não são triângulos e
+  skin sem `JOINTS_0`/`WEIGHTS_0` (desenhada rígida) viram aviso.
+- Verificado com o `Fox.glb` da Khronos (CC-BY 4.0): 26 juntas, clips Survey/Walk/Run,
+  textura embutida e UV corretas, animação tocando na GPU.
 
 ### 7.5 `assets`
 
