@@ -27,8 +27,22 @@
 			<artifactId>java-game-engine-assets</artifactId>
 		</dependency>
 		<dependency>
+			<groupId>com.farias.jengine</groupId>
+			<artifactId>java-game-engine-animation</artifactId>
+		</dependency>
+		<dependency>
 			<groupId>org.joml</groupId>
 			<artifactId>joml</artifactId>
+		</dependency>
+		<dependency>
+			<!-- JSON do glTF; o GltfReader converte o resultado para os tipos da engine. -->
+			<groupId>com.google.code.gson</groupId>
+			<artifactId>gson</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.junit.jupiter</groupId>
+			<artifactId>junit-jupiter</artifactId>
+			<scope>test</scope>
 		</dependency>
 	</dependencies>
 </project>

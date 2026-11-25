@@ -127,6 +127,83 @@ public final class Shaders {
             }
             """;
 
+    /**
+     * Máximo de juntas de um esqueleto com skin: o tamanho do array
+     * {@code uJoints} dos shaders skinned (128 {@code mat4} = 2048 componentes
+     * de uniform no vertex shader). Um esqueleto maior é recusado em
+     * {@link SkinnedModel}.
+     */
+    public static final int MAX_JOINTS = 128;
+
+    /**
+     * Skinning: cada vértice é a soma das matrizes {@code uJoints} das suas 4
+     * juntas (atributo 3) ponderadas pelos pesos (atributo 4). Comum aos
+     * shaders skinned de cor e de sombra.
+     */
+    private static final String SKINNING = """
+            layout(location = 3) in ivec4 joints;
+            layout(location = 4) in vec4 weights;
+
+            uniform mat4 uJoints[%d];
+
+            mat4 skinMatrix() {
+                return weights.x * uJoints[joints.x]
+                        + weights.y * uJoints[joints.y]
+                        + weights.z * uJoints[joints.z]
+                        + weights.w * uJoints[joints.w];
+            }
+            """.formatted(MAX_JOINTS);
+
+    /**
+     * {@link #STANDARD_VERTEX} com skinning: posição e normal deformadas pelo
+     * esqueleto antes da matriz de modelo. Mesmas saídas, então usa o
+     * {@link #STANDARD_FRAGMENT}. A normal usa a parte 3x3 da matriz de skin,
+     * exata para juntas sem escala não uniforme.
+     */
+    public static final String SKINNED_VERTEX = """
+            #version 330 core
+
+            layout(location = 0) in vec3 vertices;
+            layout(location = 1) in vec2 textures;
+            layout(location = 2) in vec3 normals;
+            """ + SKINNING + """
+
+            out vec2 tex_coords;
+            out vec3 fragNormal;
+            out vec4 fragLightSpace;
+
+            uniform mat4 uModel;
+            uniform mat4 uView;
+            uniform mat4 uProjection;
+            uniform mat3 uNormal;
+            uniform mat4 lightSpaceMatrix;
+
+            void main() {
+                mat4 skin = skinMatrix();
+                tex_coords = textures;
+                fragNormal = normalize(uNormal * (mat3(skin) * normals));
+                vec4 worldPosition = uModel * (skin * vec4(vertices, 1.0));
+                fragLightSpace = lightSpaceMatrix * worldPosition;
+                gl_Position = uProjection * uView * worldPosition;
+            }
+            """;
+
+    /** {@link #SHADOW_DEPTH_VERTEX} com skinning. */
+    public static final String SHADOW_DEPTH_SKINNED_VERTEX = """
+            #version 330 core
+
+            layout(location = 0) in vec3 vertices;
+            """ + SKINNING + """
+
+            uniform mat4 uModel;
+            uniform mat4 uView;
+            uniform mat4 uProjection;
+
+            void main() {
+                gl_Position = uProjection * uView * uModel * (skinMatrix() * vec4(vertices, 1.0));
+            }
+            """;
+
     /** Passe de profundidade do ponto de vista da luz: só a posição, sem cor. */
     public static final String SHADOW_DEPTH_VERTEX = """
             #version 330 core

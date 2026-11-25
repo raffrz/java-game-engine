@@ -1,5 +1,8 @@
 package com.farias.jengine.toolkit3d;
 
+import java.util.ArrayList;
+import java.util.List;
+
 import org.joml.Matrix4f;
 
 import com.farias.jengine.renderer.Material;
@@ -16,7 +19,8 @@ import com.farias.jengine.renderer.Texture;
  * <p>
  * Uso: crie o passe com {@link #descriptor()} e {@link #view()} <b>antes</b>
  * do passe da cena, submeta {@link #caster} para cada objeto que projeta
- * sombra, e use {@link LitMaterial#receiving} nos materiais que recebem.
+ * sombra ({@link #casters(SkinnedModel)} para modelos animados), e use
+ * {@link LitMaterial#receiving} nos materiais que recebem.
  *
  * <pre>{@code
  * RenderPass pass = renderer.createPass(shadow.descriptor(), shadow.view());
@@ -30,12 +34,15 @@ public final class ShadowMap {
     private final RenderView view;
     private final RenderPassDescriptor descriptor;
     private final Material casterMaterial;
+    private final Material skinnedCasterMaterial;
     private final float bias;
 
-    ShadowMap(Texture texture, DirectionalLight light, Material casterMaterial, float bias) {
+    ShadowMap(Texture texture, DirectionalLight light, Material casterMaterial, Material skinnedCasterMaterial,
+            float bias) {
         this.texture = texture;
         this.light = light;
         this.casterMaterial = casterMaterial;
+        this.skinnedCasterMaterial = skinnedCasterMaterial;
         this.bias = bias;
         this.view = light.shadowView(texture);
         this.descriptor = new RenderPassDescriptor("shadow")
@@ -75,5 +82,20 @@ public final class ShadowMap {
 
     public RenderCommand caster(TexturedModel model) {
         return caster(model.getMesh(), model.getModelMatrix());
+    }
+
+    /**
+     * Os comandos que desenham {@code model} no passe da luz, um por parte,
+     * na pose do último {@link SkinnedModel#update}: a sombra acompanha a
+     * animação.
+     */
+    public List<RenderCommand> casters(SkinnedModel model) {
+        Matrix4f modelMatrix = model.getModelMatrix();
+        float[] palette = model.paletteSnapshot();
+        List<RenderCommand> commands = new ArrayList<>(model.parts().size());
+        for (SkinnedModel.Part part : model.parts()) {
+            commands.add(new RenderCommand(part.mesh(), skinnedCasterMaterial, modelMatrix, palette));
+        }
+        return commands;
     }
 }

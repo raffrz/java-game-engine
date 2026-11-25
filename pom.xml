@@ -15,6 +15,7 @@
 		<module>java-game-engine-renderer</module>
 		<module>java-game-engine-platform-glfw</module>
 		<module>java-game-engine-assets</module>
+		<module>java-game-engine-animation</module>
 		<module>java-game-engine-toolkit2d</module>
 		<module>java-game-engine-toolkit3d</module>
 		<module>java-game-engine-demos</module>
@@ -28,6 +29,8 @@
 
 		<lwjgl.version>3.3.6</lwjgl.version>
 		<joml.version>1.10.8</joml.version>
+		<junit.version>5.12.2</junit.version>
+		<gson.version>2.15.0</gson.version>
 
 		<!-- Preenchidos pelos profiles de plataforma abaixo. -->
 		<lwjgl.natives>natives-linux</lwjgl.natives>
@@ -44,9 +47,26 @@
 				<type>pom</type>
 			</dependency>
 			<dependency>
+				<groupId>org.junit</groupId>
+				<artifactId>junit-bom</artifactId>
+				<version>${junit.version}</version>
+				<scope>import</scope>
+				<type>pom</type>
+			</dependency>
+			<dependency>
 				<groupId>org.joml</groupId>
 				<artifactId>joml</artifactId>
 				<version>${joml.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>com.google.code.gson</groupId>
+				<artifactId>gson</artifactId>
+				<version>${gson.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>com.farias.jengine</groupId>
+				<artifactId>java-game-engine-animation</artifactId>
+				<version>${project.version}</version>
 			</dependency>
 			<dependency>
 				<groupId>com.farias.jengine</groupId>

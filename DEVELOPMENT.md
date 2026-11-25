@@ -64,8 +64,9 @@ natives. Artefato e diretório são `java-game-engine-<módulo>`; o pacote é `c
 | `java-game-engine-platform-glfw` | `GlfwPlatformModule` (janela + input via GLFW) | core |
 | `java-game-engine-assets` | `Assets` (resolução raiz → classpath, cache de texturas), `AssetsModule`, `TextureLoader` (STB, interno) | core, renderer |
 | `java-game-engine-toolkit2d` | `Toolkit2D` (fábrica de `Canvas` e `Ui`), `SpriteSheet`, `BitmapFont`, `SpriteRenderer`, `Toolkit2DModule` | core, renderer, assets |
-| `java-game-engine-toolkit3d` | `Shapes`, `ShapeData`, `LitMaterials`, `LitMaterial`, `Models`, `TexturedModel`, `Shadows`, `ShadowMap`, `DirectionalLight`, `Camera`, `IsometricCamera`, `Projections`, `Ray`, `Picking`, `Shaders`, `Toolkit3DModule` | core, renderer, assets |
-| `java-game-engine-demos` | 5 exemplos + `Launcher` | todos os anteriores (+ natives, em runtime) |
+| `java-game-engine-animation` | Animação esquelética pura: `Skeleton`, `Pose`, `Track`, `Interpolation`, `AnimationClip`, `Poses`, `Animator`; IK em `animation.ik` (`TwoBoneIk`, `FabrikIk`, `LookAtIk`). Sem `Module`: só tipos de valor | JOML |
+| `java-game-engine-toolkit3d` | `Shapes`, `ShapeData`, `LitMaterials`, `LitMaterial`, `SkinnedMaterials`, `Models` (OBJ e glTF), `ModelAsset`, `Transform`, `TexturedModel`, `SkinnedModel`, `Shadows`, `ShadowMap`, `DirectionalLight`, `Camera`, `IsometricCamera`, `Projections`, `Ray`, `Picking`, `Shaders`, `Toolkit3DModule` | core, renderer, assets, animation, Gson |
+| `java-game-engine-demos` | 7 exemplos + `Launcher` | todos os anteriores (+ natives, em runtime) |
 
 `toolkit2d` e `toolkit3d` não dependem um do outro; nenhum módulo da biblioteca depende de
 `platform-glfw`. Cada POM declara tudo que o módulo usa direto (conferir com
@@ -83,6 +84,11 @@ Serviços registrados (o que `context.require(...)` devolve):
 
 Registrar o mesmo tipo duas vezes lança exceção (`EngineContext.registerService`).
 
+`animation` não tem módulo nem serviço: nada nele depende de `Renderer`/`Assets` (regras 3 e
+9.5), então o jogo faz `new Animator(skeleton)`, `new TwoBoneIk()` etc. O que precisa de serviço
+(carregar glTF, malha e material com skin) sai do `Toolkit3DModule`. Justificativa completa em
+`docs/PLANO-animacao.md`.
+
 ## Arquitetura
 
 ### `renderer`
@@ -91,10 +97,12 @@ Registrar o mesmo tipo duas vezes lança exceção (`EngineContext.registerServi
   passes. `createPass` cria **e enfileira** o passe no frame corrente; `beginFrame` limpa a fila,
   então os passes são criados a cada frame. Não existe `submitPass`. Um passe sem comandos ainda
   executa (o clear dele faz parte do frame).
-- Um frame é descrito por dados: `RenderPassDescriptor` (clear, depth, cull, blend, depth
-  attachment) + `RenderView` (viewport, view, projection) + `RenderCommand`s (mesh, material,
+- Um frame é descrito por dados: `RenderPassDescriptor` (clear, depth test com comparação `DepthCompare` e escrita
+  ligada ou não, cull, blend, depth attachment) + `RenderView` (viewport, view, projection) + `RenderCommand`s (mesh, material,
   model matrix). O `Renderer` executa na ordem de submissão e só reaplica material/uniforms quando
-  o material muda entre comandos consecutivos.
+  o material muda entre comandos consecutivos. O clear de profundidade segue só o `clearDepthBuffer`
+  (a máscara de escrita é ligada durante o clear e depois volta para a `depthWrite` do passe): um
+  passe que só lê a profundidade dos anteriores desliga as duas.
 - O renderer é **OpenGL-only, sem interface de backend** (decisão consciente, ver
   [Ideia futura](#ideia-futura-backend-de-render-como-módulo)). `OpenGLBackend` é um detalhe
   interno do `Renderer` (package-private) que cuida do estado de pass e do framebuffer de depth.
@@ -138,6 +146,10 @@ Registrar o mesmo tipo duas vezes lança exceção (`EngineContext.registerServi
   `Texture`). `Assets.open(path)` abre um `InputStream` com a mesma resolução. Falha lança
   `UncheckedIOException` com a raiz e o caminho. Limpar o cache não libera GPU (as texturas são
   do `Renderer`).
+- `Assets.texture(key, bytes)` decodifica uma imagem em memória (embutida num `.glb`) e
+  `Assets.solidColor(r, g, b, a)` cria a textura 1×1 de uma cor para materiais lisos; as duas
+  usam o mesmo cache. `Assets.normalize(path)` (pura) é a chave de cache, também usada por quem
+  cacheia outros assets por caminho (`Models.loadGltf`).
 
 ### `toolkit2d`
 
@@ -191,7 +203,8 @@ Registrar o mesmo tipo duas vezes lança exceção (`EngineContext.registerServi
 - `DirectionalLight` (volume ortográfico + matrizes de light-space): `covering(direção, centro,
   raio)` cria a luz de sombra a partir da esfera que deve ser coberta, derivando distância,
   extensão e planos near/far. Aceita luz a pino (troca o vetor "para cima" do `lookAt`).
-- `TexturedModel.getModelMatrix()` é a **única fonte** da matriz de modelo: o que desenha (o
+- `Transform` (posição, rotação, escala) é a **única fonte** da matriz de modelo, usada por
+  `TexturedModel` e `SkinnedModel` (`getModelMatrix()` delega para ela): o que desenha (o
   `RenderCommand`) e o que testa picking usam a mesma. Rotação em graus, ordem XYZ, sentido
   **positivo**. A matriz é T·R·S (escala antes de girar), então escala não uniforme não deforma o
   modelo girado; o `SpriteRenderer` segue a mesma ordem.
@@ -199,6 +212,44 @@ Registrar o mesmo tipo duas vezes lança exceção (`EngineContext.registerServi
   `Mesh.bounds()` (renderer) guarda a caixa local calculada na criação; `Bounds` é um tipo de valor
   sem GPU. O `Input` tem `isMouseButtonPressed` (borda de subida do botão). Ver
   [Picking](#picking).
+
+### `animation`
+
+- **Puro e sem GL**: só JOML, testável sem contexto (JUnit). Nada avança sozinho: o jogo chama
+  `animator.update(dt)` no loop.
+- `Skeleton` (imutável): juntas com pai antes do filho (`parent(j) < j`), repouso T/R/S e inversa
+  de bind; `Skeleton.ofRestPose` monta um esqueleto em código amarrado no repouso.
+- `Pose` (uma por instância): T/R/S locais mutáveis; `computeModelSpace()` e
+  `skinningPalette(float[])` (`modelo[j] * inversaDeBind[j]`, 16 floats por junta), sem alocar.
+- `AnimationClip` = `Track`s (junta, canal T/R/S, tempos, valores, `STEP`/`LINEAR`/`CUBICSPLINE`
+  como no glTF; rotação linear por slerp pelo caminho curto). `sample` só escreve os canais que
+  tem.
+- `Animator`: dois slots (atual e saindo) para crossfade; um crossfade no meio de outro congela a
+  pose misturada como origem. Velocidade negativa toca ao contrário.
+- **IK** (`animation.ik`): solvers como instâncias reutilizáveis (scratch próprio, não
+  thread-safe), no espaço do modelo, escrevendo rotações locais, com peso 0..1. Ordem no frame:
+  clip → cópia da pose → IK → `SkinnedModel.update`. O `Animator` fica com a pose limpa.
+
+### Animação no `toolkit3d` e no `renderer`
+
+- `renderer` não sabe o que é osso: `MeshData`/`Mesh` aceitam juntas e pesos (atributos 3 e 4) e
+  `RenderCommand.jointPalette` vai para o uniform `uJoints` a cada comando (cada instância tem a
+  sua pose mesmo compartilhando material).
+- `Shaders.SKINNED_VERTEX` e `SHADOW_DEPTH_SKINNED_VERTEX` (até `Shaders.MAX_JOINTS = 128`);
+  `LitMaterials.createSkinned`; `ShadowMap.casters(SkinnedModel)`.
+- Material customizado: `SkinnedMaterials` (`createSkinned(Texture baseColor)`), implementada por
+  `LitMaterials` (o padrão) e por um jogo com shader próprio; `ModelAsset.instance(SkinnedMaterials)`
+  cria cada parte com a cor base dela. A escolha é na instância, não no `loadGltf`, porque o asset é
+  compartilhado (o mesmo arquivo pode ter visuais diferentes).
+- `SkinnedModel`: partes (mesh com skin + material) e esqueleto, com o mesmo `Transform` do
+  `TexturedModel`; `commands()` e `ShadowMap.casters` copiam a matriz e compartilham uma cópia do
+  palette por `update` (o próximo `update` cria outra, então os comandos do frame continuam válidos).
+- **glTF** (`Models.loadGltf` → `ModelAsset`): loader próprio (`GltfReader`, `GltfData`,
+  package-private), `.gltf` e `.glb`. Todo nó necessário da cena vira junta (nós intermediários
+  como o "Armature" funcionam; malhas sem skin ficam presas ao próprio nó), UV sem inversão. Vai
+  para os avisos (stderr) o que é ignorado: morph targets, canais `weights`, mais de 4 influências
+  por vértice (`JOINTS_1`) e uma junta com inversas de bind diferentes em duas skins (vale a primeira).
+  Detalhes e o que não é suportado em `docs/PLANO-animacao.md` (§7.4).
 
 ### `demos`
 
@@ -209,6 +260,7 @@ Registrar o mesmo tipo duas vezes lança exceção (`EngineContext.registerServi
 | `SnakeGame` | 2D com `Canvas` | comparado por pixel com o desenho anterior |
 | `SpriteEditor` | 2D com `Canvas` (editor de pixel art) | comparado por pixel com o desenho anterior |
 | `ShadowCubeDemo` | `Engine` + `Renderer` direto, shadow mapping em 2 passes, estilo funcional | não |
+| `animation.AnimationDemo` | Fox glTF (Khronos, CC-BY, ver `resources/models/ATTRIBUTION.md`) com 3 clips e crossfade; alvo no mouse perseguido por two-bone (pata), look-at (cabeça) e FABRIK (tentáculo gerado em código, `Tentacle`); sombras | frames capturados por harness descartável (render e IK); interação com mouse/teclado não exercitada |
 
 "Comparado por pixel" = na migração, o framebuffer do desenho novo foi comparado com o do código
 anterior para a mesma cena (0 bytes diferentes), com harness descartável fora do repositório.
@@ -262,6 +314,10 @@ trabalho em `java-game-engine-demos/` (o `exec:exec` já faz isso).
   foram removidos (o do Linux estava em LWJGL 3.2.3, e o `renderer` dependia direto do de macOS).
   O POM raiz tem profiles ativados por SO/arquitetura que definem `lwjgl.natives`; só o `demos`
   declara os natives, como `runtime`. `renderer` e `core` dependem apenas das APIs.
+- Gson 2.15.0 (só no `toolkit3d`, para o JSON do glTF, modo estrito): a leitura do JSON não é
+  trabalho da engine; o `GltfReader` continua próprio porque converter para `Skeleton`/`Track`/
+  `MeshData` seria código da engine com qualquer biblioteca. Traz `error_prone_annotations`
+  (só anotações).
 - LWJGL 3.3.6, JOML 1.10.8 (há 3.4.3 e 1.10.9, não adotados), `maven.compiler.release=17`,
   encoding UTF-8. `lwjgl-assimp` e
   `lwjgl-openal` saíram: nada no código os usa.
@@ -320,7 +376,7 @@ Decisões:
 - Rodar um demo em Linux/Windows para validar os profiles de natives.
 - O warning `Uniform 'uNormal' not found in shader program` aparece nos demos 2D e no
   ShadowCubeDemo. O `Renderer` seta `uNormal` em todo draw, e shaders que não o declaram (os 2D e
-  o de shadow) geram o aviso. É ruído de log, não foi investigado a fundo.
+  os de shadow, inclusive o skinned) geram o aviso. É ruído de log, não foi investigado a fundo.
 
 **Design**
 - Adiado de propósito (só se surgir outro backend de render): `Mesh`/`Shader`/`Texture` ainda são
@@ -331,8 +387,19 @@ Decisões:
 - O teste por pixel dos demos 2D (seção Demos) é anterior à mudança da matriz de sprite para
   T·R·S e à remoção do `flip()` em `Texture`; as duas não mudam o resultado para os demos atuais
   (sprites quadrados, buffer já na posição 0), mas a comparação não foi refeita.
-- Testes: `Engine`, `EngineContext`, `Material` e `RenderPass` são testáveis sem contexto GL.
-  Ficam para outro momento (exige adicionar JUnit ao build).
+- Testes: o JUnit 5 entrou com a animação (`animation`, validação de skin no `renderer`, JSON e
+  glTF no `toolkit3d`; `./mvnw test`). `Engine`, `EngineContext`, `Material` e `RenderPass`
+  continuam sem testes, embora sejam testáveis sem contexto GL. `RenderPassDescriptor` e a tradução do estado de
+  passe para OpenGL (`OpenGLBackend.depthFunction`) têm testes sem contexto GL.
+- Animação, fora do escopo da primeira versão: camadas com máscara e blend aditivo, root motion,
+  eventos de animação, morph targets, limites angulares de junta no IK, palette em UBO/textura
+  (mais de 128 juntas), extensões glTF (Draco, `KHR_texture_transform`, PBR), mais de 4 influências
+  por vértice.
+- IK: cada solver recalcula o espaço do modelo do esqueleto inteiro várias vezes por chamada (o
+  FABRIK, uma vez por junta da cadeia). Irrelevante com dezenas de juntas; com esqueletos grandes,
+  recalcular só a subárvore da cadeia.
+- `RenderCommand.jointPalette` é um dado por comando específico de skinning. Se surgir outro
+  (instancing, pesos de morph), generalizar para "uniforms por comando" em vez de mais um campo.
 
 **Modelos de xadrez:** se forem reexportados corretamente, reverter para `cullFace(true)` em
 `ChessRenderer` e tirar o `flipNormals` da chamada de `models.load` em

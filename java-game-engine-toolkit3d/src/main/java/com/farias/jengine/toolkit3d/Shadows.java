@@ -12,6 +12,7 @@ public final class Shadows {
 
     private final Renderer renderer;
     private Material casterMaterial;
+    private Material skinnedCasterMaterial;
 
     Shadows(Renderer renderer) {
         this.renderer = renderer;
@@ -34,7 +35,10 @@ public final class Shadows {
         if (casterMaterial == null) {
             casterMaterial = renderer.createMaterial(
                     renderer.createShader(Shaders.SHADOW_DEPTH_VERTEX, Shaders.SHADOW_DEPTH_FRAGMENT));
+            skinnedCasterMaterial = renderer.createMaterial(
+                    renderer.createShader(Shaders.SHADOW_DEPTH_SKINNED_VERTEX, Shaders.SHADOW_DEPTH_FRAGMENT));
         }
-        return new ShadowMap(renderer.createDepthTexture(size, size), light, casterMaterial, bias);
+        return new ShadowMap(renderer.createDepthTexture(size, size), light, casterMaterial, skinnedCasterMaterial,
+                bias);
     }
 }

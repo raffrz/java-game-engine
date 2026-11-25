@@ -182,6 +182,11 @@ public final class Renderer {
             modelMatrix.normal(normalMatrix);
             currentShader.setMatrix4f("uModel", modelMatrix);
             currentShader.setMatrix3f("uNormal", normalMatrix);
+            float[] jointPalette = command.jointPalette();
+            if (jointPalette != null) {
+                currentShader.setMatrix4fArray(RenderCommand.JOINTS_UNIFORM, jointPalette,
+                        jointPalette.length / RenderCommand.FLOATS_PER_JOINT);
+            }
 
             command.mesh().draw();
         }
