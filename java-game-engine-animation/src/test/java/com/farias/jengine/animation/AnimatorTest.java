@@ -122,4 +122,17 @@ class AnimatorTest {
         Poses.blend(a, b, 0f, a);
         assertEquals(new Quaternionf(), a.rotation(0));
     }
+
+    @Test
+    void reverseSpeedStartsANonLoopingClipAtItsEnd() {
+        Animator animator = new Animator(skeleton).speed(-1f).play(slide("s", 0, 10, 2), false);
+        assertEquals(2f, animator.time(), EPS);
+        assertEquals(10f, rootX(animator), EPS);
+        assertFalse(animator.finished());
+        animator.update(0.5f);
+        assertEquals(7.5f, rootX(animator), EPS);
+        animator.update(5f);
+        assertTrue(animator.finished());
+        assertEquals(0f, rootX(animator), EPS);
+    }
 }

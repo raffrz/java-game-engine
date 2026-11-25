@@ -16,6 +16,7 @@ final class IkJoints {
 
     private final Quaternionf world = new Quaternionf();
     private final Quaternionf change = new Quaternionf();
+    private final Quaternionf identity = new Quaternionf();
 
     /** Posição da junta no espaço do modelo (a do último computeModelSpace). */
     Vector3f position(Pose pose, int joint, Vector3f out) {
@@ -42,6 +43,17 @@ final class IkJoints {
     /** Gira por {@code angle} radianos em torno de {@code axis} (unitário, espaço do modelo). */
     void rotateInModelSpace(Pose pose, int joint, Vector3f axis, float angle, Quaternionf scratch) {
         rotateInModelSpace(pose, joint, scratch.fromAxisAngleRad(axis, angle));
+    }
+
+    /**
+     * Escala a rotação pelo peso do solver: {@code weight = 1} a mantém,
+     * menos que isso interpola a partir da identidade (sem rotação).
+     */
+    Quaternionf weighted(Quaternionf rotation, float weight) {
+        if (weight < 1f) {
+            identity.identity().slerp(rotation, weight, rotation);
+        }
+        return rotation;
     }
 
     /** Se {@code descendant} está abaixo de {@code ancestor} na hierarquia. */

@@ -7,8 +7,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.UncheckedIOException;
-import java.nio.ByteBuffer;
-import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -23,7 +21,6 @@ import com.farias.jengine.renderer.Mesh;
 import com.farias.jengine.renderer.MeshData;
 import com.farias.jengine.renderer.Renderer;
 import com.farias.jengine.renderer.Texture;
-import com.farias.jengine.renderer.TextureData;
 
 /**
  * Carrega modelos via {@link Assets}: Wavefront OBJ (estáticos) e glTF 2.0
@@ -41,7 +38,6 @@ public final class Models {
     private final LitMaterials materials;
     private final Map<MeshKey, Mesh> meshes = new HashMap<>();
     private final Map<String, ModelAsset> gltfAssets = new HashMap<>();
-    private final Map<Integer, Texture> colorTextures = new HashMap<>();
 
     Models(Assets assets, Renderer renderer, LitMaterials materials) {
         this.assets = assets;
@@ -89,7 +85,8 @@ public final class Models {
      * @throws UnsupportedOperationException para extensões obrigatórias ou
      *                                       accessors esparsos
      */
-    public ModelAsset loadGltf(String path) {
+    public ModelAsset loadGltf(String file) {
+        String path = Assets.normalize(file);
         ModelAsset cached = gltfAssets.get(path);
         if (cached != null) {
             return cached;
@@ -112,23 +109,10 @@ public final class Models {
     private Texture texture(GltfData.Primitive primitive) {
         GltfData.Image image = primitive.image();
         if (image == null) {
-            return colorTexture(primitive.baseColor());
+            float[] rgba = primitive.baseColor();
+            return assets.solidColor(rgba[0], rgba[1], rgba[2], rgba[3]);
         }
         return image.path() != null ? assets.texture(image.path()) : assets.texture(image.key(), image.bytes());
-    }
-
-    /** Textura 1x1 de uma cor RGBA (0..1), cacheada pela cor. */
-    private Texture colorTexture(float[] rgba) {
-        int packed = 0;
-        for (int i = 0; i < 4; i++) {
-            packed = (packed << 8) | Math.round(Math.max(0f, Math.min(1f, rgba[i])) * 255f);
-        }
-        return colorTextures.computeIfAbsent(packed, color -> {
-            ByteBuffer pixel = ByteBuffer.allocateDirect(4).order(ByteOrder.nativeOrder());
-            pixel.put((byte) (color >>> 24)).put((byte) (color >>> 16)).put((byte) (color >>> 8)).put((byte) (int) color)
-                    .flip();
-            return renderer.createTexture(new TextureData(1, 1, pixel));
-        });
     }
 
     private byte[] readBytes(String path) {
@@ -143,7 +127,6 @@ public final class Models {
     void clear() {
         meshes.clear();
         gltfAssets.clear();
-        colorTextures.clear();
     }
 
     private MeshData read(String objPath, boolean flipNormals) {

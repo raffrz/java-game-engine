@@ -25,7 +25,6 @@ public final class FabrikIk {
     private final Vector3f desired = new Vector3f();
     private final Vector3f direction = new Vector3f();
     private final Quaternionf delta = new Quaternionf();
-    private final Quaternionf identity = new Quaternionf();
     private Vector3f[] positions = new Vector3f[0];
     private float[] lengths = new float[0];
 
@@ -109,11 +108,7 @@ public final class FabrikIk {
             if (direction.lengthSquared() < IkJoints.EPSILON || desired.lengthSquared() < IkJoints.EPSILON) {
                 continue;
             }
-            delta.rotationTo(direction, desired);
-            if (weight < 1f) {
-                identity.identity().slerp(delta, weight, delta);
-            }
-            joints.rotateInModelSpace(pose, chain[i], delta);
+            joints.rotateInModelSpace(pose, chain[i], joints.weighted(delta.rotationTo(direction, desired), weight));
             pose.computeModelSpace();
         }
         return iterations;

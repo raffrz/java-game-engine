@@ -3,6 +3,7 @@ package com.farias.jengine.assets;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
+import java.nio.ByteBuffer;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.HashMap;
@@ -10,6 +11,7 @@ import java.util.Map;
 
 import com.farias.jengine.renderer.Renderer;
 import com.farias.jengine.renderer.Texture;
+import com.farias.jengine.renderer.TextureData;
 
 /**
  * Servico de assets: resolve um caminho relativo primeiro a partir da raiz
@@ -67,6 +69,20 @@ public final class Assets {
     }
 
     /**
+     * Uma textura 1x1 de cor sólida (componentes de 0 a 1, limitados a esse
+     * intervalo), para materiais lisos. Cacheada pela cor em 8 bits: pedir a
+     * mesma cor de novo devolve a mesma textura.
+     */
+    public Texture solidColor(float r, float g, float b, float a) {
+        byte[] rgba = { toByte(r), toByte(g), toByte(b), toByte(a) };
+        String key = String.format("#color:%02x%02x%02x%02x", rgba[0], rgba[1], rgba[2], rgba[3]);
+        return textures.computeIfAbsent(key, k -> {
+            ByteBuffer pixel = ByteBuffer.allocateDirect(4).put(rgba).flip();
+            return renderer.createTexture(new TextureData(1, 1, pixel));
+        });
+    }
+
+    /**
      * Abre o asset para leitura (raiz, depois classpath). Nao cacheia; quem
      * chama fecha o stream.
      */
@@ -95,7 +111,16 @@ public final class Assets {
         textures.clear();
     }
 
-    private static String normalize(String path) {
+    /**
+     * A forma canônica de um caminho de asset ({@code "./a/../b.png"} vira
+     * {@code "b.png"}, separador {@code /}): a chave dos caches de texturas
+     * e de quem cacheia outros assets por caminho.
+     */
+    public static String normalize(String path) {
         return Path.of(path).normalize().toString().replace('\\', '/');
+    }
+
+    private static byte toByte(float component) {
+        return (byte) Math.round(Math.max(0f, Math.min(1f, component)) * 255f);
     }
 }

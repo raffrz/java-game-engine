@@ -17,7 +17,7 @@ import com.farias.jengine.renderer.RenderCommand;
  * Um modelo deformado por esqueleto: uma ou mais partes (mesh com skin +
  * material, tipicamente de {@link LitMaterials#createSkinned}) que
  * compartilham um {@link Skeleton}, com posição, rotação e escala no mundo
- * como em {@link TexturedModel}.
+ * ({@link Transform}, como em {@link TexturedModel}).
  *
  * <p>
  * A pose vem de fora: a cada frame o jogo calcula uma {@link Pose} (com um
@@ -44,9 +44,9 @@ public final class SkinnedModel {
     private final List<Part> parts;
     private final Skeleton skeleton;
     private final float[] palette;
-    private final Vector3f position = new Vector3f();
-    private final Vector3f rotation = new Vector3f();
-    private final Vector3f scale = new Vector3f(1, 1, 1);
+    // cópia do palette entregue aos comandos; refeita só depois de um update
+    private float[] snapshot;
+    private final Transform transform = new Transform();
 
     /**
      * Começa na pose de repouso do esqueleto.
@@ -88,12 +88,15 @@ public final class SkinnedModel {
             throw new IllegalArgumentException("pose belongs to another skeleton");
         }
         pose.skinningPalette(palette);
+        snapshot = null;
     }
 
     /**
      * Os comandos que desenham o modelo na pose do último {@link #update},
      * um por parte. Matriz de modelo e palette são cópias: os comandos podem
-     * ser guardados até o {@code endFrame} mesmo que o modelo mude antes.
+     * ser guardados até o {@code endFrame} mesmo que o modelo mude antes. A
+     * cópia do palette é uma por {@link #update}, compartilhada por estes
+     * comandos e pelos de sombra ({@link ShadowMap#casters}).
      */
     public List<RenderCommand> commands() {
         Matrix4f modelMatrix = getModelMatrix();
@@ -105,12 +108,9 @@ public final class SkinnedModel {
         return commands;
     }
 
-    /** Matriz de modelo nova, T * R * S, com a mesma convenção de {@link TexturedModel}. */
+    /** Matriz de modelo nova, T * R * S (ver {@link Transform}). */
     public Matrix4f getModelMatrix() {
-        return new Matrix4f().translation(position)
-                .rotateXYZ((float) Math.toRadians(rotation.x), (float) Math.toRadians(rotation.y),
-                        (float) Math.toRadians(rotation.z))
-                .scale(scale);
+        return transform.matrix();
     }
 
     /**
@@ -139,9 +139,16 @@ public final class SkinnedModel {
         return getModelMatrix().mul(pose.modelSpace(joint), out);
     }
 
-    /** Cópia do palette atual, para comandos que vivem até o fim do frame. */
+    /**
+     * Cópia do palette do último {@link #update}, para comandos que vivem até
+     * o fim do frame. Nunca é alterada depois de entregue: o próximo update
+     * cria outra.
+     */
     float[] paletteSnapshot() {
-        return palette.clone();
+        if (snapshot == null) {
+            snapshot = palette.clone();
+        }
+        return snapshot;
     }
 
     public List<Part> parts() {
@@ -159,23 +166,22 @@ public final class SkinnedModel {
      * @throws IllegalStateException se a parte usa outro tipo de material
      */
     public LitMaterial lit(int part) {
-        Material material = parts.get(part).material();
-        if (material instanceof LitMaterial lit) {
-            return lit;
-        }
-        throw new IllegalStateException("O material da parte " + part + " não é um LitMaterial: "
-                + material.getClass().getName());
+        return LitMaterial.of(parts.get(part).material(), "da parte " + part);
+    }
+
+    public Transform transform() {
+        return transform;
     }
 
     public Vector3f getPosition() {
-        return position;
+        return transform.position();
     }
 
     public Vector3f getRotation() {
-        return rotation;
+        return transform.rotation();
     }
 
     public Vector3f getScale() {
-        return scale;
+        return transform.scale();
     }
 }

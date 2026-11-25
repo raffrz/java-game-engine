@@ -1,7 +1,5 @@
 package com.farias.jengine.animation;
 
-import org.joml.Quaternionf;
-
 /** Operações puras entre poses. */
 public final class Poses {
 
@@ -20,9 +18,7 @@ public final class Poses {
         for (int j = 0; j < a.jointCount(); j++) {
             a.translation(j).lerp(b.translation(j), weight, out.translation(j));
             a.scale(j).lerp(b.scale(j), weight, out.scale(j));
-            Quaternionf ra = a.rotation(j);
-            Quaternionf rb = b.rotation(j);
-            Track.slerpShortest(ra.x, ra.y, ra.z, ra.w, rb.x, rb.y, rb.z, rb.w, weight, out.rotation(j));
+            a.rotation(j).slerp(b.rotation(j), weight, out.rotation(j)).normalize();
         }
     }
 }

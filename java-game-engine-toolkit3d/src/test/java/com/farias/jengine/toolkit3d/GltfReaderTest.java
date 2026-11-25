@@ -148,6 +148,41 @@ class GltfReaderTest {
     }
 
     @Test
+    void warnsAboutMoreThanFourInfluences() {
+        GltfData data = embeddedWith("\"JOINTS_0\": 4, \"WEIGHTS_0\": 5}",
+                "\"JOINTS_0\": 4, \"WEIGHTS_0\": 5, \"JOINTS_1\": 4, \"WEIGHTS_1\": 5}");
+        assertTrue(data.warnings().stream().anyMatch(w -> w.contains("more than 4")), data.warnings().toString());
+    }
+
+    @Test
+    void sharedJointKeepsTheFirstInverseBindAndWarns() {
+        // a segunda skin lista as mesmas juntas sem inverseBindMatrices (identidade), diferente da primeira
+        GltfData data = embeddedWith("\"skins\": [{\"joints\": [1, 2], \"inverseBindMatrices\": 6}]",
+                "\"skins\": [{\"joints\": [1, 2], \"inverseBindMatrices\": 6}, {\"joints\": [1, 2]}]");
+        assertTrue(data.warnings().stream().anyMatch(w -> w.contains("inverse bind")), data.warnings().toString());
+        Skeleton original = embedded().skeleton();
+        for (int j = 0; j < original.jointCount(); j++) {
+            assertTrue(original.inverseBind(j).equals(data.skeleton().inverseBind(j), EPS), "joint " + j);
+        }
+    }
+
+    /** O glTF de teste com {@code from} trocado por {@code to} no JSON. */
+    private static GltfData embeddedWith(String from, String to) {
+        String json = new String(TestGltf.embedded(), StandardCharsets.UTF_8);
+        assertTrue(json.contains(from), from);
+        return GltfReader.read("models/test.gltf", json.replace(from, to).getBytes(StandardCharsets.UTF_8), NO_FILES);
+    }
+
+    @Test
+    void rejectsInvalidJson() {
+        for (String json : new String[] { "{\"asset\" 1}", "[1, 2", "{} x", "{'asset': {}}", "" }) {
+            IllegalArgumentException error = assertThrows(IllegalArgumentException.class,
+                    () -> GltfReader.read("bad.gltf", json.getBytes(StandardCharsets.UTF_8), NO_FILES), json);
+            assertTrue(error.getMessage().contains("bad.gltf"), error.getMessage());
+        }
+    }
+
+    @Test
     void rejectsRequiredExtensions() {
         String json = "{\"asset\": {\"version\": \"2.0\"}, \"extensionsRequired\": [\"KHR_draco_mesh_compression\"]}";
         assertThrows(UnsupportedOperationException.class,

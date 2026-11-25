@@ -1,7 +1,5 @@
 package com.farias.jengine.examples.animation;
 
-import java.nio.ByteBuffer;
-import java.nio.ByteOrder;
 import java.nio.file.Path;
 import java.util.List;
 
@@ -15,6 +13,7 @@ import com.farias.jengine.animation.Pose;
 import com.farias.jengine.animation.ik.FabrikIk;
 import com.farias.jengine.animation.ik.LookAtIk;
 import com.farias.jengine.animation.ik.TwoBoneIk;
+import com.farias.jengine.assets.Assets;
 import com.farias.jengine.assets.AssetsModule;
 import com.farias.jengine.core.Engine;
 import com.farias.jengine.core.EngineContext;
@@ -28,8 +27,6 @@ import com.farias.jengine.renderer.RenderPassDescriptor;
 import com.farias.jengine.renderer.RenderView;
 import com.farias.jengine.renderer.Renderer;
 import com.farias.jengine.renderer.RendererModule;
-import com.farias.jengine.renderer.Texture;
-import com.farias.jengine.renderer.TextureData;
 import com.farias.jengine.toolkit2d.Toolkit2D;
 import com.farias.jengine.toolkit2d.Toolkit2DModule;
 import com.farias.jengine.toolkit2d.Ui;
@@ -66,6 +63,11 @@ public final class AnimationDemo {
     private static final float CROSS_FADE_SECONDS = 0.3f;
     /** O Fox está em centímetros. */
     private static final float FOX_SCALE = 0.02f;
+    /**
+     * Quanto o pole do cotovelo fica atrás do cotovelo (-Z no espaço do
+     * modelo, em centímetros do Fox): a pata dianteira dobra para trás.
+     */
+    private static final float ELBOW_POLE_BEHIND = 40f;
 
     // juntas do Fox usadas pelo IK
     private static final String SHOULDER = "b_LeftUpperArm_09";
@@ -126,6 +128,7 @@ public final class AnimationDemo {
         renderer = context.require(Renderer.class);
         ui = context.require(Toolkit2D.class).ui(WINDOW_WIDTH, WINDOW_HEIGHT);
         LitMaterials materials = context.require(LitMaterials.class);
+        Assets assets = context.require(Assets.class);
         Shapes shapes = context.require(Shapes.class);
 
         DirectionalLight light = DirectionalLight.covering(new Vector3f(0.5f, 2f, 1.2f), new Vector3f(0, 0.5f, 0), 3f);
@@ -145,15 +148,15 @@ public final class AnimationDemo {
 
         tentacle = new SkinnedModel(
                 renderer.createMesh(Tentacle.mesh(TENTACLE_SEGMENTS, TENTACLE_SEGMENT_LENGTH, 0.12f, 0.025f)),
-                materials.createSkinned(color(0.55f, 0.25f, 0.7f)).receiving(shadow)
+                materials.createSkinned(assets.solidColor(0.55f, 0.25f, 0.7f, 1f)).receiving(shadow)
                         .glossy(0.4f, 32f, new Vector3f(1, 1, 1).normalize()),
                 Tentacle.skeleton(TENTACLE_SEGMENTS, TENTACLE_SEGMENT_LENGTH));
         tentacle.getPosition().set(-1.3f, 0f, 0.5f);
         tentaclePose = new Pose(tentacle.skeleton());
 
-        ground = new TexturedModel(shapes.floor(), materials.create(color(0.42f, 0.5f, 0.38f)).receiving(shadow));
+        ground = new TexturedModel(shapes.floor(), materials.create(assets.solidColor(0.42f, 0.5f, 0.38f, 1f)).receiving(shadow));
         ground.getScale().set(8f, 1f, 8f);
-        marker = new TexturedModel(shapes.cube(), materials.create(color(0.95f, 0.2f, 0.15f)));
+        marker = new TexturedModel(shapes.cube(), materials.create(assets.solidColor(0.95f, 0.2f, 0.15f, 1f)));
         marker.getScale().set(0.08f);
     }
 
@@ -170,13 +173,6 @@ public final class AnimationDemo {
         rest.computeModelSpace();
         Quaternionf rotation = rest.modelSpace(joint).getNormalizedRotation(new Quaternionf());
         return rotation.conjugate().transform(modelAxis).normalize();
-    }
-
-    /** Textura 1x1 de uma cor, para materiais lisos. */
-    private Texture color(float r, float g, float b) {
-        ByteBuffer pixel = ByteBuffer.allocateDirect(4).order(ByteOrder.nativeOrder());
-        pixel.put((byte) (r * 255)).put((byte) (g * 255)).put((byte) (b * 255)).put((byte) 255).flip();
-        return renderer.createTexture(new TextureData(1, 1, pixel));
     }
 
     private void run() {
@@ -260,8 +256,8 @@ public final class AnimationDemo {
         foxPose.set(animator.pose());
         foxModel.toModelSpace(target, modelTarget);
         if (pawOn) {
-            // o cotovelo da pata dianteira dobra para trás (-Z no espaço do modelo)
-            foxPose.computeModelSpace().modelSpace(elbow).getTranslation(elbowPosition).add(0f, 0f, -40f);
+            foxPose.computeModelSpace().modelSpace(elbow).getTranslation(elbowPosition)
+                    .add(0f, 0f, -ELBOW_POLE_BEHIND);
             pawIk.solve(foxPose, shoulder, elbow, paw, modelTarget, elbowPosition, 1f);
         }
         if (lookOn) {

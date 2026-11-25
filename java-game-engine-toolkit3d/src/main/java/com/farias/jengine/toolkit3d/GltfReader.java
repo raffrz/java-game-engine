@@ -19,6 +19,11 @@ import org.joml.Matrix4f;
 import org.joml.Quaternionf;
 import org.joml.Vector3f;
 
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
+import com.google.gson.JsonParseException;
+import com.google.gson.Strictness;
+
 import com.farias.jengine.animation.AnimationClip;
 import com.farias.jengine.animation.Interpolation;
 import com.farias.jengine.animation.Skeleton;
@@ -51,10 +56,20 @@ import com.farias.jengine.renderer.MeshData;
  */
 final class GltfReader {
 
+    /** JSON estrito (RFC 8259): objetos viram {@code Map}, arrays {@code List}, números {@code Double}. */
+    private static final Gson GSON = new GsonBuilder().setStrictness(Strictness.STRICT).create();
+
     private static final int GLB_MAGIC = 0x46546C67; // "glTF"
     private static final int CHUNK_JSON = 0x4E4F534A;
     private static final int CHUNK_BIN = 0x004E4942;
     private static final int MODE_TRIANGLES = 4;
+    // componentType dos accessors
+    private static final int BYTE = 5120;
+    private static final int UNSIGNED_BYTE = 5121;
+    private static final int SHORT = 5122;
+    private static final int UNSIGNED_SHORT = 5123;
+    private static final int UNSIGNED_INT = 5125;
+    private static final int FLOAT = 5126;
 
     private final String path;
     private final String directory;
@@ -85,111 +100,24 @@ final class GltfReader {
     // ---- topo ----
 
     private GltfData read(byte[] file) {
-        root = asMap(Json.parse(jsonText(file)), "root");
+        root = parseJson(jsonText(file));
         List<Object> required = list(root, "extensionsRequired");
         if (!required.isEmpty()) {
             throw unsupported("required extensions " + required);
         }
         loadBuffers();
 
-        List<Object> nodes = list(root, "nodes");
-        int nodeCount = nodes.size();
-        int[] parentOf = new int[nodeCount];
-        Arrays.fill(parentOf, -1);
-        for (int n = 0; n < nodeCount; n++) {
-            for (Object child : list(node(n), "children")) {
-                parentOf[toInt(child)] = n;
-            }
-        }
-
-        Vector3f[] translations = new Vector3f[nodeCount];
-        Quaternionf[] rotations = new Quaternionf[nodeCount];
-        Vector3f[] scales = new Vector3f[nodeCount];
-        for (int n = 0; n < nodeCount; n++) {
-            readLocal(node(n), translations[n] = new Vector3f(), rotations[n] = new Quaternionf(),
-                    scales[n] = new Vector3f());
-        }
-        Matrix4f[] world = new Matrix4f[nodeCount];
-        for (int n = 0; n < nodeCount; n++) {
-            worldOf(n, parentOf, translations, rotations, scales, world);
-        }
-
-        // nós necessários: juntas, nós com malha da cena e os ancestrais
-        Set<Integer> needed = new HashSet<>();
-        List<Object> skins = list(root, "skins");
-        for (Object skin : skins) {
-            for (Object joint : list(asMap(skin, "skin"), "joints")) {
-                needed.add(toInt(joint));
-            }
-        }
-        List<Integer> meshNodes = new ArrayList<>();
-        for (int n : sceneNodes(parentOf)) {
-            if (node(n).containsKey("mesh")) {
-                meshNodes.add(n);
-                needed.add(n);
-            }
-        }
-        for (int n : new ArrayList<>(needed)) {
-            for (int p = parentOf[n]; p >= 0; p = parentOf[p]) {
-                needed.add(p);
-            }
-        }
-        if (needed.isEmpty()) {
-            throw new IllegalArgumentException("glTF '" + path + "' has no meshes");
-        }
-
-        int[] depth = new int[nodeCount];
-        for (int n = 0; n < nodeCount; n++) {
-            for (int p = parentOf[n]; p >= 0; p = parentOf[p]) {
-                depth[n]++;
-            }
-        }
-        List<Integer> order = new ArrayList<>(needed);
-        order.sort(Comparator.<Integer>comparingInt(n -> depth[n]).thenComparingInt(n -> n));
-        int[] jointOf = new int[nodeCount];
+        int[] parentOf = parentOf();
+        NodeTransforms rest = restTransforms(parentOf);
+        List<Integer> meshNodes = meshNodes(parentOf);
+        List<Integer> order = jointOrder(neededNodes(meshNodes, parentOf), parentOf);
+        int[] jointOf = new int[parentOf.length];
         Arrays.fill(jointOf, -1);
         for (int j = 0; j < order.size(); j++) {
             jointOf[order.get(j)] = j;
         }
-
-        Matrix4f[] inverseBindByNode = new Matrix4f[nodeCount];
-        for (Object skinObject : skins) {
-            Map<String, Object> skin = asMap(skinObject, "skin");
-            List<Object> joints = list(skin, "joints");
-            float[] matrices = skin.containsKey("inverseBindMatrices")
-                    ? floats(toInt(skin.get("inverseBindMatrices")))
-                    : null;
-            for (int k = 0; k < joints.size(); k++) {
-                int n = toInt(joints.get(k));
-                if (inverseBindByNode[n] == null) {
-                    inverseBindByNode[n] = matrices == null ? new Matrix4f() : new Matrix4f().set(matrices, k * 16);
-                }
-            }
-        }
-
-        int count = order.size();
-        String[] names = new String[count];
-        int[] parents = new int[count];
-        Vector3f[] restT = new Vector3f[count];
-        Quaternionf[] restR = new Quaternionf[count];
-        Vector3f[] restS = new Vector3f[count];
-        Matrix4f[] inverseBinds = new Matrix4f[count];
-        Set<String> usedNames = new HashSet<>();
-        for (int j = 0; j < count; j++) {
-            int n = order.get(j);
-            String name = string(node(n), "name", "node" + n);
-            names[j] = usedNames.add(name) ? name : name + "#" + n;
-            usedNames.add(names[j]);
-            parents[j] = parentOf[n] < 0 ? -1 : jointOf[parentOf[n]];
-            restT[j] = translations[n];
-            restR[j] = rotations[n];
-            restS[j] = scales[n];
-            if (inverseBindByNode[n] == null) {
-                inverseBindByNode[n] = new Matrix4f(world[n]).invert();
-            }
-            inverseBinds[j] = inverseBindByNode[n];
-        }
-        Skeleton skeleton = new Skeleton(names, parents, restT, restR, restS, inverseBinds);
+        Matrix4f[] inverseBindByNode = inverseBindByNode(order, rest.world());
+        Skeleton skeleton = skeleton(order, parentOf, jointOf, rest, inverseBindByNode);
 
         List<GltfData.Primitive> primitives = new ArrayList<>();
         for (int n : meshNodes) {
@@ -203,7 +131,7 @@ final class GltfReader {
         ByteBuffer data = ByteBuffer.wrap(file).order(ByteOrder.LITTLE_ENDIAN);
         if (file.length < 12 || data.getInt(0) != GLB_MAGIC) {
             String text = new String(file, StandardCharsets.UTF_8);
-            return text.startsWith("﻿") ? text.substring(1) : text;
+            return text.startsWith("\uFEFF") ? text.substring(1) : text;
         }
         int version = data.getInt(4);
         if (version != 2) {
@@ -230,6 +158,20 @@ final class GltfReader {
             throw new IllegalArgumentException("glTF '" + path + "': GLB without JSON chunk");
         }
         return json;
+    }
+
+    /** O objeto JSON da raiz do arquivo. */
+    private Map<String, Object> parseJson(String text) {
+        Object parsed;
+        try {
+            parsed = GSON.fromJson(text, Object.class);
+        } catch (JsonParseException e) {
+            throw new IllegalArgumentException("glTF '" + path + "': invalid JSON: " + e.getMessage(), e);
+        }
+        if (!(parsed instanceof Map<?, ?>)) {
+            throw new IllegalArgumentException("glTF '" + path + "': the JSON root is not an object");
+        }
+        return asMap(parsed, "root");
     }
 
     private void loadBuffers() {
@@ -266,10 +208,47 @@ final class GltfReader {
         return directory + URLDecoder.decode(uri.replace("+", "%2B"), StandardCharsets.UTF_8);
     }
 
-    // ---- nós ----
+    // ---- nós e esqueleto ----
+
+    /**
+     * Transformações de repouso de todos os nós: as locais (T, R, S) e a de
+     * mundo.
+     */
+    private record NodeTransforms(Vector3f[] translations, Quaternionf[] rotations, Vector3f[] scales,
+            Matrix4f[] world) {
+    }
 
     private Map<String, Object> node(int index) {
         return asMap(list(root, "nodes").get(index), "node");
+    }
+
+    /** O pai de cada nó, ou -1 nas raízes. */
+    private int[] parentOf() {
+        int nodeCount = list(root, "nodes").size();
+        int[] parentOf = new int[nodeCount];
+        Arrays.fill(parentOf, -1);
+        for (int n = 0; n < nodeCount; n++) {
+            for (Object child : list(node(n), "children")) {
+                parentOf[toInt(child)] = n;
+            }
+        }
+        return parentOf;
+    }
+
+    private NodeTransforms restTransforms(int[] parentOf) {
+        int nodeCount = parentOf.length;
+        NodeTransforms rest = new NodeTransforms(new Vector3f[nodeCount], new Quaternionf[nodeCount],
+                new Vector3f[nodeCount], new Matrix4f[nodeCount]);
+        for (int n = 0; n < nodeCount; n++) {
+            rest.translations()[n] = new Vector3f();
+            rest.rotations()[n] = new Quaternionf();
+            rest.scales()[n] = new Vector3f();
+            readLocal(node(n), rest.translations()[n], rest.rotations()[n], rest.scales()[n]);
+        }
+        for (int n = 0; n < nodeCount; n++) {
+            worldOf(n, parentOf, rest);
+        }
+        return rest;
     }
 
     private static void readLocal(Map<String, Object> node, Vector3f t, Quaternionf r, Vector3f s) {
@@ -288,13 +267,114 @@ final class GltfReader {
         s.set(scale[0], scale[1], scale[2]);
     }
 
-    private static Matrix4f worldOf(int n, int[] parentOf, Vector3f[] t, Quaternionf[] r, Vector3f[] s,
-            Matrix4f[] world) {
+    private static Matrix4f worldOf(int n, int[] parentOf, NodeTransforms rest) {
+        Matrix4f[] world = rest.world();
         if (world[n] == null) {
-            Matrix4f local = new Matrix4f().translationRotateScale(t[n], r[n], s[n]);
-            world[n] = parentOf[n] < 0 ? local : new Matrix4f(worldOf(parentOf[n], parentOf, t, r, s, world)).mul(local);
+            Matrix4f local = new Matrix4f().translationRotateScale(rest.translations()[n], rest.rotations()[n],
+                    rest.scales()[n]);
+            world[n] = parentOf[n] < 0 ? local : new Matrix4f(worldOf(parentOf[n], parentOf, rest)).mul(local);
         }
         return world[n];
+    }
+
+    /** Os nós com malha da cena padrão. */
+    private List<Integer> meshNodes(int[] parentOf) {
+        List<Integer> meshNodes = new ArrayList<>();
+        for (int n : sceneNodes(parentOf)) {
+            if (node(n).containsKey("mesh")) {
+                meshNodes.add(n);
+            }
+        }
+        return meshNodes;
+    }
+
+    /** Os nós que viram juntas: as juntas das skins, os nós com malha e os ancestrais de todos eles. */
+    private Set<Integer> neededNodes(List<Integer> meshNodes, int[] parentOf) {
+        Set<Integer> needed = new HashSet<>(meshNodes);
+        for (Object skin : list(root, "skins")) {
+            for (Object joint : list(asMap(skin, "skin"), "joints")) {
+                needed.add(toInt(joint));
+            }
+        }
+        for (int n : new ArrayList<>(needed)) {
+            for (int p = parentOf[n]; p >= 0; p = parentOf[p]) {
+                needed.add(p);
+            }
+        }
+        if (needed.isEmpty()) {
+            throw new IllegalArgumentException("glTF '" + path + "' has no meshes");
+        }
+        return needed;
+    }
+
+    /** A ordem das juntas: por profundidade (pai antes do filho), depois pelo índice do nó. */
+    private static List<Integer> jointOrder(Set<Integer> needed, int[] parentOf) {
+        int[] depth = new int[parentOf.length];
+        for (int n : needed) {
+            for (int p = parentOf[n]; p >= 0; p = parentOf[p]) {
+                depth[n]++;
+            }
+        }
+        List<Integer> order = new ArrayList<>(needed);
+        order.sort(Comparator.<Integer>comparingInt(n -> depth[n]).thenComparingInt(n -> n));
+        return order;
+    }
+
+    /**
+     * A inversa de bind de cada nó do esqueleto: a da skin que o lista (se
+     * duas skins dão matrizes diferentes, vale a primeira, com aviso) ou, para
+     * nós fora das skins, a inversa da matriz de repouso.
+     */
+    private Matrix4f[] inverseBindByNode(List<Integer> order, Matrix4f[] world) {
+        Matrix4f[] byNode = new Matrix4f[world.length];
+        List<Object> skins = list(root, "skins");
+        for (int s = 0; s < skins.size(); s++) {
+            Map<String, Object> skin = asMap(skins.get(s), "skin");
+            List<Object> joints = list(skin, "joints");
+            float[] matrices = skin.containsKey("inverseBindMatrices")
+                    ? floats(toInt(skin.get("inverseBindMatrices")))
+                    : null;
+            for (int k = 0; k < joints.size(); k++) {
+                int n = toInt(joints.get(k));
+                Matrix4f matrix = matrices == null ? new Matrix4f() : new Matrix4f().set(matrices, k * 16);
+                if (byNode[n] == null) {
+                    byNode[n] = matrix;
+                } else if (!byNode[n].equals(matrix, 1e-4f)) {
+                    warnings.add("skin " + s + ": node " + n
+                            + " has a different inverse bind matrix in another skin; using the first one");
+                }
+            }
+        }
+        for (int n : order) {
+            if (byNode[n] == null) {
+                byNode[n] = new Matrix4f(world[n]).invert();
+            }
+        }
+        return byNode;
+    }
+
+    private Skeleton skeleton(List<Integer> order, int[] parentOf, int[] jointOf, NodeTransforms rest,
+            Matrix4f[] inverseBindByNode) {
+        int count = order.size();
+        String[] names = new String[count];
+        int[] parents = new int[count];
+        Vector3f[] translations = new Vector3f[count];
+        Quaternionf[] rotations = new Quaternionf[count];
+        Vector3f[] scales = new Vector3f[count];
+        Matrix4f[] inverseBinds = new Matrix4f[count];
+        Set<String> usedNames = new HashSet<>();
+        for (int j = 0; j < count; j++) {
+            int n = order.get(j);
+            String name = string(node(n), "name", "node" + n);
+            names[j] = usedNames.add(name) ? name : name + "#" + n;
+            usedNames.add(names[j]);
+            parents[j] = parentOf[n] < 0 ? -1 : jointOf[parentOf[n]];
+            translations[j] = rest.translations()[n];
+            rotations[j] = rest.rotations()[n];
+            scales[j] = rest.scales()[n];
+            inverseBinds[j] = inverseBindByNode[n];
+        }
+        return new Skeleton(names, parents, translations, rotations, scales, inverseBinds);
     }
 
     /** Os nós da cena padrão (ou de todas as raízes, se não há cenas), em profundidade. */
@@ -366,6 +446,9 @@ final class GltfReader {
             boolean skinned = skinJoints != null && attributes.containsKey("JOINTS_0")
                     && attributes.containsKey("WEIGHTS_0");
             if (skinned) {
+                if (attributes.containsKey("JOINTS_1")) {
+                    warnings.add(where + ": more than 4 joint influences per vertex, only JOINTS_0/WEIGHTS_0 used");
+                }
                 int[] rawJoints = ints(toInt(attributes.get("JOINTS_0")));
                 float[] rawWeights = floats(toInt(attributes.get("WEIGHTS_0")));
                 int fallback = jointOf[nodeIndex];
@@ -529,6 +612,20 @@ final class GltfReader {
 
     // ---- accessors ----
 
+    /**
+     * Onde estão os componentes de um accessor: {@code total} componentes,
+     * {@code components} por elemento, elementos a {@code stride} bytes um do
+     * outro a partir de {@code start}. {@code data} null: accessor de zeros
+     * (sem bufferView).
+     */
+    private record AccessorView(ByteBuffer data, int start, int total, int components, int stride,
+            int componentType) {
+
+        int offset(int i) {
+            return start + (i / components) * stride + (i % components) * componentSize(componentType);
+        }
+    }
+
     private static int components(String type) {
         return switch (type) {
             case "SCALAR" -> 1;
@@ -543,9 +640,9 @@ final class GltfReader {
 
     private static int componentSize(int componentType) {
         return switch (componentType) {
-            case 5120, 5121 -> 1;
-            case 5122, 5123 -> 2;
-            case 5125, 5126 -> 4;
+            case BYTE, UNSIGNED_BYTE -> 1;
+            case SHORT, UNSIGNED_SHORT -> 2;
+            case UNSIGNED_INT, FLOAT -> 4;
             default -> throw new IllegalArgumentException("unknown componentType " + componentType);
         };
     }
@@ -553,62 +650,60 @@ final class GltfReader {
     /** Os componentes do accessor, achatados; inteiros normalizados viram [0, 1] ou [-1, 1]. */
     float[] floats(int accessorIndex) {
         Map<String, Object> accessor = accessor(accessorIndex);
-        int componentType = toInt(accessor.get("componentType"));
         boolean normalized = Boolean.TRUE.equals(accessor.get("normalized"));
-        int[] layout = new int[3];
-        ByteBuffer data = accessorData(accessor, layout);
-        int total = layout[0];
-        float[] out = new float[total];
-        if (data == null) {
+        AccessorView view = view(accessor);
+        float[] out = new float[view.total()];
+        if (view.data() == null) {
             return out;
         }
-        int comps = layout[1];
-        int stride = layout[2];
-        int size = componentSize(componentType);
-        int base = data.position();
-        for (int i = 0; i < total; i++) {
-            int offset = base + (i / comps) * stride + (i % comps) * size;
-            out[i] = switch (componentType) {
-                case 5126 -> data.getFloat(offset);
-                case 5120 -> normalized ? Math.max(data.get(offset) / 127f, -1f) : data.get(offset);
-                case 5121 -> normalized ? (data.get(offset) & 0xFF) / 255f : data.get(offset) & 0xFF;
-                case 5122 -> normalized ? Math.max(data.getShort(offset) / 32767f, -1f) : data.getShort(offset);
-                case 5123 -> normalized ? (data.getShort(offset) & 0xFFFF) / 65535f : data.getShort(offset) & 0xFFFF;
-                default -> data.getInt(offset);
-            };
+        int type = view.componentType();
+        for (int i = 0; i < out.length; i++) {
+            int offset = view.offset(i);
+            if (type == FLOAT) {
+                out[i] = view.data().getFloat(offset);
+            } else {
+                int value = integer(view.data(), offset, type);
+                out[i] = normalized ? normalize(value, type) : value;
+            }
         }
         return out;
     }
 
     /** Os componentes inteiros do accessor (índices, juntas), achatados. */
     int[] ints(int accessorIndex) {
-        Map<String, Object> accessor = accessor(accessorIndex);
-        int componentType = toInt(accessor.get("componentType"));
-        if (componentType == 5126) {
+        AccessorView view = view(accessor(accessorIndex));
+        if (view.componentType() == FLOAT) {
             throw new IllegalArgumentException("accessor " + accessorIndex + " is float, expected integers");
         }
-        int[] layout = new int[3];
-        ByteBuffer data = accessorData(accessor, layout);
-        int total = layout[0];
-        int[] out = new int[total];
-        if (data == null) {
+        int[] out = new int[view.total()];
+        if (view.data() == null) {
             return out;
         }
-        int comps = layout[1];
-        int stride = layout[2];
-        int size = componentSize(componentType);
-        int base = data.position();
-        for (int i = 0; i < total; i++) {
-            int offset = base + (i / comps) * stride + (i % comps) * size;
-            out[i] = switch (componentType) {
-                case 5120 -> data.get(offset);
-                case 5121 -> data.get(offset) & 0xFF;
-                case 5122 -> data.getShort(offset);
-                case 5123 -> data.getShort(offset) & 0xFFFF;
-                default -> data.getInt(offset);
-            };
+        for (int i = 0; i < out.length; i++) {
+            out[i] = integer(view.data(), view.offset(i), view.componentType());
         }
         return out;
+    }
+
+    private static int integer(ByteBuffer data, int offset, int componentType) {
+        return switch (componentType) {
+            case BYTE -> data.get(offset);
+            case UNSIGNED_BYTE -> data.get(offset) & 0xFF;
+            case SHORT -> data.getShort(offset);
+            case UNSIGNED_SHORT -> data.getShort(offset) & 0xFFFF;
+            default -> data.getInt(offset);
+        };
+    }
+
+    /** Inteiro normalizado (definição do glTF): sem sinal em [0, 1], com sinal em [-1, 1]. */
+    private static float normalize(int value, int componentType) {
+        return switch (componentType) {
+            case BYTE -> Math.max(value / 127f, -1f);
+            case UNSIGNED_BYTE -> value / 255f;
+            case SHORT -> Math.max(value / 32767f, -1f);
+            case UNSIGNED_SHORT -> value / 65535f;
+            default -> value;
+        };
     }
 
     private Map<String, Object> accessor(int index) {
@@ -619,33 +714,23 @@ final class GltfReader {
         return accessor;
     }
 
-    /**
-     * O buffer do accessor, com a posição no primeiro byte; null se não há
-     * bufferView (accessor de zeros). Preenche layout = {total de
-     * componentes, componentes por elemento, stride em bytes}.
-     */
-    private ByteBuffer accessorData(Map<String, Object> accessor, int[] layout) {
+    private AccessorView view(Map<String, Object> accessor) {
         int count = toInt(accessor.get("count"));
-        int comps = components(string(accessor, "type", "SCALAR"));
-        int size = componentSize(toInt(accessor.get("componentType")));
-        layout[0] = count * comps;
-        layout[1] = comps;
-        layout[2] = comps * size;
+        int components = components(string(accessor, "type", "SCALAR"));
+        int componentType = toInt(accessor.get("componentType"));
+        int size = componentSize(componentType);
         if (!accessor.containsKey("bufferView")) {
-            return null;
+            return new AccessorView(null, 0, count * components, components, components * size, componentType);
         }
-        Map<String, Object> view = bufferView(toInt(accessor.get("bufferView")));
-        if (view.containsKey("byteStride")) {
-            layout[2] = toInt(view.get("byteStride"));
-        }
-        ByteBuffer buffer = buffers[toInt(view.get("buffer"))].duplicate().order(ByteOrder.LITTLE_ENDIAN);
-        int start = intOr(view, "byteOffset", 0) + intOr(accessor, "byteOffset", 0);
-        int end = start + (count - 1) * layout[2] + comps * size;
+        Map<String, Object> bufferView = bufferView(toInt(accessor.get("bufferView")));
+        int stride = intOr(bufferView, "byteStride", components * size);
+        ByteBuffer buffer = buffers[toInt(bufferView.get("buffer"))];
+        int start = intOr(bufferView, "byteOffset", 0) + intOr(accessor, "byteOffset", 0);
+        int end = start + (count - 1) * stride + components * size;
         if (count > 0 && end > buffer.capacity()) {
             throw new IllegalArgumentException("glTF '" + path + "': accessor reads past the end of its buffer");
         }
-        buffer.position(start);
-        return buffer;
+        return new AccessorView(buffer, start, count * components, components, stride, componentType);
     }
 
     private Map<String, Object> bufferView(int index) {

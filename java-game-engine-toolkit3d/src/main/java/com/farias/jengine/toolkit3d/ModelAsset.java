@@ -27,14 +27,14 @@ public final class ModelAsset {
     private final List<Mesh> meshes;
     private final List<Texture> textures;
     private final Map<String, AnimationClip> clips = new LinkedHashMap<>();
-    private final LitMaterials materials;
+    private final SkinnedMaterials defaultMaterials;
 
     ModelAsset(Skeleton skeleton, List<Mesh> meshes, List<Texture> textures, List<AnimationClip> clips,
-            LitMaterials materials) {
+            SkinnedMaterials defaultMaterials) {
         this.skeleton = skeleton;
         this.meshes = List.copyOf(meshes);
         this.textures = List.copyOf(textures);
-        this.materials = materials;
+        this.defaultMaterials = defaultMaterials;
         for (AnimationClip clip : clips) {
             this.clips.putIfAbsent(clip.name(), clip);
         }
@@ -64,7 +64,7 @@ public final class ModelAsset {
      * materiais ({@link LitMaterial}, um por parte), transformação e pose.
      */
     public SkinnedModel instance() {
-        return instance(materials);
+        return instance(defaultMaterials);
     }
 
     /**

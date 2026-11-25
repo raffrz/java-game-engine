@@ -28,6 +28,8 @@ public final class Pose {
     private final Vector3f[] scales;
     private final Matrix4f[] modelSpace;
     private final Matrix4f scratch = new Matrix4f();
+    /** Scratch para quem escreve rotações na pose (o slerp das trilhas), sem alocar por amostra. */
+    final Quaternionf scratchRotation = new Quaternionf();
 
     /** Uma pose no repouso de {@code skeleton}. */
     public Pose(Skeleton skeleton) {

@@ -50,8 +50,9 @@ public final class RenderPassDescriptor {
     }
 
     /**
-     * Se os fragmentos que passam gravam a profundidade. Desligada, o passe só lê a profundidade dos anteriores (um
-     * overlay que não deve esconder nada). Com a escrita desligada, o clear de profundidade do passe não acontece.
+     * Se os fragmentos que passam gravam a profundidade. Desligada, o passe só lê a profundidade (um overlay que não
+     * deve esconder nada). Vale só para os desenhos: o clear de profundidade segue {@link #clearDepthBuffer(boolean)},
+     * então, para ler a profundidade dos passes anteriores, desligue também o clear.
      */
     public RenderPassDescriptor depthWrite(boolean value) {
         this.depthWrite = value;

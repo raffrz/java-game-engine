@@ -39,9 +39,12 @@ public final class Animator {
         this.from = new Pose(skeleton);
     }
 
-    /** Toca {@code clip} do começo, sem transição (corta qualquer crossfade). */
+    /**
+     * Toca {@code clip} do começo, sem transição (corta qualquer crossfade).
+     * Com velocidade negativa, "começo" é o fim do clip.
+     */
     public Animator play(AnimationClip clip, boolean loop) {
-        current = new Slot(Objects.requireNonNull(clip, "clip"), loop);
+        current = startSlot(Objects.requireNonNull(clip, "clip"), loop);
         endFade();
         evaluate();
         return this;
@@ -65,7 +68,7 @@ public final class Animator {
             previous = current;
             fromFrozen = false;
         }
-        current = new Slot(clip, loop);
+        current = startSlot(clip, loop);
         fadeDuration = seconds;
         fadeElapsed = 0f;
         evaluate();
@@ -144,6 +147,15 @@ public final class Animator {
      */
     public Pose pose() {
         return pose;
+    }
+
+    /** Um slot no ponto de partida do sentido em que o tempo anda. */
+    private Slot startSlot(AnimationClip clip, boolean loop) {
+        Slot slot = new Slot(clip, loop);
+        if (speed < 0f) {
+            slot.time = clip.duration();
+        }
+        return slot;
     }
 
     private void endFade() {

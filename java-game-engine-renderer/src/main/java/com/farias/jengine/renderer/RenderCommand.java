@@ -7,7 +7,8 @@ import org.joml.Matrix4f;
  *
  * <p>
  * {@code jointPalette} é opcional ({@code null} em malhas sem skin): as
- * matrizes de skinning de cada junta, column-major, 16 floats por junta. O
+ * matrizes de skinning de cada junta, column-major,
+ * {@value #FLOATS_PER_JOINT} floats por junta. O
  * {@link Renderer} as passa no uniform {@value #JOINTS_UNIFORM} a cada
  * comando, então cada instância animada tem a sua pose mesmo compartilhando
  * material. O array não é copiado: não o altere antes do {@code endFrame}.
@@ -17,10 +18,13 @@ public record RenderCommand(Mesh mesh, Material material, Matrix4f modelMatrix, 
     /** Nome do uniform {@code mat4[]} que recebe {@link #jointPalette()}. */
     public static final String JOINTS_UNIFORM = "uJoints";
 
+    /** Floats por junta em {@link #jointPalette()}: uma {@code mat4}. */
+    public static final int FLOATS_PER_JOINT = 16;
+
     public RenderCommand {
-        if (jointPalette != null && jointPalette.length % 16 != 0) {
-            throw new IllegalArgumentException(
-                    "jointPalette must have 16 floats per joint, got " + jointPalette.length);
+        if (jointPalette != null && jointPalette.length % FLOATS_PER_JOINT != 0) {
+            throw new IllegalArgumentException("jointPalette must have " + FLOATS_PER_JOINT
+                    + " floats per joint, got " + jointPalette.length);
         }
     }
 

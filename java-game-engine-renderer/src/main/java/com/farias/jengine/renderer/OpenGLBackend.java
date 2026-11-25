@@ -24,9 +24,6 @@ final class OpenGLBackend {
         } else {
             glDisable(GL_DEPTH_TEST);
         }
-        // a máscara vale também para o clear: com a escrita desligada, a profundidade dos passes anteriores fica
-        glDepthMask(descriptor.depthWrite());
-
         if (descriptor.cullFace()) {
             glEnable(GL_CULL_FACE);
         } else {
@@ -59,7 +56,11 @@ final class OpenGLBackend {
             clearMask |= GL_DEPTH_BUFFER_BIT;
         }
 
+        // a máscara de escrita também vale para o glClear: liga durante o clear para que clearDepthBuffer seja
+        // obedecido mesmo num passe que não grava profundidade, e só depois aplica a escrita do passe
+        glDepthMask(true);
         glClear(clearMask);
+        glDepthMask(descriptor.depthWrite());
     }
 
     /** A função de profundidade do OpenGL para a comparação do passe. */

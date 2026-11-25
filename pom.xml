@@ -30,6 +30,7 @@
 		<lwjgl.version>3.3.6</lwjgl.version>
 		<joml.version>1.10.8</joml.version>
 		<junit.version>5.12.2</junit.version>
+		<gson.version>2.15.0</gson.version>
 
 		<!-- Preenchidos pelos profiles de plataforma abaixo. -->
 		<lwjgl.natives>natives-linux</lwjgl.natives>
@@ -56,6 +57,11 @@
 				<groupId>org.joml</groupId>
 				<artifactId>joml</artifactId>
 				<version>${joml.version}</version>
+			</dependency>
+			<dependency>
+				<groupId>com.google.code.gson</groupId>
+				<artifactId>gson</artifactId>
+				<version>${gson.version}</version>
 			</dependency>
 			<dependency>
 				<groupId>com.farias.jengine</groupId>

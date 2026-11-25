@@ -75,7 +75,7 @@ public record Track(int joint, Path path, float[] times, float[] values, Interpo
         switch (path) {
             case TRANSLATION -> sampleVector(time, pose.translation(joint));
             case SCALE -> sampleVector(time, pose.scale(joint));
-            case ROTATION -> sampleRotation(time, pose.rotation(joint));
+            case ROTATION -> sampleRotation(time, pose.rotation(joint), pose.scratchRotation);
         }
     }
 
@@ -104,7 +104,7 @@ public record Track(int joint, Path path, float[] times, float[] values, Interpo
         }
     }
 
-    private void sampleRotation(float time, Quaternionf out) {
+    private void sampleRotation(float time, Quaternionf out, Quaternionf next) {
         int last = times.length - 1;
         if (time <= times[0] || last == 0) {
             readRotation(valueOffset(0), out);
@@ -120,10 +120,10 @@ public record Track(int joint, Path path, float[] times, float[] values, Interpo
         switch (interpolation) {
             case STEP -> readRotation(valueOffset(k), out);
             case LINEAR -> {
-                int a = valueOffset(k);
-                int b = valueOffset(k + 1);
-                slerpShortest(values[a], values[a + 1], values[a + 2], values[a + 3],
-                        values[b], values[b + 1], values[b + 2], values[b + 3], u, out);
+                // slerp do JOML: já vai pelo caminho mais curto e cai para lerp com os dois quase alinhados
+                readRotation(valueOffset(k), out);
+                readRotation(valueOffset(k + 1), next);
+                out.slerp(next, u).normalize();
             }
             case CUBICSPLINE -> out.set(hermite(k, 0, u, dt), hermite(k, 1, u, dt), hermite(k, 2, u, dt),
                     hermite(k, 3, u, dt)).normalize();
@@ -177,34 +177,5 @@ public record Track(int joint, Path path, float[] times, float[] values, Interpo
 
     private static float lerp(float a, float b, float u) {
         return a + (b - a) * u;
-    }
-
-    /**
-     * Slerp de a para b pelo caminho mais curto (q e -q são a mesma rotação:
-     * se o produto escalar é negativo, b é invertido). Perto de alinhados cai
-     * para nlerp, que é estável.
-     */
-    static void slerpShortest(float ax, float ay, float az, float aw, float bx, float by, float bz, float bw,
-            float u, Quaternionf out) {
-        float dot = ax * bx + ay * by + az * bz + aw * bw;
-        if (dot < 0f) {
-            dot = -dot;
-            bx = -bx;
-            by = -by;
-            bz = -bz;
-            bw = -bw;
-        }
-        float wa;
-        float wb;
-        if (dot > 0.9995f) {
-            wa = 1f - u;
-            wb = u;
-        } else {
-            float theta = (float) Math.acos(dot);
-            float sin = (float) Math.sin(theta);
-            wa = (float) Math.sin((1f - u) * theta) / sin;
-            wb = (float) Math.sin(u * theta) / sin;
-        }
-        out.set(wa * ax + wb * bx, wa * ay + wb * by, wa * az + wb * bz, wa * aw + wb * bw).normalize();
     }
 }

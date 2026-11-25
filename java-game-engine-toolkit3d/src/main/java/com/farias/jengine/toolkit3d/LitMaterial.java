@@ -29,6 +29,20 @@ public final class LitMaterial extends Material {
     private static final int SHADOW_MAP_UNIT = 1;
     private static final int EMISSION_MAP_UNIT = 2;
 
+    /**
+     * {@code material} como {@code LitMaterial}, para os {@code lit()} dos
+     * modelos.
+     *
+     * @param owner de quem é o material, para a mensagem de erro
+     * @throws IllegalStateException se o material é de outro tipo
+     */
+    static LitMaterial of(Material material, String owner) {
+        if (material instanceof LitMaterial lit) {
+            return lit;
+        }
+        throw new IllegalStateException("O material " + owner + " não é um LitMaterial: " + material.getClass().getName());
+    }
+
     LitMaterial(Shader shader, Texture texture) {
         super(shader);
         setTexture("uTexture", texture, TEXTURE_UNIT);

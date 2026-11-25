@@ -6,8 +6,17 @@
 - `RenderPassDescriptor.depthCompare(DepthCompare)` e `depthWrite(boolean)`: a comparação do teste de profundidade do
   passe (`LESS`, o padrão, `LESS_OR_EQUAL`, `GREATER`, `GREATER_OR_EQUAL`, `ALWAYS`) e se ele grava a profundidade
   (padrão: grava). Com `GREATER` e sem escrita, um passe desenha só o que os anteriores escondem (a silhueta de um
-  personagem atrás de uma parede). Aplicados no `OpenGLBackend` com `glDepthFunc` e `glDepthMask`; a máscara vale também
-  para o clear de profundidade do passe.
+  personagem atrás de uma parede; desligue também o `clearDepthBuffer`). Aplicados no `OpenGLBackend` com `glDepthFunc` e
+  `glDepthMask`; o clear de profundidade segue só o `clearDepthBuffer`, independente da escrita.
+- Animação esquelética 3D: módulo `animation` (`Skeleton`, `Pose`, `Track`, `AnimationClip`, `Poses`,
+  `Animator` com crossfade; IK `TwoBoneIk`, `FabrikIk`, `LookAtIk`), skinning na GPU (`MeshData`/`Mesh` com
+  juntas e pesos, `RenderCommand.jointPalette`), `SkinnedModel`, `SkinnedMaterials` e loader glTF 2.0
+  (`Models.loadGltf` → `ModelAsset`; JSON lido pelo Gson 2.15.0, nova dependência do `toolkit3d`). Demo
+  `animation.AnimationDemo`.
+- `Transform`: posição, rotação e escala com a matriz de modelo T·R·S, comum a `TexturedModel` e
+  `SkinnedModel` (`transform()`).
+- `Assets.texture(key, bytes)` (imagem em memória), `Assets.solidColor(r, g, b, a)` (textura 1×1 cacheada
+  pela cor) e `Assets.normalize(path)`.
 - `Input.getScrollY()`: rolagem vertical da roda do mouse no frame, implementada no `GlfwInput`.
 - `IsometricCamera.rotate(degrees)` e `yaw()`: a câmera orbita em volta do eixo Y do alvo;
   `pan`, `viewMatrix` e `directionToEye` acompanham o yaw.

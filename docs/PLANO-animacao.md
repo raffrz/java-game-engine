@@ -9,7 +9,7 @@ Base: branch `feature/procedural-city` (módulos `core`, `renderer`, `assets`, `
 | Tema | Decisão |
 |---|---|
 | Escopo de animação | **Esquelética 3D**: esqueleto, clips de keyframes por junta (T/R/S), skinning na GPU, crossfade. Sem animação de sprite 2D e sem tween de objetos nesta fase |
-| Formato | **glTF 2.0** (`.gltf` e `.glb`) com **loader próprio**, sem dependência nova (parser JSON mínimo interno) |
+| Formato | **glTF 2.0** (`.gltf` e `.glb`) com **loader próprio**; o JSON é lido pelo Gson (revisão do PR: o parser interno da primeira versão foi trocado) |
 | IK | **Two-bone analítico** (com pole), **FABRIK** para cadeias de N ossos e **look-at**; pós-processo sobre a pose animada, com peso |
 | Onde mora a matemática | Módulo Maven novo **`animation`**: só JOML, sem GL e sem `core`, testável sem contexto |
 | Onde mora o desenho | `renderer` ganha o mínimo genérico (atributos de skin, array de matrizes por comando); `toolkit3d` ganha shaders skinned, `SkinnedModel` e o loader glTF |
@@ -363,7 +363,7 @@ As classes internas ficam no próprio pacote do `toolkit3d`, package-private: um
 
 | Classe | Visibilidade | Papel |
 |---|---|---|
-| `Json` | package-private | Parser JSON mínimo (objeto, array, string com escapes, número, bool, null), erros com posição |
+| ~~`Json`~~ | removido | Era um parser JSON interno; substituído pelo Gson (estrito) dentro do `GltfReader` |
 | `GltfReader` | package-private | `.gltf` (buffers externos pelo `resolver` ou `data:` base64) e `.glb` (header + chunks JSON/BIN) → `GltfData` |
 | `GltfData` | package-private | `Skeleton`, `List<Primitive(MeshData, Image, baseColor)>`, `List<AnimationClip>`, avisos |
 | `ModelAsset` | público | Resultado carregado: meshes e texturas na GPU, `skeleton()`, `clips()`, `clip(name)`; `instance()` cria um `SkinnedModel` com materiais próprios |
@@ -458,7 +458,7 @@ Testes automáticos (`./mvnw test`):
   esticado na direção; pole muda o lado da flexão; `weight = 0` não altera a pose.
 - FABRIK: converge abaixo da tolerância; preserva comprimentos; alvo inalcançável → reta.
 - Look-at: respeita `maxAngle`.
-- glTF: parser JSON (escapes, números, aninhamento, erros com posição); accessors com stride e
+- glTF: JSON inválido rejeitado com o caminho do arquivo; accessors com stride e
   `normalized`; reordenação de juntas; `.gltf` e `.glb` produzem o mesmo `GltfData`.
 
 Manual:

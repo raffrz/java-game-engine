@@ -36,6 +36,7 @@ public final class TwoBoneIk {
     private final Vector3f axis = new Vector3f();
     private final Vector3f u = new Vector3f();
     private final Vector3f v = new Vector3f();
+    private final Vector3f side = new Vector3f();
     private final Quaternionf scratch = new Quaternionf();
 
     /**
@@ -123,9 +124,9 @@ public final class TwoBoneIk {
                 return;
             }
         }
-        // qualquer perpendicular à cadeia
-        ac.cross(Math.abs(ac.x) < 0.9f * ac.length() ? 1f : 0f, Math.abs(ac.x) < 0.9f * ac.length() ? 0f : 1f, 0f,
-                axis).normalize();
+        // qualquer perpendicular à cadeia: cruza com X, ou com Y se a cadeia for quase paralela a X
+        boolean alongX = Math.abs(ac.x) >= 0.9f * ac.length();
+        ac.cross(alongX ? 0f : 1f, alongX ? 1f : 0f, 0f, axis).normalize();
     }
 
     private void twistTowardPole(Pose pose, int root, int mid, Vector3fc pole, float weight) {
@@ -140,7 +141,7 @@ public final class TwoBoneIk {
             return;
         }
         float angle = IkJoints.angle(u, v);
-        if (u.cross(v, ba).dot(axis) < 0f) {
+        if (u.cross(v, side).dot(axis) < 0f) {
             angle = -angle;
         }
         joints.rotateInModelSpace(pose, root, axis, angle * weight, scratch);

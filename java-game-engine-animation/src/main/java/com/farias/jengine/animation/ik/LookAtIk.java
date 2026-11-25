@@ -22,7 +22,6 @@ public final class LookAtIk {
     private final Vector3f toTarget = new Vector3f();
     private final Quaternionf rotation = new Quaternionf();
     private final Quaternionf delta = new Quaternionf();
-    private final Quaternionf identity = new Quaternionf();
 
     /**
      * @param pose         a pose a corrigir (o espaço do modelo é
@@ -55,10 +54,7 @@ public final class LookAtIk {
         if (angle > maxAngle) {
             fraction *= maxAngle / angle;
         }
-        if (fraction < 1f) {
-            identity.identity().slerp(delta, fraction, delta);
-        }
-        joints.rotateInModelSpace(pose, joint, delta);
+        joints.rotateInModelSpace(pose, joint, joints.weighted(delta, fraction));
         pose.computeModelSpace();
     }
 }

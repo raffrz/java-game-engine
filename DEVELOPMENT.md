@@ -65,7 +65,7 @@ natives. Artefato e diretório são `java-game-engine-<módulo>`; o pacote é `c
 | `java-game-engine-assets` | `Assets` (resolução raiz → classpath, cache de texturas), `AssetsModule`, `TextureLoader` (STB, interno) | core, renderer |
 | `java-game-engine-toolkit2d` | `Toolkit2D` (fábrica de `Canvas` e `Ui`), `SpriteSheet`, `BitmapFont`, `SpriteRenderer`, `Toolkit2DModule` | core, renderer, assets |
 | `java-game-engine-animation` | Animação esquelética pura: `Skeleton`, `Pose`, `Track`, `Interpolation`, `AnimationClip`, `Poses`, `Animator`; IK em `animation.ik` (`TwoBoneIk`, `FabrikIk`, `LookAtIk`). Sem `Module`: só tipos de valor | JOML |
-| `java-game-engine-toolkit3d` | `Shapes`, `ShapeData`, `LitMaterials`, `LitMaterial`, `SkinnedMaterials`, `Models` (OBJ e glTF), `ModelAsset`, `TexturedModel`, `SkinnedModel`, `Shadows`, `ShadowMap`, `DirectionalLight`, `Camera`, `IsometricCamera`, `Projections`, `Ray`, `Picking`, `Shaders`, `Toolkit3DModule` | core, renderer, assets, animation |
+| `java-game-engine-toolkit3d` | `Shapes`, `ShapeData`, `LitMaterials`, `LitMaterial`, `SkinnedMaterials`, `Models` (OBJ e glTF), `ModelAsset`, `Transform`, `TexturedModel`, `SkinnedModel`, `Shadows`, `ShadowMap`, `DirectionalLight`, `Camera`, `IsometricCamera`, `Projections`, `Ray`, `Picking`, `Shaders`, `Toolkit3DModule` | core, renderer, assets, animation, Gson |
 | `java-game-engine-demos` | 7 exemplos + `Launcher` | todos os anteriores (+ natives, em runtime) |
 
 `toolkit2d` e `toolkit3d` não dependem um do outro; nenhum módulo da biblioteca depende de
@@ -87,7 +87,7 @@ Registrar o mesmo tipo duas vezes lança exceção (`EngineContext.registerServi
 `animation` não tem módulo nem serviço: nada nele depende de `Renderer`/`Assets` (regras 3 e
 9.5), então o jogo faz `new Animator(skeleton)`, `new TwoBoneIk()` etc. O que precisa de serviço
 (carregar glTF, malha e material com skin) sai do `Toolkit3DModule`. Justificativa completa em
-`PLANO-animacao.md`.
+`docs/PLANO-animacao.md`.
 
 ## Arquitetura
 
@@ -100,7 +100,9 @@ Registrar o mesmo tipo duas vezes lança exceção (`EngineContext.registerServi
 - Um frame é descrito por dados: `RenderPassDescriptor` (clear, depth test com comparação `DepthCompare` e escrita
   ligada ou não, cull, blend, depth attachment) + `RenderView` (viewport, view, projection) + `RenderCommand`s (mesh, material,
   model matrix). O `Renderer` executa na ordem de submissão e só reaplica material/uniforms quando
-  o material muda entre comandos consecutivos.
+  o material muda entre comandos consecutivos. O clear de profundidade segue só o `clearDepthBuffer`
+  (a máscara de escrita é ligada durante o clear e depois volta para a `depthWrite` do passe): um
+  passe que só lê a profundidade dos anteriores desliga as duas.
 - O renderer é **OpenGL-only, sem interface de backend** (decisão consciente, ver
   [Ideia futura](#ideia-futura-backend-de-render-como-módulo)). `OpenGLBackend` é um detalhe
   interno do `Renderer` (package-private) que cuida do estado de pass e do framebuffer de depth.
@@ -144,6 +146,10 @@ Registrar o mesmo tipo duas vezes lança exceção (`EngineContext.registerServi
   `Texture`). `Assets.open(path)` abre um `InputStream` com a mesma resolução. Falha lança
   `UncheckedIOException` com a raiz e o caminho. Limpar o cache não libera GPU (as texturas são
   do `Renderer`).
+- `Assets.texture(key, bytes)` decodifica uma imagem em memória (embutida num `.glb`) e
+  `Assets.solidColor(r, g, b, a)` cria a textura 1×1 de uma cor para materiais lisos; as duas
+  usam o mesmo cache. `Assets.normalize(path)` (pura) é a chave de cache, também usada por quem
+  cacheia outros assets por caminho (`Models.loadGltf`).
 
 ### `toolkit2d`
 
@@ -197,7 +203,8 @@ Registrar o mesmo tipo duas vezes lança exceção (`EngineContext.registerServi
 - `DirectionalLight` (volume ortográfico + matrizes de light-space): `covering(direção, centro,
   raio)` cria a luz de sombra a partir da esfera que deve ser coberta, derivando distância,
   extensão e planos near/far. Aceita luz a pino (troca o vetor "para cima" do `lookAt`).
-- `TexturedModel.getModelMatrix()` é a **única fonte** da matriz de modelo: o que desenha (o
+- `Transform` (posição, rotação, escala) é a **única fonte** da matriz de modelo, usada por
+  `TexturedModel` e `SkinnedModel` (`getModelMatrix()` delega para ela): o que desenha (o
   `RenderCommand`) e o que testa picking usam a mesma. Rotação em graus, ordem XYZ, sentido
   **positivo**. A matriz é T·R·S (escala antes de girar), então escala não uniforme não deforma o
   modelo girado; o `SpriteRenderer` segue a mesma ordem.
@@ -234,12 +241,15 @@ Registrar o mesmo tipo duas vezes lança exceção (`EngineContext.registerServi
   `LitMaterials` (o padrão) e por um jogo com shader próprio; `ModelAsset.instance(SkinnedMaterials)`
   cria cada parte com a cor base dela. A escolha é na instância, não no `loadGltf`, porque o asset é
   compartilhado (o mesmo arquivo pode ter visuais diferentes).
-- `SkinnedModel`: partes (mesh com skin + material) e esqueleto, TRS como `TexturedModel`;
-  `commands()` copia matriz e palette.
-- **glTF** (`Models.loadGltf` → `ModelAsset`): loader próprio (`Json`, `GltfReader`, `GltfData`,
+- `SkinnedModel`: partes (mesh com skin + material) e esqueleto, com o mesmo `Transform` do
+  `TexturedModel`; `commands()` e `ShadowMap.casters` copiam a matriz e compartilham uma cópia do
+  palette por `update` (o próximo `update` cria outra, então os comandos do frame continuam válidos).
+- **glTF** (`Models.loadGltf` → `ModelAsset`): loader próprio (`GltfReader`, `GltfData`,
   package-private), `.gltf` e `.glb`. Todo nó necessário da cena vira junta (nós intermediários
-  como o "Armature" funcionam; malhas sem skin ficam presas ao próprio nó), UV sem inversão.
-  Detalhes e o que não é suportado em `PLANO-animacao.md` (§7.4).
+  como o "Armature" funcionam; malhas sem skin ficam presas ao próprio nó), UV sem inversão. Vai
+  para os avisos (stderr) o que é ignorado: morph targets, canais `weights`, mais de 4 influências
+  por vértice (`JOINTS_1`) e uma junta com inversas de bind diferentes em duas skins (vale a primeira).
+  Detalhes e o que não é suportado em `docs/PLANO-animacao.md` (§7.4).
 
 ### `demos`
 
@@ -304,6 +314,10 @@ trabalho em `java-game-engine-demos/` (o `exec:exec` já faz isso).
   foram removidos (o do Linux estava em LWJGL 3.2.3, e o `renderer` dependia direto do de macOS).
   O POM raiz tem profiles ativados por SO/arquitetura que definem `lwjgl.natives`; só o `demos`
   declara os natives, como `runtime`. `renderer` e `core` dependem apenas das APIs.
+- Gson 2.15.0 (só no `toolkit3d`, para o JSON do glTF, modo estrito): a leitura do JSON não é
+  trabalho da engine; o `GltfReader` continua próprio porque converter para `Skeleton`/`Track`/
+  `MeshData` seria código da engine com qualquer biblioteca. Traz `error_prone_annotations`
+  (só anotações).
 - LWJGL 3.3.6, JOML 1.10.8 (há 3.4.3 e 1.10.9, não adotados), `maven.compiler.release=17`,
   encoding UTF-8. `lwjgl-assimp` e
   `lwjgl-openal` saíram: nada no código os usa.
@@ -379,7 +393,13 @@ Decisões:
   passe para OpenGL (`OpenGLBackend.depthFunction`) têm testes sem contexto GL.
 - Animação, fora do escopo da primeira versão: camadas com máscara e blend aditivo, root motion,
   eventos de animação, morph targets, limites angulares de junta no IK, palette em UBO/textura
-  (mais de 128 juntas), extensões glTF (Draco, `KHR_texture_transform`, PBR).
+  (mais de 128 juntas), extensões glTF (Draco, `KHR_texture_transform`, PBR), mais de 4 influências
+  por vértice.
+- IK: cada solver recalcula o espaço do modelo do esqueleto inteiro várias vezes por chamada (o
+  FABRIK, uma vez por junta da cadeia). Irrelevante com dezenas de juntas; com esqueletos grandes,
+  recalcular só a subárvore da cadeia.
+- `RenderCommand.jointPalette` é um dado por comando específico de skinning. Se surgir outro
+  (instancing, pesos de morph), generalizar para "uniforms por comando" em vez de mais um campo.
 
 **Modelos de xadrez:** se forem reexportados corretamente, reverter para `cullFace(true)` em
 `ChessRenderer` e tirar o `flipNormals` da chamada de `models.load` em

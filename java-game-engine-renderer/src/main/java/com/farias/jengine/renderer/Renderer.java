@@ -185,7 +185,7 @@ public final class Renderer {
             float[] jointPalette = command.jointPalette();
             if (jointPalette != null) {
                 currentShader.setMatrix4fArray(RenderCommand.JOINTS_UNIFORM, jointPalette,
-                        jointPalette.length / 16);
+                        jointPalette.length / RenderCommand.FLOATS_PER_JOINT);
             }
 
             command.mesh().draw();
