@@ -1,5 +1,10 @@
 package com.farias.jengine.renderer;
 
+/**
+ * O estado de um passe: o que limpar, o teste de profundidade (ligado, a comparação e se grava), descarte de faces,
+ * blend e o alvo de profundidade. Os padrões são os de uma cena comum: limpa cor e profundidade, testa com
+ * {@link DepthCompare#LESS} e grava a profundidade, descarta as faces de trás, sem blend.
+ */
 public final class RenderPassDescriptor {
 
     private final String name;
@@ -10,6 +15,8 @@ public final class RenderPassDescriptor {
     private boolean clearDepthBuffer = true;
 
     private boolean depthTest = true;
+    private DepthCompare depthCompare = DepthCompare.LESS;
+    private boolean depthWrite = true;
     private boolean cullFace = true;
     private boolean blend = false;
     private Texture depthAttachment;
@@ -30,6 +37,24 @@ public final class RenderPassDescriptor {
 
     public RenderPassDescriptor depthTest(boolean value) {
         this.depthTest = value;
+        return this;
+    }
+
+    /** Como o teste de profundidade compara (vale só com o teste ligado). */
+    public RenderPassDescriptor depthCompare(DepthCompare value) {
+        if (value == null) {
+            throw new IllegalArgumentException("Depth compare must not be null");
+        }
+        this.depthCompare = value;
+        return this;
+    }
+
+    /**
+     * Se os fragmentos que passam gravam a profundidade. Desligada, o passe só lê a profundidade dos anteriores (um
+     * overlay que não deve esconder nada). Com a escrita desligada, o clear de profundidade do passe não acontece.
+     */
+    public RenderPassDescriptor depthWrite(boolean value) {
+        this.depthWrite = value;
         return this;
     }
 
@@ -83,6 +108,14 @@ public final class RenderPassDescriptor {
 
     public boolean depthTest() {
         return depthTest;
+    }
+
+    public DepthCompare depthCompare() {
+        return depthCompare;
+    }
+
+    public boolean depthWrite() {
+        return depthWrite;
     }
 
     public boolean cullFace() {

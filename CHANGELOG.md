@@ -3,6 +3,11 @@
 ## [Não lançado]
 
 ### Adicionado
+- `RenderPassDescriptor.depthCompare(DepthCompare)` e `depthWrite(boolean)`: a comparação do teste de profundidade do
+  passe (`LESS`, o padrão, `LESS_OR_EQUAL`, `GREATER`, `GREATER_OR_EQUAL`, `ALWAYS`) e se ele grava a profundidade
+  (padrão: grava). Com `GREATER` e sem escrita, um passe desenha só o que os anteriores escondem (a silhueta de um
+  personagem atrás de uma parede). Aplicados no `OpenGLBackend` com `glDepthFunc` e `glDepthMask`; a máscara vale também
+  para o clear de profundidade do passe.
 - `Input.getScrollY()`: rolagem vertical da roda do mouse no frame, implementada no `GlfwInput`.
 - `IsometricCamera.rotate(degrees)` e `yaw()`: a câmera orbita em volta do eixo Y do alvo;
   `pan`, `viewMatrix` e `directionToEye` acompanham o yaw.

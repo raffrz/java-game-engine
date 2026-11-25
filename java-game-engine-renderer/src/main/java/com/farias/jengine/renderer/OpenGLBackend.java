@@ -20,9 +20,12 @@ final class OpenGLBackend {
 
         if (descriptor.depthTest()) {
             glEnable(GL_DEPTH_TEST);
+            glDepthFunc(depthFunction(descriptor.depthCompare()));
         } else {
             glDisable(GL_DEPTH_TEST);
         }
+        // a máscara vale também para o clear: com a escrita desligada, a profundidade dos passes anteriores fica
+        glDepthMask(descriptor.depthWrite());
 
         if (descriptor.cullFace()) {
             glEnable(GL_CULL_FACE);
@@ -57,6 +60,17 @@ final class OpenGLBackend {
         }
 
         glClear(clearMask);
+    }
+
+    /** A função de profundidade do OpenGL para a comparação do passe. */
+    static int depthFunction(DepthCompare compare) {
+        return switch (compare) {
+            case LESS -> GL_LESS;
+            case LESS_OR_EQUAL -> GL_LEQUAL;
+            case GREATER -> GL_GREATER;
+            case GREATER_OR_EQUAL -> GL_GEQUAL;
+            case ALWAYS -> GL_ALWAYS;
+        };
     }
 
     void endPass() {
