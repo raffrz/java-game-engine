@@ -97,8 +97,8 @@ Registrar o mesmo tipo duas vezes lança exceção (`EngineContext.registerServi
   passes. `createPass` cria **e enfileira** o passe no frame corrente; `beginFrame` limpa a fila,
   então os passes são criados a cada frame. Não existe `submitPass`. Um passe sem comandos ainda
   executa (o clear dele faz parte do frame).
-- Um frame é descrito por dados: `RenderPassDescriptor` (clear, depth, cull, blend, depth
-  attachment) + `RenderView` (viewport, view, projection) + `RenderCommand`s (mesh, material,
+- Um frame é descrito por dados: `RenderPassDescriptor` (clear, depth test com comparação `DepthCompare` e escrita
+  ligada ou não, cull, blend, depth attachment) + `RenderView` (viewport, view, projection) + `RenderCommand`s (mesh, material,
   model matrix). O `Renderer` executa na ordem de submissão e só reaplica material/uniforms quando
   o material muda entre comandos consecutivos.
 - O renderer é **OpenGL-only, sem interface de backend** (decisão consciente, ver
@@ -375,7 +375,8 @@ Decisões:
   (sprites quadrados, buffer já na posição 0), mas a comparação não foi refeita.
 - Testes: o JUnit 5 entrou com a animação (`animation`, validação de skin no `renderer`, JSON e
   glTF no `toolkit3d`; `./mvnw test`). `Engine`, `EngineContext`, `Material` e `RenderPass`
-  continuam sem testes, embora sejam testáveis sem contexto GL.
+  continuam sem testes, embora sejam testáveis sem contexto GL. `RenderPassDescriptor` e a tradução do estado de
+  passe para OpenGL (`OpenGLBackend.depthFunction`) têm testes sem contexto GL.
 - Animação, fora do escopo da primeira versão: camadas com máscara e blend aditivo, root motion,
   eventos de animação, morph targets, limites angulares de junta no IK, palette em UBO/textura
   (mais de 128 juntas), extensões glTF (Draco, `KHR_texture_transform`, PBR).
